@@ -78,13 +78,29 @@ Nie uruchamiaj na hoście drugiego proxy (nginx/Apache) na portach 80/443.
 Przygotuj je **lokalnie** (QGIS → OSGeo4W Shell), zanim trafią na serwer:
 
 ```bash
-# kolorowe skany: JPEG w YCbCr, 10–20× mniejsze
+# kolorowe skany bez przezroczystości: JPEG w YCbCr, 10–20× mniejsze
 gdal_translate -of COG -co COMPRESS=JPEG -co QUALITY=85 -co OVERVIEWS=AUTO skan.tif skan_cog.tif
 # czarno-białe / z paletą: bezstratnie
 gdal_translate -of COG -co COMPRESS=DEFLATE -co PREDICTOR=2 -co OVERVIEWS=AUTO skan.tif skan_cog.tif
-# po georeferencji z białą ramką: przezroczystość zamiast ramki
-gdalwarp -dstalpha -co COMPRESS=DEFLATE skan_geo.tif skan_alpha.tif
 ```
+
+**Przezroczystość tylko przez kanał alfa (RGBA), nie przez maskę.** JPEG zamienia alfę na maskę
+GDAL, a QGIS maski nie respektuje: wokół obróconego arkusza rysuje czarne kliny. Dla rastrów
+z przezroczystym tłem używaj `COMPRESS=WEBP` (stratne, zachowuje alfę, rozmiar jak JPEG), a w QGIS
+ustaw w warstwie **Właściwości → Przezroczystość → Pasmo przezroczystości: Pasmo 4**.
+
+**Messtischblatt (TK25): przycięcie do ramki** — `scripts/rasters/messtischblatt.py` liczy ramkę
+z numeru arkusza (pierwsze 4 cyfry nazwy pliku) i wycina arkusz z przezroczystością poza nią:
+
+```bat
+python scripts\rasters\messtischblatt.py oryginaly\*.tif rastry\ --margin 4
+rem gdy georeferencja skanu jest zła: piksele narożników ramki NW NE SW SE w rastrze wejściowym
+python scripts\rasters\messtischblatt.py oryginaly\5364_*.tif rastry\ --margin 4 --corners 400,472 3171,461 406,3089 3180,3072
+```
+
+`--check` zapisuje samą ramkę jako GeoJSON. Wczytaj ją w QGIS na tle skanu: jeśli nie pokrywa się
+z ramką na mapie, georeferencja jest zła i trzeba użyć `--corners`. `--margin 4` (ok. 1 piksel)
+usuwa szparę między sąsiednimi arkuszami.
 
 Wiele arkuszy → wtyczka **Fia** → „Zbuduj VRT + piramidy”. Na serwer:
 
@@ -100,6 +116,28 @@ działają wtedy po obu stronach bez zmian. Kopia zapasowa pomija pliki rastrowe
 ```powershell
 scp -r E:\gis\archiwalne\sokolec\rastry sophia:/opt/sophia/data/projects/sokolec/
 ```
+
+### Kafle i cache
+
+WebUI pobiera rastry (arkusze, mozaiki, zdalne WMTS) jako kafle WMS 512 px na stałej siatce,
+a nginx (`tilecache`, konfiguracja w `proxy/tilecache.conf`) zapisuje je w wolumenie `tiles`
+(do 5 GB). Każdy kafel jest renderowany przez QGIS Server tylko raz, a autoryzacja w Caddy działa
+nadal dla każdego żądania. Format dobierany jest automatycznie: zdalne WMS/WMTS w JPEG idą jako
+JPEG, pozostałe rastry jako 8-bitowy PNG z przezroczystością. Wektory nie są kaflowane ani
+cache'owane, bo zmieniają się przy edycji.
+
+Ponowna publikacja projektu z Fii daje automatycznie nowe kafle. **Po podmianie samych plików
+rastrowych** (bez publikacji) trzeba zmienić wersję projektu i przeładować QGIS Server:
+
+```bash
+cd /opt/sophia
+sudo touch data/projects/<slug>/<slug>.qgz && docker compose restart qgis
+# albo wyczyść cały cache kafli:
+docker compose exec tilecache sh -c 'rm -rf /var/cache/tiles/*'
+```
+
+Pliki rastrowe podmieniaj przez wgranie pod tymczasową nazwą i `mv`, nie nadpisuj ich na miejscu:
+QGIS Server trzyma je otwarte.
 
 ## 5. QGIS Desktop ↔ baza na serwerze
 
@@ -133,8 +171,9 @@ w profilu `FCGID_MAX_PROCESSES` do 4 i limit pamięci `qgis` do 3,5 GB.
 | PostGIS (ok. 1000 obiektów) | 0,3–0,5 GB | 1 GB |
 | QGIS Server (3 procesy, GDAL cache 256 MB) | 1,5–2 GB | 2,5 GB |
 | API (2 procesy) | 0,2 GB | 512 MB |
-| Caddy + nginx | 0,1 GB | 320 MB |
+| Caddy + nginx (WebUI, cache kafli) | 0,15 GB | 450 MB |
 
-Reszta RAM to cache plików systemu — z niego korzystają rastry czytane wielokrotnie. Wąskim gardłem
-będzie dysk (liczba rastrów) i CPU przy renderowaniu rastrów; gdy zacznie brakować, następny krok to
-cache kafli WMTS (rastry historyczne się nie zmieniają), a dopiero potem większy VPS.
+Reszta RAM to cache plików systemu — z niego korzystają rastry czytane wielokrotnie. Kafle rastrów
+są cache'owane na dysku (do 5 GB), więc CPU pracuje głównie przy pierwszym obejrzeniu danego
+fragmentu. Kolejny krok przy dużym ruchu to wstępne wygenerowanie kafli (seed), a dopiero potem
+większy VPS.

@@ -118,3 +118,11 @@ def test_load_project(project_path: Path):
     kinds = {c.name: c.kind for c in p.tree.children}
     assert kinds == {"Ewidencja": "group", "Ortofotomapa 2024": "raster_group"}
     assert [(r.layout, r.layer_id) for r in p.reports] == [("Karta działki", "dzialki_1")]
+
+
+def test_raster_tile_format():
+    from app.qgsproject import TILE_JPEG, TILE_PNG8, raster_tile_format
+
+    assert raster_tile_format("wms", "crs=EPSG%3A2180&format=image%2Fjpeg&layers=ORTO") == TILE_JPEG
+    assert raster_tile_format("wms", "format=image/png&layers=dzialki") == TILE_PNG8
+    assert raster_tile_format("gdal", "./rastry/arkusz.tif") == TILE_PNG8

@@ -55,6 +55,12 @@ services:
         limits:
           memory: 512m
 
+  tilecache:
+    deploy:
+      resources:
+        limits:
+          memory: 128m
+
   web:
     deploy:
       resources:

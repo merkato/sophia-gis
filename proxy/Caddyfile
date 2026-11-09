@@ -33,8 +33,8 @@ import /etc/caddy/sites/*.caddy
 			uri query MAP {http.request.header.X-Portal-Map}
 			uri query -PROJECT
 			rewrite * /
-			# obraz camptocamp uruchomiony jako root słucha na porcie 80 (nie 8080)
-			reverse_proxy qgis:80
+			# cache kafli (proxy/tilecache.conf) przed QGIS Server
+			reverse_proxy tilecache:80
 		}
 	}
 

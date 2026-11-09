@@ -4,7 +4,12 @@ import View from "ol/View";
 import ImageLayer from "ol/layer/Image";
 import TileLayer from "ol/layer/Tile";
 import VectorLayer from "ol/layer/Vector";
+import LayerGroup from "ol/layer/Group";
 import ImageWMS from "ol/source/ImageWMS";
+import TileWMS from "ol/source/TileWMS";
+import TileGrid from "ol/tilegrid/TileGrid";
+import Collection from "ol/Collection";
+import { get as getProjection } from "ol/proj";
 import OSM from "ol/source/OSM";
 import VectorSource from "ol/source/Vector";
 import GeoJSON from "ol/format/GeoJSON";
@@ -17,7 +22,33 @@ import type { EventsKey } from "ol/events";
 import type Feature from "ol/Feature";
 import type { Geometry } from "ol/geom";
 import { api } from "../api";
-import type { GeoJSONFeature, ProjectConfig } from "../types";
+import type { GeoJSONFeature, ProjectConfig, TreeNode } from "../types";
+
+// --- Kafle rastrów
+// Rastry (skany, mozaiki, zdalne WMTS) idą jako kafle WMS na stałej siatce: te same adresy
+// przy każdym oglądaniu, więc serwer (nginx przed QGIS) i przeglądarka mogą je cache'ować.
+// Wektory zostają jednym obrazem WMS bez cache — zmieniają się przy edycji.
+const TILE_SIZE = 512;
+const PNG8 = "image/png; mode=8bit";
+
+/** Siatka niezależna od zasięgu projektu: początek w (0,0), rozdzielczości co 2x. */
+function tileGridFor(crs: string): TileGrid {
+  const top = getProjection(crs)?.getUnits() === "degrees" ? 360 / TILE_SIZE : 4096; // m/px na z=0
+  const resolutions = Array.from({ length: 18 }, (_, z) => top / 2 ** z);
+  return new TileGrid({ origin: [0, 0], resolutions, tileSize: TILE_SIZE });
+}
+
+/** Nazwa WMS -> format kafli dla warstw rastrowych i mozaik (pozostałe = wektory). */
+function tileFormats(config: ProjectConfig): Map<string, string> {
+  const out = new Map<string, string>();
+  for (const l of Object.values(config.layers)) if (l.tile_format) out.set(l.wms_name, l.tile_format);
+  const walk = (n: TreeNode) => {
+    if (n.kind === "raster_group") out.set(n.name, PNG8);
+    n.children.forEach(walk);
+  };
+  walk(config.tree);
+  return out;
+}
 
 export type Tool = "identify" | "select" | "draw" | "modify";
 
@@ -46,6 +77,9 @@ export function MapView(props: Props) {
   const { config, wmsLayers, editLayerId, tool, reloadToken, mapRef } = props;
   const divRef = useRef<HTMLDivElement>(null);
   const wmsRef = useRef<ImageWMS | null>(null);
+  const wmsLayerRef = useRef<ImageLayer<ImageWMS> | null>(null);
+  const rasterGroupRef = useRef<LayerGroup | null>(null);
+  const tileLayersRef = useRef(new Map<string, TileLayer<TileWMS>>());
   const editSourceRef = useRef(new VectorSource<Feature<Geometry>>());
   const cbRef = useRef(props);
   cbRef.current = props;
@@ -61,15 +95,26 @@ export function MapView(props: Props) {
       serverType: "qgis",
     });
     wmsRef.current = wms;
+    const wmsLayer = new ImageLayer({ source: wms, visible: false });
+    wmsLayerRef.current = wmsLayer;
+    const rasterGroup = new LayerGroup();
+    rasterGroupRef.current = rasterGroup;
+    tileLayersRef.current = new Map();
+    const tileGrid = tileGridFor(crs);
     const map = new OlMap({
       target: divRef.current!,
       controls: defaultControls().extend([new ScaleLine()]),
       layers: [
         new TileLayer({ source: new OSM(), properties: { name: "basemap" } }),
-        new ImageLayer({ source: wms }),
+        rasterGroup,
+        wmsLayer,
         new VectorLayer({ source: editSourceRef.current, style: editStyle }),
       ],
-      view: new View({ projection: crs, center: [500000, 400000], zoom: 6 }),
+      // Poziomy powiększenia = rozdzielczości siatki kafli: kafle wyświetlane 1:1, ostre.
+      view: new View({
+        projection: crs, center: [500000, 400000], zoom: 6,
+        resolutions: tileGrid.getResolutions(), constrainResolution: true,
+      }),
     });
     if (config.extent) map.getView().fit(config.extent, { padding: [20, 20, 20, 20] });
     mapRef.current = map;
@@ -77,14 +122,42 @@ export function MapView(props: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config.slug]);
 
-  // --- widoczne warstwy WMS
+  // --- widoczne warstwy: rastry jako kafle (każdy osobno), wektory jednym obrazem WMS na wierzchu
   useEffect(() => {
     const wms = wmsRef.current;
-    if (!wms) return;
-    const layer = mapRef.current?.getLayers().item(1);
-    layer?.setVisible(wmsLayers.length > 0);
-    wms.updateParams({ LAYERS: wmsLayers.join(","), _t: reloadToken });
-  }, [wmsLayers, reloadToken, mapRef]);
+    const group = rasterGroupRef.current;
+    if (!wms || !group) return;
+    const formats = tileFormats(config);
+    const tileGrid = tileGridFor(crs);
+    const tiled: TileLayer<TileWMS>[] = [];
+    const vectors: string[] = [];
+    for (const name of wmsLayers) {
+      const format = formats.get(name);
+      if (!format) { vectors.push(name); continue; }
+      const key = `${name}@${config.version}`;
+      let layer = tileLayersRef.current.get(key);
+      if (!layer) {
+        layer = new TileLayer({
+          preload: 1,
+          source: new TileWMS({
+            url: "/ows",
+            params: {
+              PROJECT: config.slug, VERSION: "1.1.1", LAYERS: name, STYLES: "", FORMAT: format,
+              TRANSPARENT: format === "image/jpeg" ? "false" : "true",
+              TILED: "true", V: config.version,     // TILED=true => cache nginx; V => nowa wersja projektu
+            },
+            tileGrid, serverType: "qgis", hidpi: false, transition: 0,
+          }),
+        });
+        tileLayersRef.current.set(key, layer);
+      }
+      tiled.push(layer);
+    }
+    group.setLayers(new Collection(tiled));
+    wmsLayerRef.current?.setVisible(vectors.length > 0);
+    wms.updateParams({ LAYERS: vectors.join(","), _t: reloadToken });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wmsLayers, reloadToken, config.slug, config.version]);
 
   // --- obiekty warstwy edycyjnej (ładowane z API dla bieżącego widoku)
   useEffect(() => {

@@ -43,6 +43,15 @@ services:
         condition: service_healthy
     # BRAK portów publicznych — dostęp wyłącznie przez proxy z autoryzacją w API.
 
+  # Cache kafli rastrów (proxy/tilecache.conf): Caddy -> tilecache -> qgis
+  tilecache:
+    image: nginx:1.27-alpine
+    restart: unless-stopped
+    volumes:
+      - ./proxy/tilecache.conf:/etc/nginx/conf.d/default.conf:ro
+      - tiles:/var/cache/tiles
+    depends_on: [qgis]
+
   api:
     build: ./api
     restart: unless-stopped
@@ -82,7 +91,7 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"   # usługi uruchomione bezpośrednio na hoście
     networks: [default, edge]
-    depends_on: [api, web, qgis]
+    depends_on: [api, web, tilecache]
 
 networks:
   # Wspólna sieć dla innych projektów Compose na tym serwerze (dołączają jako external: true)
@@ -94,3 +103,4 @@ volumes:
   attachments:
   caddy_data:
   caddy_config:
+  tiles:

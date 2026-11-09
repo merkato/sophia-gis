@@ -60,6 +60,7 @@ async def project_config(slug: str, user: CurrentUser | None = Depends(optional_
             "name": lyr.name,
             "wms_name": lyr.wms_name,
             "type": lyr.type,
+            "tile_format": lyr.tile_format,
             "geometry_type": lyr.geometry_type,
             "crs": lyr.crs,
             "popup": lyr.popup,
@@ -75,6 +76,8 @@ async def project_config(slug: str, user: CurrentUser | None = Depends(optional_
         "title": ctx.title,
         "role": ctx.role,
         "crs": p.crs,
+        # zmienia się przy każdej publikacji -> nowe adresy kafli (cache serwera i przeglądarki)
+        "version": int(p.mtime),
         "extent": p.extent,
         "options": p.options,
         "tree": _filter_tree(p.tree, visible),

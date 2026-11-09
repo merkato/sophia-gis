@@ -60,10 +60,25 @@ class LayerDef:
     attachments: bool = False
     popup: bool = True
     hidden: bool = False
+    tile_format: str | None = None      # rastry: format kafli w WebUI (None = wektor, bez kafli)
 
     @property
     def wms_name(self) -> str:
         return self.short_name or self.name
+
+
+# Kafle rastrów w WebUI. WebP w obrazie camptocamp zwraca pusty plik, więc:
+# zdalne WMS/WMTS podawane jako JPEG (ortofoto, mapy topo) -> JPEG (4-5x mniejsze niż PNG),
+# pozostałe rastry (skany z przezroczystym tłem po przycięciu) -> 8-bitowy PNG z przezroczystością.
+TILE_JPEG = "image/jpeg"
+TILE_PNG8 = "image/png; mode=8bit"
+
+
+def raster_tile_format(provider: str, datasource: str) -> str:
+    ds = datasource.lower()
+    if provider == "wms" and ("format=image/jpeg" in ds or "format=image%2fjpeg" in ds):
+        return TILE_JPEG
+    return TILE_PNG8
 
 
 @dataclass
@@ -269,6 +284,8 @@ def load_project(path: Path) -> Project:
             geometry_type=_geometry_kind(ml) if ml.get("type") == "vector" else None,
             display_expression=ml.findtext("previewExpression") or None,
         )
+        if lyr.type == "raster":
+            lyr.tile_format = raster_tile_format(provider, ml.findtext("datasource") or "")
         if lyr.type == "vector":
             lyr.fields = _parse_fields(ml)
             if provider == "postgres":

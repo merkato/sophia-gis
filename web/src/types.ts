@@ -35,6 +35,7 @@ export interface LayerInfo {
   name: string;
   wms_name: string;
   type: "vector" | "raster";
+  tile_format: string | null;        // rastry: kafle WMS w tym formacie; wektory: null (bez kafli)
   geometry_type: "Point" | "Line" | "Polygon" | null;
   crs: string | null;
   popup: boolean;
@@ -75,6 +76,7 @@ export interface ProjectConfig {
   title: string;
   role: string | null;
   crs: string;
+  version: number;                   // zmienia się przy publikacji projektu (adresy kafli)
   extent: [number, number, number, number] | null;
   options: Record<string, unknown>;
   tree: TreeNode;
