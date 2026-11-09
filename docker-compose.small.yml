@@ -1,0 +1,68 @@
+# Profil dla małego VPS (np. OVH VPS-1: 4 vCore, 8 GB RAM).
+# Użycie:
+#   docker compose -f docker-compose.yml -f docker-compose.small.yml up -d --build
+# albo w .env:  COMPOSE_FILE=docker-compose.yml:docker-compose.small.yml
+#
+# Budżet RAM (limity twarde, suma ok. 4,5 GB) — reszta zostaje na cache plików systemu,
+# z którego korzystają rastry (GeoTIFF/VRT czytane wielokrotnie).
+
+services:
+  db:
+    command:
+      - postgres
+      - -c
+      - shared_buffers=256MB
+      - -c
+      - effective_cache_size=1GB
+      - -c
+      - work_mem=8MB
+      - -c
+      - maintenance_work_mem=64MB
+      - -c
+      - max_connections=50
+      - -c
+      - random_page_cost=1.1          # dysk SSD/NVMe
+    deploy:
+      resources:
+        limits:
+          memory: 1g
+    shm_size: 256mb
+
+  qgis:
+    environment:
+      # Apache mod_fcgid w obrazie camptocamp: liczba procesów QGIS Server.
+      # Każdy proces trzyma wczytane projekty i własny cache GDAL.
+      FCGID_MIN_PROCESSES: 1
+      FCGID_MAX_PROCESSES: 3
+      FCGID_MAX_REQUESTS_PER_PROCESS: 2000   # okresowy restart procesu = brak wycieków pamięci
+      FCGID_IO_TIMEOUT: 120
+      QGIS_SERVER_MAX_THREADS: 2
+      GDAL_CACHEMAX: 256                     # MB na proces
+      GDAL_DISABLE_READDIR_ON_OPEN: EMPTY_DIR
+      VSI_CACHE: "TRUE"
+      VSI_CACHE_SIZE: 50000000
+    deploy:
+      resources:
+        limits:
+          memory: 2.5g
+
+  api:
+    # 2 procesy uvicorn wystarczą: API głównie czeka na bazę.
+    command: ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "2",
+              "--proxy-headers", "--forwarded-allow-ips", "*"]
+    deploy:
+      resources:
+        limits:
+          memory: 512m
+
+  web:
+    deploy:
+      resources:
+        limits:
+          memory: 64m
+
+  proxy:
+    deploy:
+      resources:
+        limits:
+          memory: 256m

@@ -1,0 +1,43 @@
+{
+	email {$ACME_EMAIL}
+}
+
+{$SITE_ADDRESS} {
+	encode zstd gzip
+
+	# --- API ---
+	handle /api/* {
+		request_body {
+			max_size 100MB
+		}
+		reverse_proxy api:8000
+	}
+
+	# --- QGIS Server (WMS/WMTS/WFS/GetPrint) ---
+	# Każde żądanie przechodzi przez forward_auth: API sprawdza token, projekt (MAP)
+	# i warstwy (LAYERS/QUERY_LAYERS/TYPENAME) względem uprawnień grupy użytkownika,
+	# a następnie podaje ścieżkę pliku projektu (klient wysyła tylko PROJECT=<slug>,
+	# parametr MAP od klienta jest zawsze nadpisywany).
+	handle /ows {
+		forward_auth api:8000 {
+			uri /api/ows/authorize?{query}
+			copy_headers X-Portal-User X-Portal-Groups X-Portal-Map
+		}
+		uri query MAP {http.request.header.X-Portal-Map}
+		uri query -PROJECT
+		rewrite * /
+		reverse_proxy qgis:8080
+	}
+
+	# --- WebUI (SPA) ---
+	handle {
+		reverse_proxy web:80
+	}
+
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+}

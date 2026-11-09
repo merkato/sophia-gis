@@ -1,0 +1,87 @@
+# Sophia — pełny stos: PostGIS + QGIS Server + API + WebUI + proxy SSL (Caddy)
+# Uruchomienie:  cp .env.example .env  &&  docker compose up -d --build
+
+name: sophia
+
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB}
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      retries: 10
+    # Port wystawiony tylko na localhost — do podłączenia QGIS Desktop przez tunel / lokalnie.
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+
+  qgis:
+    image: ${QGIS_SERVER_IMAGE:-camptocamp/qgis-server:4.2}
+    restart: unless-stopped
+    environment:
+      PGSERVICEFILE: /etc/sophia/pg_service.conf
+      QGIS_SERVER_LOG_LEVEL: 1
+      QGIS_SERVER_PARALLEL_RENDERING: "true"
+      QGIS_SERVER_IGNORE_BAD_LAYERS: "true"
+      QGIS_SERVER_TRUST_LAYER_METADATA: "true"
+      QGIS_PLUGINPATH: /var/www/plugins
+      MAX_CACHE_LAYERS: 500
+    volumes:
+      - ./data/projects:/projects:ro
+      - ./data/rasters:/rasters:ro
+      - ./config/pg_service.conf:/etc/sophia/pg_service.conf:ro
+      - ./qgis-server-plugins:/var/www/plugins:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    # BRAK portów publicznych — dostęp wyłącznie przez proxy z autoryzacją w API.
+
+  api:
+    build: ./api
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      PGSERVICEFILE: /etc/sophia/pg_service.conf
+      PROJECTS_DIR: /projects
+      ATTACHMENTS_DIR: /attachments
+      QGIS_SERVER_URL: http://qgis:8080/
+    volumes:
+      - ./data/projects:/projects        # rw: publikacja projektów z wtyczki QGIS
+      - attachments:/attachments
+      - ./config/pg_service.conf:/etc/sophia/pg_service.conf:ro
+    depends_on:
+      db:
+        condition: service_healthy
+
+  web:
+    build: ./web
+    restart: unless-stopped
+
+  proxy:
+    image: caddy:2.8
+    restart: unless-stopped
+    environment:
+      SITE_ADDRESS: ${SITE_ADDRESS}
+      ACME_EMAIL: ${ACME_EMAIL}
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./proxy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on: [api, web, qgis]
+
+volumes:
+  pgdata:
+  attachments:
+  caddy_data:
+  caddy_config:

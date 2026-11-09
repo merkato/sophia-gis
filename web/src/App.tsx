@@ -1,0 +1,212 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type OlMap from "ol/Map";
+import { api, ApiError } from "./api";
+import { ensureProjection } from "./projections";
+import type { GeoJSONFeature, ProjectConfig, ProjectSummary, TreeNode, User } from "./types";
+import { MapView, type Tool } from "./components/MapView";
+import { LayerTree, initialVisibility, nodeKey, visibleWmsNames } from "./components/LayerTree";
+import { FeaturePanel } from "./components/FeaturePanel";
+
+interface Selection {
+  layerId: string;
+  feature: GeoJSONFeature;
+  isNew: boolean;
+}
+
+function LoginForm({ onLogin }: { onLogin: () => void }) {
+  const [login, setLogin] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  return (
+    <form className="login" onSubmit={async (e) => {
+      e.preventDefault();
+      try { await api.login(login, password); onLogin(); } catch (err) { setError((err as Error).message); }
+    }}>
+      <h2>Logowanie</h2>
+      {error && <div className="error">{error}</div>}
+      <input placeholder="Login" value={login} onChange={(e) => setLogin(e.target.value)} autoFocus />
+      <input placeholder="Hasło" type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+      <button className="primary" type="submit">Zaloguj</button>
+    </form>
+  );
+}
+
+export default function App() {
+  const [user, setUser] = useState<User | null>(null);
+  const [projects, setProjects] = useState<ProjectSummary[]>([]);
+  const [slug, setSlug] = useState<string | null>(() => new URLSearchParams(location.search).get("p"));
+  const [config, setConfig] = useState<ProjectConfig | null>(null);
+  const [visible, setVisible] = useState<Set<string>>(new Set());
+  const [editLayerId, setEditLayerId] = useState<string | null>(null);
+  const [tool, setTool] = useState<Tool>("identify");
+  const [selection, setSelection] = useState<Selection | null>(null);
+  const [reloadToken, setReloadToken] = useState(0);
+  const [showLogin, setShowLogin] = useState(false);
+  const [message, setMessage] = useState<string | null>(null);
+  const mapRef = useRef<OlMap | null>(null);
+
+  const refreshSession = useCallback(async () => {
+    setUser(await api.me().catch(() => null));
+    const list = await api.projects().catch(() => []);
+    setProjects(list);
+    setSlug((s) => (s && list.some((p) => p.slug === s) ? s : list[0]?.slug ?? null));
+  }, []);
+
+  useEffect(() => { refreshSession(); }, [refreshSession]);
+
+  useEffect(() => {
+    if (!slug) { setConfig(null); return; }
+    history.replaceState(null, "", `?p=${encodeURIComponent(slug)}`);
+    setSelection(null);
+    setEditLayerId(null);
+    setTool("identify");
+    api.project(slug)
+      .then(async (cfg) => {
+        await ensureProjection(cfg.crs);
+        setConfig(cfg);
+        setVisible(initialVisibility(cfg.tree));
+      })
+      .catch((e) => {
+        setConfig(null);
+        if (e instanceof ApiError && e.status === 401) setShowLogin(true);
+        else setMessage(e.message);
+      });
+  }, [slug, user?.id]);
+
+  const wmsLayers = useMemo(
+    () => (config ? visibleWmsNames(config.tree, visible, (id) => config.layers[id]?.wms_name) : []),
+    [config, visible]);
+
+  const editableIds = useMemo(
+    () => new Set(Object.values(config?.layers ?? {}).filter((l) => l.perms.insert || l.perms.update || l.perms.delete).map((l) => l.id)),
+    [config]);
+
+  const toggle = (node: TreeNode, parent: TreeNode | null) => {
+    setVisible((prev) => {
+      const next = new Set(prev);
+      const key = nodeKey(node);
+      if (parent?.mutually_exclusive) parent.children.forEach((c) => next.delete(nodeKey(c)));
+      if (prev.has(key) && !parent?.mutually_exclusive) next.delete(key); else next.add(key);
+      return next;
+    });
+  };
+
+  const openFeature = async (layerId: string, pk: string) => {
+    if (!config) return;
+    try {
+      const f = await api.feature(config.slug, layerId, pk, config.crs);
+      setSelection({ layerId, feature: f, isNew: false });
+    } catch (e) {
+      setMessage((e as Error).message);
+    }
+  };
+
+  const editLayer = editLayerId ? config?.layers[editLayerId] : null;
+
+  return (
+    <div className="app">
+      <header className="topbar">
+        <strong className="brand">Sophia</strong>
+        <select value={slug ?? ""} onChange={(e) => setSlug(e.target.value || null)} aria-label="Projekt">
+          {projects.length === 0 && <option value="">Brak dostępnych projektów</option>}
+          {projects.map((p) => <option key={p.slug} value={p.slug}>{p.title}</option>)}
+        </select>
+        <div className="spacer" />
+        {user ? (
+          <>
+            <span className="muted">{user.full_name ?? user.login}</span>
+            {user.is_admin && <a className="button" href="/api/docs" target="_blank" rel="noreferrer">API</a>}
+            <button onClick={async () => { await api.logout(); await refreshSession(); }}>Wyloguj</button>
+          </>
+        ) : (
+          <button className="primary" onClick={() => setShowLogin(true)}>Zaloguj</button>
+        )}
+      </header>
+
+      <div className="body">
+        <aside className="sidebar">
+          {config ? (
+            <>
+              <h3>Warstwy</h3>
+              <LayerTree tree={config.tree} visible={visible} onToggle={toggle}
+                editableIds={editableIds} editLayerId={editLayerId}
+                onEditLayer={(id) => { setEditLayerId(id); setTool(id ? "select" : "identify"); setSelection(null); }} />
+
+              {editLayer && (
+                <section className="edit-tools">
+                  <h3>Edycja: {editLayer.name}</h3>
+                  <div className="toolgroup">
+                    <button className={tool === "select" ? "active" : ""} onClick={() => setTool("select")}>Wybierz</button>
+                    {editLayer.perms.insert && editLayer.geometry_type && (
+                      <button className={tool === "draw" ? "active" : ""} onClick={() => setTool("draw")}>
+                        Rysuj {({ Point: "punkt", Line: "linię", Polygon: "poligon" })[editLayer.geometry_type]}
+                      </button>
+                    )}
+                    {editLayer.perms.update && editLayer.geometry_type && (
+                      <button className={tool === "modify" ? "active" : ""} onClick={() => setTool("modify")}>Zmień geometrię</button>
+                    )}
+                  </div>
+                </section>
+              )}
+
+              {config.reports.some((r) => !r.layer_id) && (
+                <section>
+                  <h3>Wydruki</h3>
+                  {config.reports.filter((r) => !r.layer_id).map((r) => (
+                    <button key={r.layout} className="block" onClick={() => {
+                      const map = mapRef.current;
+                      if (!map) return;
+                      const extent = map.getView().calculateExtent(map.getSize());
+                      window.open(api.reportUrl(config.slug, r.layout, {
+                        extent: extent.join(","), layers: [...wmsLayers].reverse().join(","),
+                      }), "_blank");
+                    }}>🖨 {r.title}</button>
+                  ))}
+                </section>
+              )}
+            </>
+          ) : <p className="muted">Wybierz projekt z menu.</p>}
+        </aside>
+
+        <main className="mapwrap">
+          {config && (
+            <MapView
+              config={config} wmsLayers={wmsLayers} editLayerId={editLayerId} tool={tool}
+              reloadToken={reloadToken} mapRef={mapRef}
+              onIdentify={openFeature}
+              onSelect={(layerId, feature) => setSelection({ layerId, feature, isNew: false })}
+              onDrawn={(layerId, geometry) =>
+                setSelection({ layerId, isNew: true, feature: { type: "Feature", id: "", geometry, properties: {} } })}
+              onGeometryModified={async (layerId, pk, geometry) => {
+                try {
+                  await api.updateFeature(config.slug, layerId, pk, { geometry }, config.crs);
+                  setReloadToken((t) => t + 1);
+                } catch (e) {
+                  setMessage((e as Error).message);
+                  setReloadToken((t) => t + 1);   // przywróć geometrię z bazy
+                }
+              }}
+            />
+          )}
+          {message && <div className="toast" onClick={() => setMessage(null)}>{message}</div>}
+        </main>
+
+        {config && selection && (
+          <FeaturePanel
+            config={config} layerId={selection.layerId} feature={selection.feature} isNew={selection.isNew}
+            onSaved={(f) => { setSelection({ layerId: selection.layerId, feature: f, isNew: false }); setReloadToken((t) => t + 1); }}
+            onDeleted={() => { setSelection(null); setReloadToken((t) => t + 1); }}
+            onClose={() => { if (selection.isNew) setReloadToken((t) => t + 1); setSelection(null); }}
+            onOpenRelated={openFeature}
+          />
+        )}
+      </div>
+
+      {showLogin && !user && (
+        <div className="modal" onClick={(e) => e.target === e.currentTarget && setShowLogin(false)}>
+          <LoginForm onLogin={async () => { setShowLogin(false); await refreshSession(); }} />
+        </div>
+      )}
+    </div>
+  );
+}

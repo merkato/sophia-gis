@@ -1,0 +1,31 @@
+from functools import lru_cache
+from pathlib import Path
+
+from pydantic_settings import BaseSettings
+
+
+class Settings(BaseSettings):
+    # Połączenie do bazy portalu (schemat "portal") — przez usługę z pg_service.conf
+    portal_db_service: str = "sophia"
+
+    jwt_secret: str
+    jwt_ttl_minutes: int = 720
+    cookie_name: str = "sophia_token"
+    cookie_secure: bool = True
+
+    admin_login: str = "admin"
+    admin_password: str | None = None
+
+    projects_dir: Path = Path("/projects")
+    attachments_dir: Path = Path("/attachments")
+    max_attachment_mb: int = 50
+
+    qgis_server_url: str = "http://qgis:8080/"
+
+    # Układ, w którym przechowywane są zasięgi (portal.extents)
+    extents_srid: int = 2180
+
+
+@lru_cache
+def get_settings() -> Settings:
+    return Settings()  # type: ignore[call-arg]

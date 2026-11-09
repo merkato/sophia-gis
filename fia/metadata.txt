@@ -1,0 +1,13 @@
+[general]
+name=Fia
+qgisMinimumVersion=3.40
+qgisMaximumVersion=4.99
+supportsQt6=True
+description=Konfiguracja i publikacja projektów QGIS w geoportalu Sophia (edycja, załączniki PDF, mozaiki rastrowe, raporty).
+about=Konfiguruje warstwy edytowalne, załączniki, grupy rastrowe (mozaiki GeoTIFF/VRT) i raporty. Sprawdza projekt pod kątem typowych błędów i publikuje go na serwerze jednym kliknięciem.
+version=0.1.0
+author=Sophia
+email=admin@example.com
+category=Web
+experimental=True
+tags=web,server,publish,postgis
