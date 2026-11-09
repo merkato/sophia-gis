@@ -24,7 +24,8 @@ import /etc/caddy/sites/*.caddy
 	# parametr MAP od klienta jest zawsze nadpisywany).
 	handle /ows {
 		forward_auth api:8000 {
-			uri /api/ows/authorize?{query}
+			# parametry API czyta z nagłówka X-Forwarded-Uri (forward_auth gubi query string)
+			uri /api/ows/authorize
 			copy_headers X-Portal-User X-Portal-Groups X-Portal-Map
 		}
 		uri query MAP {http.request.header.X-Portal-Map}

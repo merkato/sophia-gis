@@ -1,4 +1,6 @@
 """Autoryzacja żądań OWS (forward_auth z Caddy) przed przekazaniem do QGIS Server."""
+from urllib.parse import parse_qsl, urlsplit
+
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
 from ..permissions import load_project_context
@@ -22,9 +24,22 @@ def _raster_group_names(node: TreeNode) -> set[str]:
     return names
 
 
+def ows_params(request: Request) -> dict[str, str]:
+    """Parametry oryginalnego żądania /ows (klucze małymi literami).
+
+    Caddy forward_auth nie przenosi query stringu do żądania autoryzacji, ale zawsze ustawia
+    (nadpisując wartość od klienta) nagłówek X-Forwarded-Uri z pełnym oryginalnym URI.
+    Bez nagłówka (wywołanie bezpośrednie) używamy własnego query stringu.
+    """
+    fwd = request.headers.get("x-forwarded-uri")
+    items = (parse_qsl(urlsplit(fwd).query, keep_blank_values=True) if fwd
+             else request.query_params.multi_items())
+    return {k.lower(): v for k, v in items}
+
+
 @router.get("/authorize")
 async def authorize(request: Request, user: CurrentUser | None = Depends(optional_user)):
-    q = {k.lower(): v for k, v in request.query_params.items()}
+    q = ows_params(request)
     slug = q.get("project")
     if not slug:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Brak parametru PROJECT")
