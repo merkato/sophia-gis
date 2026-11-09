@@ -20,7 +20,7 @@ class Settings(BaseSettings):
     attachments_dir: Path = Path("/attachments")
     max_attachment_mb: int = 50
 
-    qgis_server_url: str = "http://qgis:8080/"
+    qgis_server_url: str = "http://qgis:80/"
 
     # Układ, w którym przechowywane są zasięgi (portal.extents)
     extents_srid: int = 2180

@@ -31,7 +31,8 @@ import /etc/caddy/sites/*.caddy
 		uri query MAP {http.request.header.X-Portal-Map}
 		uri query -PROJECT
 		rewrite * /
-		reverse_proxy qgis:8080
+		# obraz camptocamp uruchomiony jako root słucha na porcie 80 (nie 8080)
+		reverse_proxy qgis:80
 	}
 
 	# --- WebUI (SPA) ---

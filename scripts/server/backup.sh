@@ -26,8 +26,12 @@ echo "[$(date -Is)] Kopia -> $DEST"
 # 1. Baza — format custom (skompresowany, pozwala odtworzyć pojedyncze tabele)
 docker compose exec -T db pg_dump -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Fc > "$DEST/db.dump"
 
-# 2. Projekty QGIS + .portal.json
-tar -czf "$DEST/projects.tar.gz" -C "$APP_DIR/data" projects
+# 2. Projekty QGIS + .portal.json. Rastry leżące obok projektu (np. projects/<slug>/rastry/)
+#    pomijamy tak samo jak data/rasters: oryginały są u autora projektu.
+tar -czf "$DEST/projects.tar.gz" -C "$APP_DIR/data" \
+  --exclude='*.tif' --exclude='*.tiff' --exclude='*.TIF' --exclude='*.ovr' \
+  --exclude='*.jp2' --exclude='*.ecw' --exclude='*.vrt' --exclude='*.aux.xml' \
+  projects
 
 # 3. Załączniki PDF (wolumen Dockera) — czytane przez kontener api, bez znajomości ścieżek wolumenu
 docker compose exec -T api tar -czf - -C / attachments > "$DEST/attachments.tar.gz"

@@ -92,7 +92,14 @@ Wiele arkuszy → wtyczka **Fia** → „Zbuduj VRT + piramidy”. Na serwer:
 scp -r D:\mapy\mapa_1900 sophia:/opt/sophia/data/rasters/
 ```
 
-W projekcie QGIS ścieżki muszą być **względne**, a układ katalogów w `data/rasters` taki sam jak lokalnie.
+W projekcie QGIS ścieżki muszą być **względne**. Fia publikuje projekt do
+`data/projects/<slug>/<slug>.qgz`, więc najprościej trzymać rastry w podkatalogu obok projektu
+(lokalnie `sokolec\rastry\`, na serwerze `data/projects/sokolec/rastry/`). Ścieżki `./rastry/…`
+działają wtedy po obu stronach bez zmian. Kopia zapasowa pomija pliki rastrowe także w tym miejscu.
+
+```powershell
+scp -r E:\gis\archiwalne\sokolec\rastry sophia:/opt/sophia/data/projects/sokolec/
+```
 
 ## 5. QGIS Desktop ↔ baza na serwerze
 

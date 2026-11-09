@@ -91,7 +91,7 @@
 ## Ograniczenia v0.1 i roadmapa
 
 **Etap 1 — uruchomienie (MVP, ten szkielet)**
-- [ ] Pierwsze `docker compose up` i test na prawdziwym projekcie zapisanym w QGIS 4.2 (sprawdzić port 8080 obrazu)
+- [x] Pierwsze `docker compose up` i test na prawdziwym projekcie zapisanym w QGIS 4.2 (obraz camptocamp jako root słucha na porcie 80, nie 8080)
 - [ ] Panel administracyjny w WebUI (na razie tylko API + Swagger `/api/docs`)
 - [ ] Testy integracyjne API na PostGIS w kontenerze (pytest + testcontainers)
 
