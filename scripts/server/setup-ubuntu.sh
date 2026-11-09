@@ -169,7 +169,7 @@ cat <<EOF
 
 $(printf '\033[1;32mSerwer gotowy.\033[0m') Dalej (jako $APP_USER, po ponownym zalogowaniu):
 
-  1. Skopiuj repo:      z Windows:  scp -r ...   albo  git clone <repo> $APP_DIR
+  1. Repo:             git clone https://github.com/merkato/sophia-gis.git $APP_DIR
   2. Konfiguracja:      cd $APP_DIR && cp .env.example .env && nano .env
                         echo 'COMPOSE_FILE=docker-compose.yml:docker-compose.small.yml' >> .env
                         (hasło w config/pg_service.conf = POSTGRES_PASSWORD)

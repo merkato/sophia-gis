@@ -46,18 +46,14 @@ Po zakończeniu sprawdź w **nowym** oknie `ssh sophia`, zanim zamkniesz poprzed
 
 ## 3. Aplikacja
 
-```powershell
-# z Windows (dopóki repo nie ma zdalnego origin):
-scp -r D:\dev\sophia\* sophia:/opt/sophia/
-```
-
 ```bash
 ssh sophia
+git clone https://github.com/merkato/sophia-gis.git /opt/sophia
 cd /opt/sophia
 cp .env.example .env && nano .env          # SITE_ADDRESS=twoja.domena.pl, hasła, JWT_SECRET
 echo 'COMPOSE_FILE=docker-compose.yml:docker-compose.small.yml' >> .env
 nano config/pg_service.conf                # to samo hasło co POSTGRES_PASSWORD
-chmod +x scripts/server/*.sh
+
 docker compose up -d --build
 docker compose ps
 ```
