@@ -23,16 +23,19 @@ import /etc/caddy/sites/*.caddy
 	# a następnie podaje ścieżkę pliku projektu (klient wysyła tylko PROJECT=<slug>,
 	# parametr MAP od klienta jest zawsze nadpisywany).
 	handle /ows {
-		forward_auth api:8000 {
-			# parametry API czyta z nagłówka X-Forwarded-Uri (forward_auth gubi query string)
-			uri /api/ows/authorize
-			copy_headers X-Portal-User X-Portal-Groups X-Portal-Map
+		# "route" = dyrektywy w kolejności zapisu. Bez niego Caddy sortuje je po swojemu
+		# i "uri"/"rewrite" wykonują się PRZED forward_auth (API nie widzi PROJECT, MAP jest pusty).
+		route {
+			forward_auth api:8000 {
+				uri /api/ows/authorize
+				copy_headers X-Portal-User X-Portal-Groups X-Portal-Map
+			}
+			uri query MAP {http.request.header.X-Portal-Map}
+			uri query -PROJECT
+			rewrite * /
+			# obraz camptocamp uruchomiony jako root słucha na porcie 80 (nie 8080)
+			reverse_proxy qgis:80
 		}
-		uri query MAP {http.request.header.X-Portal-Map}
-		uri query -PROJECT
-		rewrite * /
-		# obraz camptocamp uruchomiony jako root słucha na porcie 80 (nie 8080)
-		reverse_proxy qgis:80
 	}
 
 	# --- WebUI (SPA) ---

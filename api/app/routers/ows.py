@@ -27,8 +27,8 @@ def _raster_group_names(node: TreeNode) -> set[str]:
 def ows_params(request: Request) -> dict[str, str]:
     """Parametry oryginalnego żądania /ows (klucze małymi literami).
 
-    Caddy forward_auth nie przenosi query stringu do żądania autoryzacji, ale zawsze ustawia
-    (nadpisując wartość od klienta) nagłówek X-Forwarded-Uri z pełnym oryginalnym URI.
+    Caddy forward_auth zawsze ustawia (nadpisując wartość od klienta) nagłówek X-Forwarded-Uri
+    z oryginalnym URI — to jednoznaczne źródło, niezależne od przepisywania ścieżki autoryzacji.
     Bez nagłówka (wywołanie bezpośrednie) używamy własnego query stringu.
     """
     fwd = request.headers.get("x-forwarded-uri")
