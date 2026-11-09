@@ -1,4 +1,4 @@
-# Profil dla małego VPS (np. OVH VPS-1: 4 vCore, 8 GB RAM).
+# Profil dla małego VPS albo serwera współdzielonego z innymi usługami (np. OVH VPS-2 2026).
 # Użycie:
 #   docker compose -f docker-compose.yml -f docker-compose.small.yml up -d --build
 # albo w .env:  COMPOSE_FILE=docker-compose.yml:docker-compose.small.yml

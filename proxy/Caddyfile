@@ -2,6 +2,10 @@
 	email {$ACME_EMAIL}
 }
 
+# Caddy Sophii jest głównym proxy serwera (porty 80/443, certyfikaty dla wszystkich subdomen).
+# Inne usługi na tym samym VPS dopisujesz jako pliki proxy/sites/<nazwa>.caddy — patrz proxy/sites/README.md.
+import /etc/caddy/sites/*.caddy
+
 {$SITE_ADDRESS} {
 	encode zstd gzip
 

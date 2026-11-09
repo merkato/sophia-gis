@@ -1,0 +1,5 @@
+# Przykład: zmień nazwę na <usluga>.caddy, popraw domenę i cel, przeładuj Caddy.
+dashboard.example.pl {
+	encode zstd gzip
+	reverse_proxy dashboard:3000
+}

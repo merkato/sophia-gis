@@ -1,7 +1,11 @@
 # Wdrożenie na VPS (OVHcloud, Ubuntu)
 
-Docelowo dla małego projektu: **OVH VPS-1** (4 vCore, 8 GB RAM, ok. 75 GB), Ubuntu 24.04 LTS
-(lub 26.04 LTS), profil `docker-compose.small.yml`. Uzasadnienie rozmiaru — na końcu dokumentu.
+Serwer docelowy: **OVH VPS-2 2026** (6 vCore, 12 GB RAM, 100 GB), świeże Ubuntu 24.04 LTS
+(lub 26.04 LTS), profil `docker-compose.small.yml`, adres **webgis.giswgorach.pl**.
+Uzasadnienie rozmiaru jest na końcu dokumentu.
+
+Sophia jest główną usługą serwera: jej Caddy zajmuje porty 80/443 i obsługuje certyfikaty także
+dla innych subdomen, które powstaną później (patrz [proxy/sites/README.md](../proxy/sites/README.md)).
 
 ## 1. Windows: klucz SSH (raz na komputer)
 
@@ -22,13 +26,17 @@ D:\dev\sophia\scripts\windows\setup-ssh.ps1 -ConfigureGit
 * Klucz publiczny ląduje w schowku — wklej go w panelu OVH przy zamawianiu VPS (pole „Klucz SSH”).
 * `-ConfigureGit` każe Gitowi używać tego samego ssh i agenta (przyda się do GitHub/GitLab).
 
-Po zakupie VPS (OVH przyśle IP, użytkownik domyślny: `ubuntu`):
+Po zakupie lub reinstalacji VPS (OVH przyśle IP, domyślny użytkownik to `ubuntu`):
 
 ```powershell
 D:\dev\sophia\scripts\windows\setup-ssh.ps1 -Server 51.75.12.34
 # jeśli VPS zainstalowano BEZ klucza (OVH przysłał hasło):
 D:\dev\sophia\scripts\windows\setup-ssh.ps1 -Server 51.75.12.34 -CopyToServer
 ```
+
+Po **reinstalacji** serwer ma nowy klucz hosta i ssh odmówi połączenia („REMOTE HOST
+IDENTIFICATION HAS CHANGED”). Usuń stary wpis: `ssh-keygen -R 51.75.12.34`. Klucz SSH najlepiej
+wskazać w panelu OVH już przy reinstalacji.
 
 Od teraz: `ssh sophia`.
 
@@ -50,7 +58,7 @@ Po zakończeniu sprawdź w **nowym** oknie `ssh sophia`, zanim zamkniesz poprzed
 ssh sophia
 git clone https://github.com/merkato/sophia-gis.git /opt/sophia
 cd /opt/sophia
-cp .env.example .env && nano .env          # SITE_ADDRESS=twoja.domena.pl, hasła, JWT_SECRET
+cp .env.example .env && nano .env          # SITE_ADDRESS=webgis.giswgorach.pl, ACME_EMAIL, hasła, JWT_SECRET
 echo 'COMPOSE_FILE=docker-compose.yml:docker-compose.small.yml' >> .env
 nano config/pg_service.conf                # to samo hasło co POSTGRES_PASSWORD
 
@@ -59,6 +67,11 @@ docker compose ps
 ```
 
 Rekord DNS **A** domeny → IP serwera musi istnieć przed startem — Caddy pobierze certyfikat sam.
+
+Inne usługi postawione później na tym serwerze (dashboard, geokoder, …) dopisujesz jako
+`proxy/sites/<nazwa>.caddy`. Caddy Sophii wystawi je z certyfikatem, a do kontenerów dotrze przez
+wspólną sieć Dockera `edge` (szczegóły w [proxy/sites/README.md](../proxy/sites/README.md)).
+Nie uruchamiaj na hoście drugiego proxy (nginx/Apache) na portach 80/443.
 
 ## 4. Rastry historyczne
 
@@ -102,7 +115,11 @@ Codziennie: `pg_dump`, projekty, załączniki PDF, konfiguracja; trzymane 14 dni
 `sudo apt install rclone`, `rclone config` (OVH Object Storage — S3), w `.env`: `RCLONE_REMOTE=ovh:sophia-backup`.
 Rastrów skrypt nie kopiuje — oryginały trzymaj u siebie.
 
-## Dlaczego VPS-1 wystarcza
+## Rozmiar serwera (VPS-2 2026: 6 vCore, 12 GB)
+
+Profil `docker-compose.small.yml` zabiera Sophii twardo ok. 4,5 GB RAM. Około 7 GB zostaje na inne
+usługi i na cache plików rastrów. Gdy inne usługi okażą się lekkie, a rastrów przybędzie, podnieś
+w profilu `FCGID_MAX_PROCESSES` do 4 i limit pamięci `qgis` do 3,5 GB.
 
 | Usługa | RAM | Limit w `docker-compose.small.yml` |
 |---|---|---|

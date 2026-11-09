@@ -76,9 +76,18 @@ services:
       - "443:443/udp"
     volumes:
       - ./proxy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./proxy/sites:/etc/caddy/sites:ro     # inne serwisy na tym VPS (proxy/sites/README.md)
       - caddy_data:/data
       - caddy_config:/config
+    extra_hosts:
+      - "host.docker.internal:host-gateway"   # usługi uruchomione bezpośrednio na hoście
+    networks: [default, edge]
     depends_on: [api, web, qgis]
+
+networks:
+  # Wspólna sieć dla innych projektów Compose na tym serwerze (dołączają jako external: true)
+  edge:
+    name: edge
 
 volumes:
   pgdata:
