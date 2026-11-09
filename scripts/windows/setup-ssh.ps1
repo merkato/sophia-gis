@@ -63,7 +63,9 @@ if (-not $ssh) {
     }
     throw "Brak ssh.exe. Uruchom jako Administrator albo: Ustawienia > System > Funkcje opcjonalne > Klient OpenSSH"
 }
-Ok "$($ssh.Source) ($((& ssh.exe -V 2>&1) -join ' '))"
+# Wersja z metadanych pliku: "ssh -V" pisze na stderr, a w PowerShell 5.1 przekierowanie stderr
+# programu przy ErrorActionPreference=Stop konczy skrypt bledem NativeCommandError.
+Ok "$($ssh.Source) (wersja $((Get-Item $ssh.Source).VersionInfo.ProductVersion))"
 
 # ------------------------------------------------------------------ 2. ssh-agent
 Step "Usluga ssh-agent"
@@ -110,7 +112,8 @@ if (Test-Path $keyPath) {
 if ($agent.Status -eq "Running") {
     Step "Dodanie klucza do agenta"
     $fingerprint = ((& ssh-keygen.exe -lf $pubPath) -split " ")[1]
-    $loaded = (& ssh-add.exe -l 2>$null) -join "`n"
+    # Lokalnie Continue: pusty agent zwraca kod 1 i komunikat na stderr - to nie jest blad skryptu
+    $loaded = & { $ErrorActionPreference = "Continue"; (& ssh-add.exe -l 2>$null) -join "`n" }
     if ($loaded -like "*$fingerprint*") {
         Ok "Klucz juz jest w agencie"
     } else {
