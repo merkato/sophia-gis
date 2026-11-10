@@ -8,6 +8,8 @@ Warstwa źródłowa musi być warstwą PostGIS projektu, a użytkownik musi mie�
 """
 from __future__ import annotations
 
+import re
+
 from fastapi import APIRouter, Depends, HTTPException, status
 from psycopg import sql
 
@@ -22,16 +24,24 @@ MAX_OPTIONS = 5000
 
 
 def label_field(lyr: LayerDef) -> str | None:
-    """Pole etykiety rekordu: wyrażenie wyświetlane z QGIS (gdy to sama nazwa pola) albo pierwsze pole tekstowe."""
-    names = {f.name for f in lyr.fields}
+    """Pole etykiety rekordu na podstawie wyrażenia wyświetlanego z QGIS (Wyświetlanie -> Nazwa wyświetlana):
+    sama nazwa pola, albo pierwsze pole użyte w wyrażeniu (np. COALESCE("nazwa", '<NULL>') -> nazwa).
+    Bez wyrażenia: pierwsze pole tekstowe, a gdy typy nieznane (projekt QGIS ich nie zapisuje) —
+    pierwsze pole niebędące kluczem ani geometrią."""
+    names = [f.name for f in lyr.fields]
     expr = (lyr.display_expression or "").strip()
-    if len(expr) > 1 and expr[0] == expr[-1] == '"':
-        expr = expr[1:-1]
     if expr in names:
         return expr
+    for quoted in re.findall(r'"((?:[^"]|"")+)"', expr):
+        name = quoted.replace('""', '"')
+        if name in names:
+            return name
     key = lyr.pg.key if lyr.pg else None
-    return next((f.name for f in lyr.fields
-                 if f.name != key and f.type and any(t in f.type.lower() for t in ("char", "text", "string"))), None)
+    geom = lyr.pg.geometry_column if lyr.pg else None
+    candidates = [f for f in lyr.fields if f.name not in (key, geom)]
+    text = next((f.name for f in candidates
+                 if f.type and any(t in f.type.lower() for t in ("char", "text", "string"))), None)
+    return text or (candidates[0].name if candidates else None)
 
 
 def _resolve(ctx: ProjectContext, lyr: LayerDef, field_name: str) -> tuple[LayerDef, str, str | None]:

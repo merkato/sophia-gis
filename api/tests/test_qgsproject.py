@@ -126,3 +126,17 @@ def test_raster_tile_format():
     assert raster_tile_format("wms", "crs=EPSG%3A2180&format=image%2Fjpeg&layers=ORTO") == TILE_JPEG
     assert raster_tile_format("wms", "format=image/png&layers=dzialki") == TILE_PNG8
     assert raster_tile_format("gdal", "./rastry/arkusz.tif") == TILE_PNG8
+
+
+def test_start_extent_priority():
+    from lxml import etree
+
+    from app.qgsproject import start_extent
+
+    view = '<ProjectViewSettings><DefaultViewExtent xmin="1" ymin="2" xmax="3" ymax="4"/></ProjectViewSettings>'
+    wms = "<properties><WMSExtent><value>10</value><value>20</value><value>30</value><value>40</value></WMSExtent></properties>"
+    canvas = "<mapcanvas><extent><xmin>5</xmin><ymin>6</ymin><xmax>7</xmax><ymax>8</ymax></extent></mapcanvas>"
+    assert start_extent(etree.fromstring(f"<qgis>{view}{wms}{canvas}</qgis>"), "EPSG:2180") == [1, 2, 3, 4]
+    assert start_extent(etree.fromstring(f"<qgis>{wms}{canvas}</qgis>"), "EPSG:2180") == [10, 20, 30, 40]
+    assert start_extent(etree.fromstring(f"<qgis>{canvas}</qgis>"), "EPSG:2180") == [5, 6, 7, 8]
+    assert start_extent(etree.fromstring("<qgis/>"), "EPSG:2180") is None

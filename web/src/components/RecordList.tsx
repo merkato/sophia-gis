@@ -11,12 +11,18 @@ interface Props {
   onNew: () => void;
 }
 
-/** Etykieta rekordu: wyrażenie wyświetlane z QGIS, jeśli to sama nazwa pola, inaczej pierwsze pole tekstowe. */
+/**
+ * Pole etykiety rekordu — ta sama reguła co w API (fields.label_field): nazwa pola z wyrażenia
+ * wyświetlanego QGIS (np. COALESCE("nazwa", '<NULL>') -> nazwa), inaczej pierwsze pole tekstowe,
+ * a gdy typy nieznane (QGIS ich nie zapisuje w projekcie) — pierwsze pole poza kluczem.
+ */
 function labelFor(layer: LayerInfo): (f: GeoJSONFeature) => string {
-  const expr = layer.display_expression?.trim().replace(/^"(.*)"$/, "$1");
-  const byExpr = expr && layer.fields.some((f) => f.name === expr) ? expr : null;
-  const textField = layer.fields.find((f) => f.name !== layer.primary_key && /char|text/i.test(f.type ?? ""))?.name;
-  const field = byExpr ?? textField;
+  const names = layer.fields.map((f) => f.name);
+  const expr = layer.display_expression?.trim() ?? "";
+  const quoted = [...expr.matchAll(/"((?:[^"]|"")+)"/g)].map((m) => m[1].replace(/""/g, '"'));
+  const byExpr = names.includes(expr) ? expr : quoted.find((n) => names.includes(n));
+  const others = layer.fields.filter((f) => f.name !== layer.primary_key);
+  const field = byExpr ?? others.find((f) => /char|text|string/i.test(f.type ?? ""))?.name ?? others[0]?.name;
   return (f) => {
     const v = field ? f.properties[field] : null;
     return v !== null && v !== undefined && String(v).trim() ? String(v) : `#${f.id}`;

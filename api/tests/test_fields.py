@@ -15,3 +15,12 @@ def test_label_field():
     assert label_field(_layer("nazwa")) == "nazwa"
     assert label_field(_layer("concat(nazwa, url)")) == "nazwa"   # wyrażenie -> pierwsze pole tekstowe
     assert label_field(_layer(None)) == "nazwa"              # nigdy klucz główny
+    assert label_field(_layer("COALESCE( \"nazwa\", '<NULL>' )")) == "nazwa"   # pole z wyrażenia
+    assert label_field(_layer("\"url\" || ' ' || \"nazwa\"")) == "url"
+
+
+def test_label_field_without_types():
+    # QGIS nie zapisuje typów pól w projekcie — wtedy pierwsze pole poza kluczem
+    lyr = _layer(None)
+    lyr.fields = [FieldDef("fid"), FieldDef("nazwa"), FieldDef("url")]
+    assert label_field(lyr) == "nazwa"

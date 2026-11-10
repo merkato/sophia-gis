@@ -14,6 +14,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
+import pyproj
 from lxml import etree
 
 # --------------------------------------------------------------------------- modele
@@ -262,6 +263,48 @@ def _parse_tree(group_el: etree._Element, raster_groups: set[str]) -> TreeNode:
     return node
 
 
+def _valid_extent(ext: list[float]) -> list[float] | None:
+    return ext if len(ext) == 4 and ext[2] > ext[0] and ext[3] > ext[1] else None
+
+
+def start_extent(root: etree._Element, crs: str) -> list[float] | None:
+    """Widok startowy WebUI z projektu QGIS, w układzie projektu. Kolejność:
+    1. ProjectViewSettings/DefaultViewExtent — widok, w którym QGIS otwiera projekt (zapisywany
+       przy zapisie projektu; QGIS >= 3.18),
+    2. properties/WMSExtent — rozgłaszany zasięg (Właściwości projektu -> QGIS Server),
+    3. mapcanvas/extent — widok mapy w chwili zapisu (starsze projekty).
+    """
+    el = root.find("./ProjectViewSettings/DefaultViewExtent")
+    if el is not None and el.get("xmin") is not None:
+        try:
+            ext = _valid_extent([float(el.get(k)) for k in ("xmin", "ymin", "xmax", "ymax")])
+        except (TypeError, ValueError):
+            ext = None
+        src = el.findtext(".//spatialrefsys/authid")
+        if ext and src and src != crs:
+            try:
+                ext = list(pyproj.Transformer.from_crs(src, crs, always_xy=True).transform_bounds(*ext))
+            except Exception:  # noqa: BLE001 — nieznany układ: lepiej brak widoku niż zły
+                ext = None
+        if ext:
+            return ext
+    wms = root.find("./properties/WMSExtent")
+    if wms is not None:
+        try:
+            ext = _valid_extent([float(v.text) for v in wms.findall("value") if v.text])
+        except ValueError:
+            ext = None
+        if ext:
+            return ext
+    canvas = root.find("./mapcanvas/extent")
+    if canvas is not None:
+        try:
+            return _valid_extent([float(canvas.findtext(k)) for k in ("xmin", "ymin", "xmax", "ymax")])
+        except (TypeError, ValueError):
+            return None
+    return None
+
+
 def load_project(path: Path) -> Project:
     root = _load_xml(path)
     sidecar_path = path.with_suffix(".portal.json")
@@ -333,16 +376,11 @@ def load_project(path: Path) -> Project:
         reports.append(ReportDef(layout=name, title=rc.get("title", name), layer_id=atlas_layer))
 
     crs = root.findtext("./projectCrs/spatialrefsys/authid") or "EPSG:2180"
-    extent = None
-    ext_el = root.find("./properties/WMSExtent")
-    if ext_el is not None:
-        vals = [float(v.text) for v in ext_el.findall("value") if v.text]
-        extent = vals if len(vals) == 4 else None
 
     return Project(
         title=root.get("projectname") or root.findtext("title") or path.stem,
         crs=crs,
-        extent=cfg.get("map", {}).get("extent", extent),
+        extent=cfg.get("map", {}).get("extent") or start_extent(root, crs),
         layers=layers,
         relations=relations,
         tree=tree,
