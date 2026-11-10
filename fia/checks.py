@@ -6,6 +6,31 @@ import os
 
 from qgis.core import Qgis, QgsDataSourceUri, QgsMapLayer, QgsProject, QgsRasterLayer, QgsVectorLayer
 
+LIBRARY_DIR = "rasters"     # wspólna biblioteka: <katalog>/rasters  <->  /opt/sophia/data/rasters
+
+
+def _raster_location(src: str, home: str) -> list[tuple[str, str]]:
+    """Gdzie raster wyląduje na serwerze. Fia publikuje projekt do data/projects/<slug>/<slug>.qgz,
+    więc działają dwa układy (te same ścieżki względne lokalnie i na serwerze):
+      - obok projektu:      ./rastry/...           -> data/projects/<slug>/rastry/...
+      - biblioteka wspólna: ../../rasters/<seria>   -> data/rasters/<seria>/...
+    """
+    if not home or not os.path.isabs(src):
+        return []
+    path = src.split("|")[0]                       # GDAL: "plik.tif|layername=..." itp.
+    try:
+        rel = os.path.relpath(path, home).replace("\\", "/")
+    except ValueError:                             # inny dysk niż projekt (Windows)
+        rel = None
+    if rel and not rel.startswith("../"):
+        return [("info", f"Raster obok projektu — na serwer do data/projects/<slug>/{rel}")]
+    lib = f"../../{LIBRARY_DIR}/"
+    if rel and rel.startswith(lib):
+        return [("info", f"Biblioteka rastrów — na serwerze data/rasters/{rel[len(lib):]}")]
+    expected = os.path.normpath(os.path.join(home, "..", "..", LIBRARY_DIR))
+    return [("warning", (f"Raster poza katalogiem projektu i poza biblioteką rastrów ({expected}) — "
+                         "serwer go nie znajdzie. Przenieś go do biblioteki albo obok projektu"))]
+
 
 def layer_issues(layer: QgsMapLayer, want_edit: bool = False) -> list[tuple[str, str]]:
     """Lista (poziom, komunikat) dla jednej warstwy. Poziomy: error | warning | info."""
@@ -35,8 +60,7 @@ def layer_issues(layer: QgsMapLayer, want_edit: bool = False) -> list[tuple[str,
 
     if isinstance(layer, QgsRasterLayer) and layer.providerType() == "gdal":
         src = layer.source()
-        if os.path.isabs(src) and QgsProject.instance().homePath() not in src:
-            out.append(("warning", "Raster poza katalogiem projektu — skopiuj go do data/rasters na serwerze"))
+        out.extend(_raster_location(src, QgsProject.instance().homePath()))
         try:
             has_overviews = any(p.getExists() for p in layer.dataProvider().buildPyramidList())
         except Exception:  # noqa: BLE001 — API piramid różni się między wersjami QGIS
