@@ -5,7 +5,8 @@ from fastapi import FastAPI
 
 from .config import get_settings
 from .db import close_pools, portal_conn
-from .routers import admin, attachments, auth, features, ows, projects, reports
+from .migrations import run_migrations
+from .routers import admin, attachments, auth, basemaps, features, ows, projects, reports
 from .security import hash_password
 
 log = logging.getLogger("sophia")
@@ -27,6 +28,7 @@ async def _bootstrap_admin() -> None:
 
 @asynccontextmanager
 async def lifespan(_: FastAPI):
+    await run_migrations()
     await _bootstrap_admin()
     yield
     await close_pools()
@@ -35,8 +37,9 @@ async def lifespan(_: FastAPI):
 app = FastAPI(title="Sophia API", version="0.1.0", lifespan=lifespan,
               docs_url="/api/docs", openapi_url="/api/openapi.json")
 
-for r in (auth, projects, features, attachments, reports, ows, admin):
+for r in (auth, projects, features, attachments, reports, ows, admin, basemaps):
     app.include_router(r.router)
+app.include_router(basemaps.admin)
 
 
 @app.get("/api/health")

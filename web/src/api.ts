@@ -1,5 +1,6 @@
 import type {
-  Attachment, GeoJSONFeature, ProjectConfig, ProjectSummary, RelatedGroup, User,
+  AdminProject, AdminUser, Attachment, Basemap, GeoJSONFeature, Group, ProjectAccess, ProjectConfig,
+  ProjectSummary, RelatedGroup, User, WmtsCapabilities,
 } from "./types";
 
 export class ApiError extends Error {
@@ -67,4 +68,39 @@ export const api = {
 
   reportUrl: (slug: string, layout: string, params: Record<string, string>) =>
     `/api/projects/${enc(slug)}/reports/${enc(layout)}?${new URLSearchParams(params)}`,
+
+  basemaps: () => request<Basemap[]>("/api/basemaps"),
 };
+
+const json = (method: string, body: unknown): RequestInit => ({ method, body: JSON.stringify(body) });
+
+/** Panel administratora (wymaga konta z is_admin). */
+export const adminApi = {
+  users: () => request<AdminUser[]>("/api/admin/users"),
+  createUser: (u: UserInput) => request<{ id: number }>("/api/admin/users", json("POST", u)),
+  updateUser: (id: number, u: UserInput) => request(`/api/admin/users/${id}`, json("PUT", u)),
+  deleteUser: (id: number) => request<void>(`/api/admin/users/${id}`, { method: "DELETE" }),
+
+  groups: () => request<Group[]>("/api/admin/groups"),
+  createGroup: (g: Omit<Group, "id">) => request<{ id: number }>("/api/admin/groups", json("POST", g)),
+  updateGroup: (id: number, g: Omit<Group, "id">) => request(`/api/admin/groups/${id}`, json("PUT", g)),
+  deleteGroup: (id: number) => request<void>(`/api/admin/groups/${id}`, { method: "DELETE" }),
+
+  projects: () => request<AdminProject[]>("/api/admin/projects"),
+  projectFiles: () => request<{ file_name: string; registered: boolean }[]>("/api/admin/project-files"),
+  createProject: (p: Omit<AdminProject, "id">) => request<{ id: number }>("/api/admin/projects", json("POST", p)),
+  updateProject: (id: number, p: Omit<AdminProject, "id">) => request(`/api/admin/projects/${id}`, json("PUT", p)),
+  deleteProject: (id: number) => request<void>(`/api/admin/projects/${id}`, { method: "DELETE" }),
+  projectAccess: (id: number) => request<ProjectAccess>(`/api/admin/projects/${id}/access`),
+  setProjectAccess: (id: number, a: ProjectAccess) => request(`/api/admin/projects/${id}/access`, json("PUT", a)),
+
+  basemaps: () => request<Basemap[]>("/api/admin/basemaps"),
+  createBasemap: (b: BasemapInput) => request<Basemap>("/api/admin/basemaps", json("POST", b)),
+  updateBasemap: (id: number, b: BasemapInput) => request<Basemap>(`/api/admin/basemaps/${id}`, json("PUT", b)),
+  deleteBasemap: (id: number) => request<void>(`/api/admin/basemaps/${id}`, { method: "DELETE" }),
+  capabilities: (src: { url?: string; xml?: string }) =>
+    request<WmtsCapabilities>("/api/admin/basemaps/capabilities", json("POST", src)),
+};
+
+export type UserInput = Omit<AdminUser, "id" | "last_login_at"> & { password?: string };
+export type BasemapInput = Omit<Basemap, "id" | "version">;

@@ -2,10 +2,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type OlMap from "ol/Map";
 import { api, ApiError } from "./api";
 import { ensureProjection } from "./projections";
-import type { GeoJSONFeature, ProjectConfig, ProjectSummary, TreeNode, User } from "./types";
+import type { Basemap, GeoJSONFeature, ProjectConfig, ProjectSummary, TreeNode, User } from "./types";
 import { MapView, type Tool } from "./components/MapView";
 import { LayerTree, initialVisibility, nodeKey, visibleWmsNames } from "./components/LayerTree";
 import { FeaturePanel } from "./components/FeaturePanel";
+import { AdminPanel } from "./components/AdminPanel";
+import { BasemapSwitcher, initialBasemapChoice, saveBasemapChoice } from "./components/BasemapSwitcher";
 
 interface Selection {
   layerId: string;
@@ -43,14 +45,30 @@ export default function App() {
   const [reloadToken, setReloadToken] = useState(0);
   const [showLogin, setShowLogin] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [showAdmin, setShowAdmin] = useState(false);
+  const [basemaps, setBasemaps] = useState<Basemap[]>([]);
+  const [baseId, setBaseId] = useState<number | null>(null);
+  const [overlayIds, setOverlayIds] = useState<Set<number>>(new Set());
   const mapRef = useRef<OlMap | null>(null);
 
   const refreshSession = useCallback(async () => {
     setUser(await api.me().catch(() => null));
-    const list = await api.projects().catch(() => []);
+    const [list, bms] = await Promise.all([api.projects().catch(() => []), api.basemaps().catch(() => [])]);
     setProjects(list);
     setSlug((s) => (s && list.some((p) => p.slug === s) ? s : list[0]?.slug ?? null));
+    setBasemaps(bms);
+    const choice = initialBasemapChoice(bms);
+    setBaseId(choice.baseId);
+    setOverlayIds(choice.overlayIds);
   }, []);
+
+  const chooseBase = (id: number | null) => { setBaseId(id); saveBasemapChoice(id, overlayIds); };
+  const toggleOverlay = (id: number) => {
+    const next = new Set(overlayIds);
+    if (next.has(id)) next.delete(id); else next.add(id);
+    setOverlayIds(next);
+    saveBasemapChoice(baseId, next);
+  };
 
   useEffect(() => { refreshSession(); }, [refreshSession]);
 
@@ -115,7 +133,7 @@ export default function App() {
         {user ? (
           <>
             <span className="muted">{user.full_name ?? user.login}</span>
-            {user.is_admin && <a className="button" href="/api/docs" target="_blank" rel="noreferrer">API</a>}
+            {user.is_admin && <button onClick={() => setShowAdmin(true)}>Administracja</button>}
             <button onClick={async () => { await api.logout(); await refreshSession(); }}>Wyloguj</button>
           </>
         ) : (
@@ -125,6 +143,8 @@ export default function App() {
 
       <div className="body">
         <aside className="sidebar">
+          <BasemapSwitcher basemaps={basemaps} baseId={baseId} overlayIds={overlayIds}
+            onBase={chooseBase} onToggleOverlay={toggleOverlay} />
           {config ? (
             <>
               <h3>Warstwy</h3>
@@ -173,6 +193,7 @@ export default function App() {
             <MapView
               config={config} wmsLayers={wmsLayers} editLayerId={editLayerId} tool={tool}
               reloadToken={reloadToken} mapRef={mapRef}
+              basemaps={basemaps} baseId={baseId} overlayIds={overlayIds}
               onIdentify={openFeature}
               onSelect={(layerId, feature) => setSelection({ layerId, feature, isNew: false })}
               onDrawn={(layerId, geometry) =>
@@ -201,6 +222,10 @@ export default function App() {
           />
         )}
       </div>
+
+      {showAdmin && user?.is_admin && (
+        <AdminPanel onClose={() => setShowAdmin(false)} onChanged={refreshSession} />
+      )}
 
       {showLogin && !user && (
         <div className="modal" onClick={(e) => e.target === e.currentTarget && setShowLogin(false)}>

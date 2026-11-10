@@ -7,10 +7,7 @@ import VectorLayer from "ol/layer/Vector";
 import LayerGroup from "ol/layer/Group";
 import ImageWMS from "ol/source/ImageWMS";
 import TileWMS from "ol/source/TileWMS";
-import TileGrid from "ol/tilegrid/TileGrid";
 import Collection from "ol/Collection";
-import { get as getProjection } from "ol/proj";
-import OSM from "ol/source/OSM";
 import VectorSource from "ol/source/Vector";
 import GeoJSON from "ol/format/GeoJSON";
 import { Draw, Modify, Select, Snap } from "ol/interaction";
@@ -22,21 +19,14 @@ import type { EventsKey } from "ol/events";
 import type Feature from "ol/Feature";
 import type { Geometry } from "ol/geom";
 import { api } from "../api";
-import type { GeoJSONFeature, ProjectConfig, TreeNode } from "../types";
+import type { Basemap, GeoJSONFeature, ProjectConfig, TreeNode } from "../types";
+import { PNG8, basemapLayer, ensureBasemapProjections, tileGridFor } from "../tiles";
 
 // --- Kafle rastrów
-// Rastry (skany, mozaiki, zdalne WMTS) idą jako kafle WMS na stałej siatce: te same adresy
+// Rastry projektu (skany, mozaiki) idą jako kafle WMS na stałej siatce: te same adresy
 // przy każdym oglądaniu, więc serwer (nginx przed QGIS) i przeglądarka mogą je cache'ować.
 // Wektory zostają jednym obrazem WMS bez cache — zmieniają się przy edycji.
-const TILE_SIZE = 512;
-const PNG8 = "image/png; mode=8bit";
-
-/** Siatka niezależna od zasięgu projektu: początek w (0,0), rozdzielczości co 2x. */
-function tileGridFor(crs: string): TileGrid {
-  const top = getProjection(crs)?.getUnits() === "degrees" ? 360 / TILE_SIZE : 4096; // m/px na z=0
-  const resolutions = Array.from({ length: 18 }, (_, z) => top / 2 ** z);
-  return new TileGrid({ origin: [0, 0], resolutions, tileSize: TILE_SIZE });
-}
+// Podkłady (ortofoto, topo, OSM...) pochodzą z katalogu Sophii, nie z projektu.
 
 /** Nazwa WMS -> format kafli dla warstw rastrowych i mozaik (pozostałe = wektory). */
 function tileFormats(config: ProjectConfig): Map<string, string> {
@@ -58,6 +48,9 @@ interface Props {
   editLayerId: string | null;
   tool: Tool;
   reloadToken: number;               // zmiana => przeładuj obiekty warstwy edycyjnej i WMS
+  basemaps: Basemap[];               // katalog podkładów (kolejność = sort_order)
+  baseId: number | null;             // wybrany podkład (null = brak)
+  overlayIds: Set<number>;           // włączone nakładki (np. cieniowanie)
   onIdentify: (layerId: string, pk: string) => void;
   onSelect: (layerId: string, feature: GeoJSONFeature) => void;
   onDrawn: (layerId: string, geometry: GeoJSONFeature["geometry"]) => void;
@@ -79,6 +72,8 @@ export function MapView(props: Props) {
   const wmsRef = useRef<ImageWMS | null>(null);
   const wmsLayerRef = useRef<ImageLayer<ImageWMS> | null>(null);
   const rasterGroupRef = useRef<LayerGroup | null>(null);
+  const basemapGroupRef = useRef<LayerGroup | null>(null);
+  const basemapLayersRef = useRef(new Map<string, TileLayer>());
   const tileLayersRef = useRef(new Map<string, TileLayer<TileWMS>>());
   const editSourceRef = useRef(new VectorSource<Feature<Geometry>>());
   const cbRef = useRef(props);
@@ -99,13 +94,16 @@ export function MapView(props: Props) {
     wmsLayerRef.current = wmsLayer;
     const rasterGroup = new LayerGroup();
     rasterGroupRef.current = rasterGroup;
+    const basemapGroup = new LayerGroup();
+    basemapGroupRef.current = basemapGroup;
     tileLayersRef.current = new Map();
+    basemapLayersRef.current = new Map();
     const tileGrid = tileGridFor(crs);
     const map = new OlMap({
       target: divRef.current!,
       controls: defaultControls().extend([new ScaleLine()]),
       layers: [
-        new TileLayer({ source: new OSM(), properties: { name: "basemap" } }),
+        basemapGroup,
         rasterGroup,
         wmsLayer,
         new VectorLayer({ source: editSourceRef.current, style: editStyle }),
@@ -121,6 +119,33 @@ export function MapView(props: Props) {
     return () => { map.setTarget(undefined); mapRef.current = null; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [config.slug]);
+
+  // --- podkłady: wybrany podkład + włączone nakładki, w kolejności katalogu
+  const { basemaps, baseId, overlayIds } = props;
+  useEffect(() => {
+    const group = basemapGroupRef.current;
+    if (!group) return;
+    let cancelled = false;
+    (async () => {
+      const active = basemaps.filter((b) => (b.is_overlay ? overlayIds.has(b.id) : b.id === baseId));
+      await ensureBasemapProjections(active);
+      if (cancelled) return;
+      const layers = active
+        .sort((a, b) => Number(a.is_overlay) - Number(b.is_overlay))   // podkład pod nakładkami
+        .map((b) => {
+          const key = `${b.id}@${b.version}`;
+          let layer = basemapLayersRef.current.get(key);
+          if (!layer) {
+            layer = basemapLayer(b, crs);
+            basemapLayersRef.current.set(key, layer);
+          }
+          return layer;
+        });
+      group.setLayers(new Collection(layers));
+    })().catch(console.error);
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [basemaps, baseId, overlayIds, config.slug]);
 
   // --- widoczne warstwy: rastry jako kafle (każdy osobno), wektory jednym obrazem WMS na wierzchu
   useEffect(() => {

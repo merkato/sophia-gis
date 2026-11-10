@@ -75,7 +75,54 @@ button.block, .reports .button { display: block; width: 100%; text-align: left; 
 .login { background: var(--surface); padding: 24px; border-radius: 10px; width: 320px; display: flex; flex-direction: column; gap: 10px; }
 .login h2 { margin: 0 0 6px; }
 
+/* --- podkłady w panelu bocznym */
+.basemaps .tree-row label { gap: 8px; }
+
+/* --- panel administratora */
+.admin { position: fixed; inset: 0; z-index: 20; background: var(--bg); display: flex; flex-direction: column; }
+.admin-head { display: flex; align-items: center; gap: 16px; padding: 8px 14px; background: var(--surface);
+  border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.admin-head h2 { margin: 0; font-size: 16px; }
+.admin-head .tabs { border: none; margin: 0; }
+.admin > .error { margin: 8px 14px 0; cursor: pointer; }
+.admin-body { flex: 1; overflow: auto; padding: 14px; }
+.admin-split { display: flex; gap: 16px; align-items: flex-start; }
+.admin-split > section:first-child { flex: 1; min-width: 0; }
+.admin-form { width: 380px; flex: none; background: var(--surface); border: 1px solid var(--line);
+  border-radius: 8px; padding: 12px 14px; position: sticky; top: 0; }
+.admin-form h3, .basemap-form h3 { margin: 0 0 10px; font-size: 15px; }
+.admin-actions { margin-bottom: 10px; }
+.narrow { max-width: 760px; }
+.notice { background: color-mix(in srgb, var(--accent) 12%, transparent); padding: 8px 10px; border-radius: 6px; margin-bottom: 10px; }
+.notice code { user-select: all; font-size: 14px; }
+table.grid { width: 100%; border-collapse: collapse; background: var(--surface); border: 1px solid var(--line); border-radius: 8px; }
+table.grid th { text-align: left; font-size: 12px; color: var(--muted); font-weight: 600; padding: 8px; border-bottom: 1px solid var(--line); }
+table.grid td { padding: 6px 8px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+table.grid tr:last-child td { border-bottom: none; }
+table.grid td input:not([type="checkbox"]), table.grid td select { width: 100%; }
+table.grid tr.inactive td { opacity: .55; }
+.row-actions { white-space: nowrap; text-align: right; }
+.row-actions button { margin-left: 4px; }
+input.num { width: 80px !important; }
+.form fieldset { border: 1px solid var(--line); border-radius: 8px; margin: 0 0 12px; padding: 8px 12px 10px; }
+.form fieldset legend { font-size: 12px; color: var(--muted); padding: 0 4px; }
+.form fieldset > input, .form fieldset > textarea { width: 100%; margin-bottom: 8px; }
+.check { display: flex; align-items: center; gap: 6px; margin: 4px 0; cursor: pointer; }
+.inline { display: flex; gap: 6px; align-items: center; }
+.inline input { flex: 1; }
+ul.plain { list-style: none; padding: 0; }
+ul.plain li { padding: 4px 0; }
+.basemap-form { width: 440px; flex: none; }
+.basemap-form + .preview { flex: 1; }
+.preview { position: sticky; top: 0; display: flex; flex-direction: column; gap: 6px; height: calc(100vh - 110px); min-width: 300px; }
+.preview-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.preview-map { flex: 1; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: #f2f2ee; }
+
 @media (max-width: 800px) {
   .sidebar { position: absolute; z-index: 5; height: calc(100% - 49px); width: 260px; }
   .feature-panel { position: absolute; right: 0; z-index: 6; height: calc(100% - 49px); width: 100%; }
+  .admin-split { flex-direction: column; }
+  .admin-form, .basemap-form, .preview { width: 100%; position: static; }
+  .preview { height: 360px; }
+  table.grid { display: block; overflow-x: auto; }
 }

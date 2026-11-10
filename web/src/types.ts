@@ -109,3 +109,56 @@ export interface RelatedGroup {
   pairs: [string, string][];
   features: GeoJSONFeature[];
 }
+
+// --- podkłady (wspólny katalog dla wszystkich projektów)
+export interface WmtsTileGrid {
+  crs: string;
+  origin: [number, number];
+  origins?: [number, number][] | null;
+  resolutions: number[];
+  matrix_ids: string[];
+  tile_size: [number, number];
+}
+
+export interface Basemap {
+  id: number;
+  name: string;
+  kind: "wmts" | "xyz" | "sophia";
+  is_overlay: boolean;
+  opacity: number;
+  visible_default: boolean;
+  enabled?: boolean;
+  sort_order: number;
+  attribution: string | null;
+  // wmts: url, request_encoding, layer, style, format, matrix_set, tile_grid, capabilities_url
+  // xyz: url, max_zoom   sophia: project, layers, format
+  config: Record<string, any>;
+  version: number;
+}
+
+export interface WmtsCapabilities {
+  title: string | null;
+  kvp_url: string | null;
+  capabilities_url: string | null;
+  layers: {
+    identifier: string; title: string; formats: string[]; styles: string[]; default_style: string | null;
+    matrix_sets: string[]; wgs84_bbox: number[] | null; resource_urls: Record<string, string>;
+  }[];
+  matrix_sets: Record<string, WmtsTileGrid>;
+}
+
+// --- panel administratora
+export interface AdminUser {
+  id: number; login: string; full_name: string | null; email: string | null;
+  is_admin: boolean; is_active: boolean; last_login_at: string | null; group_ids: number[];
+}
+export interface Group { id: number; name: string; description: string | null }
+export interface AdminProject {
+  id: number; slug: string; title: string; description: string | null; file_name: string;
+  sort_order: number; is_public: boolean;
+}
+export type ProjectRole = "viewer" | "editor" | "manager";
+export interface ProjectAccess {
+  groups: { group_id: number; role: ProjectRole }[];
+  layers: Record<string, unknown>[];
+}
