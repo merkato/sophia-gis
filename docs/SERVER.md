@@ -141,13 +141,35 @@ QGIS Server trzyma je otwarte.
 
 ## 5. QGIS Desktop ↔ baza na serwerze
 
-PostGIS nie jest wystawiony do internetu. Łącz się tunelem (wpis `sophia-db` dodał skrypt Windows):
+PostGIS nie jest wystawiony do internetu. Łączysz się tunelem SSH (wpis `sophia-db` dodał
+`setup-ssh.ps1`): `localhost:15432` na Windows → `127.0.0.1:5432` na serwerze.
 
 ```powershell
-ssh -N sophia-db          # zostaw okno otwarte
+D:\dev\sophia\scripts\windows\setup-pg.ps1 -StartTunnel
 ```
 
-W `pg_service.conf` na Windows: `host=localhost port=15432` w sekcji `[sophia]`.
+Skrypt:
+* zapisuje usługę `[sophia]` w `%APPDATA%\postgresql\.pg_service.conf`, **bez hasła**;
+* pyta o hasło (`POSTGRES_PASSWORD` z `/opt/sophia/.env`) i zapisuje je w `%APPDATA%\postgresql\pgpass.conf`
+  z dostępem tylko dla Ciebie;
+* uruchamia tunel w tle i testuje połączenie.
+
+Tunel na stałe, także po restarcie Windows:
+
+```powershell
+D:\dev\sophia\scripts\windows\setup-pg.ps1 -SkipPassword -Autostart
+```
+
+Rejestruje zadanie Harmonogramu „Sophia tunel bazy (sophia-db)”, które po zalogowaniu uruchamia
+`scripts\windows\sophia-tunnel.ps1` w tle. Pętla wznawia tunel po zerwaniu (uśpienie, zmiana sieci).
+Wymaga klucza SSH bez hasła albo działającego ssh-agent. Usunięcie: `-RemoveAutostart`.
+Zadanie wskazuje skrypt w repo, więc po przeniesieniu repo trzeba uruchomić `-Autostart` ponownie.
+
+**W QGIS:** Przeglądarka → PostgreSQL → *Nowe połączenie* → Nazwa `sophia`, **Usługa** `sophia`,
+pozostałe pola (host, port, baza, uwierzytelnianie) **puste**. Dzięki temu źródło warstw
+w projekcie to samo `service='sophia' … table=…`. Na serwerze ta sama nazwa usługi wskazuje
+kontener `db`, więc projekt działa po publikacji bez żadnych zmian. Nie zapisuj w połączeniu
+loginu ani hasła: trafiłyby do projektu, a diagnostyka Fii zgłosi taką warstwę.
 
 ## 6. Kopie zapasowe
 
