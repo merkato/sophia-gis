@@ -52,6 +52,11 @@ button.block, .reports .button { display: block; width: 100%; text-align: left; 
 .edit-btn.active { color: var(--edit); background: none; }
 
 .edit-tools { border-left: 3px solid var(--edit); padding-left: 10px; }
+.records input { width: 100%; margin: 8px 0 4px; }
+.records ul { list-style: none; padding: 0; margin: 6px 0 0; max-height: 50vh; overflow: auto; }
+.records .link-row { display: block; width: 100%; text-align: left; border: none; background: none; padding: 5px 6px; border-radius: 4px; }
+.records .link-row:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
+.records .link-row.active { background: color-mix(in srgb, var(--edit) 18%, transparent); color: inherit; }
 .toolgroup { display: flex; flex-wrap: wrap; gap: 6px; }
 
 .feature-panel { width: 360px; overflow: auto; background: var(--surface); border-left: 1px solid var(--line); padding: 12px 14px; }

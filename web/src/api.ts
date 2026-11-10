@@ -37,9 +37,10 @@ export const api = {
   projects: () => request<ProjectSummary[]>("/api/projects"),
   project: (slug: string) => request<ProjectConfig>(`/api/projects/${enc(slug)}`),
 
-  features: (slug: string, layerId: string, bbox: number[], crs: string) =>
+  // bbox = null: wszystkie rekordy (tabele bez geometrii)
+  features: (slug: string, layerId: string, bbox: number[] | null, crs: string) =>
     request<{ features: GeoJSONFeature[]; truncated: boolean }>(
-      `${featuresUrl(slug, layerId)}?bbox=${bbox.join(",")}&crs=${enc(crs)}&limit=5000`),
+      `${featuresUrl(slug, layerId)}?${bbox ? `bbox=${bbox.join(",")}&` : ""}crs=${enc(crs)}&limit=5000`),
   feature: (slug: string, layerId: string, pk: string, crs: string) =>
     request<GeoJSONFeature>(`${featuresUrl(slug, layerId)}/${enc(pk)}?crs=${enc(crs)}`),
   createFeature: (slug: string, layerId: string, f: Partial<GeoJSONFeature>, crs: string) =>

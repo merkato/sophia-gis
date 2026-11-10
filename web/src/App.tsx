@@ -6,6 +6,7 @@ import type { Basemap, GeoJSONFeature, ProjectConfig, ProjectSummary, TreeNode, 
 import { MapView, type Tool } from "./components/MapView";
 import { LayerTree, initialVisibility, nodeKey, visibleWmsNames } from "./components/LayerTree";
 import { FeaturePanel } from "./components/FeaturePanel";
+import { RecordList } from "./components/RecordList";
 import { AdminPanel } from "./components/AdminPanel";
 import { BasemapSwitcher, initialBasemapChoice, saveBasemapChoice } from "./components/BasemapSwitcher";
 
@@ -150,11 +151,22 @@ export default function App() {
               <h3>Warstwy</h3>
               <LayerTree tree={config.tree} visible={visible} onToggle={toggle}
                 editableIds={editableIds} editLayerId={editLayerId}
-                onEditLayer={(id) => { setEditLayerId(id); setTool(id ? "select" : "identify"); setSelection(null); }} />
+                onEditLayer={(id) => {
+                  setEditLayerId(id);
+                  // tabela bez geometrii: nic do zaznaczania na mapie — lista rekordów w panelu
+                  setTool(id && config.layers[id]?.geometry_type ? "select" : "identify");
+                  setSelection(null);
+                }} />
 
               {editLayer && (
                 <section className="edit-tools">
                   <h3>Edycja: {editLayer.name}</h3>
+                  {!editLayer.geometry_type ? (
+                    <RecordList config={config} layer={editLayer} reloadToken={reloadToken}
+                      selectedId={selection && selection.layerId === editLayer.id && !selection.isNew ? String(selection.feature.id) : null}
+                      onOpen={(pk) => openFeature(editLayer.id, pk)}
+                      onNew={() => setSelection({ layerId: editLayer.id, isNew: true, feature: { type: "Feature", id: "", geometry: null, properties: {} } })} />
+                  ) : (
                   <div className="toolgroup">
                     <button className={tool === "select" ? "active" : ""} onClick={() => setTool("select")}>Wybierz</button>
                     {editLayer.perms.insert && editLayer.geometry_type && (
@@ -166,6 +178,7 @@ export default function App() {
                       <button className={tool === "modify" ? "active" : ""} onClick={() => setTool("modify")}>Zmień geometrię</button>
                     )}
                   </div>
+                  )}
                 </section>
               )}
 

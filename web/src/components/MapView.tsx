@@ -189,7 +189,7 @@ export function MapView(props: Props) {
     const map = mapRef.current;
     const source = editSourceRef.current;
     source.clear();
-    if (!map || !editLayerId) return;
+    if (!map || !editLayerId || !config.layers[editLayerId]?.geometry_type) return;   // bez geometrii: lista w panelu
     let cancelled = false;
     const load = async () => {
       const extent = map.getView().calculateExtent(map.getSize());
