@@ -50,7 +50,7 @@ def _check_item(checked: bool, enabled: bool = True) -> QTableWidgetItem:
 
 
 class FiaDialog(QDialog):
-    LAYER_COLS = ["Warstwa", "Edycja", "Załączniki PDF", "Popup", "Ukryta", "Stan"]
+    LAYER_COLS = ["Warstwa", "Edycja", "Załączniki PDF", "Popup", "Tylko w QGIS", "Stan"]
 
     def __init__(self, iface, parent=None):
         super().__init__(parent)

@@ -67,6 +67,29 @@
    * `view` — dodatkowo filtruje odczyt obiektów przez API.
    * Brak przypisań = brak ograniczenia.
 
+## Podkłady (katalog wspólny dla wszystkich projektów)
+
+Podkłady nie pochodzą z projektów QGIS. Administrator definiuje je raz (Administracja → Podkłady,
+tabela `portal.basemaps`), a WebUI pokazuje je w każdym projekcie: jeden podkład i dowolne nakładki.
+Dzięki temu każda usługa ma **jedno źródło kafli**, niezależne od liczby projektów.
+
+| Rodzaj | Skąd kafle | Cache |
+|---|---|---|
+| `wmts` (np. geoportal.gov.pl) | przeglądarka → serwis dostawcy | dostawcy + przeglądarki; nasz serwer nie uczestniczy |
+| `xyz` (np. OSM) | przeglądarka → serwis dostawcy | jw. |
+| `sophia` (np. biblioteka TK25) | `/ows` z wybranego projektu Sophii | wspólny `tilecache`, jeden zestaw kafli |
+
+Edytor WMTS wczytuje GetCapabilities (adres albo wklejony XML) przez API (bez CORS), pokazuje
+warstwy, macierze kafli, formaty i style oraz podgląd na żywo. Kolejność osi w `TopLeftCorner`
+(EPSG:2180 i 4326 to północ/wschód) ustala pyproj. Adresy `http://` z GetCapabilities usług dostępnych
+po HTTPS są zamieniane na `https://`. Mapy w EPSG:2180 używają krajowej macierzy kafli GUGiK
+(narożnik 100000/850000, skale geoportalu), więc kafle geoportalu wyświetlają się 1:1.
+
+Warstwy, które w projekcie QGIS służą tylko do pracy (np. ortofoto), zaznacz w Fii jako
+**„Tylko w QGIS”**. Wtedy nie trafiają do WebUI (dla nikogo, także administratora) ani do `/ows`.
+Raporty dla obiektu (atlas) używają warstw zapisanych w układzie wydruku, więc ortofoto w nich
+zostaje. Wydruk widoku mapy zawiera tylko warstwy włączone w WebUI, na razie bez podkładu z katalogu.
+
 ## Rastry z wielu GeoTIFF
 
 * **Grupa jako mozaika** — grupa w drzewie oznaczona w `.portal.json` → w portalu jeden przełącznik, do WMS
@@ -111,6 +134,9 @@
 - [x] Cache kafli rastrów (nginx przed QGIS Server, kafle WMS na stałej siatce)
 - [ ] Wspólna biblioteka rastrów (`data/rasters/<seria>/`) dla wielu projektów + narzędzie
       do synchronizacji (wgrywa tylko nowe/zmienione arkusze, przebudowuje VRT, czyści cache kafli)
+- [x] Katalog podkładów (WMTS/XYZ/warstwa Sophii) z edytorem GetCapabilities; panel administratora
+      (użytkownicy, grupy, projekty publiczne / z uprawnieniami)
+- [ ] Podkład z katalogu w wydruku widoku mapy (GetPrint: zewnętrzna warstwa WMTS w żądaniu)
 - [ ] Wyszukiwarka (pełnotekstowa po wskazanych polach), tabela atrybutów z filtrowaniem i eksportem
 - [ ] Historia zmian obiektu z `audit_log`, przywracanie wersji
 - [ ] Kopie zapasowe (pg_dump + wolumen załączników), monitoring

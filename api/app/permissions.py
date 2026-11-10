@@ -45,6 +45,10 @@ class ProjectContext:
 
     def perms(self, layer_id: str) -> LayerPerms:
         lyr = self.layer(layer_id)
+        if lyr.hidden:
+            # "Ukryta" (Fia) = tylko w QGIS Desktop, np. ortofoto do pracy, które w WebUI daje katalog
+            # podkładów. Niewidoczna dla wszystkich, także administratora — jedno źródło kafli.
+            return LayerPerms()
         if self.user and self.user.is_admin:
             return LayerPerms(True, lyr.editable, lyr.editable, lyr.editable)
         if layer_id in self._layer_overrides:
@@ -52,8 +56,6 @@ class ProjectContext:
             # Nadpisanie nie może włączyć edycji warstwy niezaznaczonej jako edytowalna w projekcie.
             return LayerPerms(p.view, p.insert and lyr.editable, p.update and lyr.editable,
                               p.delete and lyr.editable)
-        if lyr.hidden:
-            return LayerPerms()
         can_edit = lyr.editable and ROLE_RANK.get(self.role or "", 0) >= ROLE_RANK["editor"]
         return LayerPerms(True, can_edit, can_edit, can_edit)
 
