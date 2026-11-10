@@ -5,7 +5,10 @@ na elipsoidzie Bessela (datum Potsdam/Rauenberg ~ DHDN). Numer arkusza "RRCC":
     północna krawędź  = 56° - RR * 6'
     zachodnia krawędź = 5°50' + (CC-1) * 10'     (= pełne 10' od Ferro, Ferro = 17°40' W)
 np. 5264 Charlottenbrunn: 50°42'-50°48' N, 16°20'-16°30' E (na mapie: 34°0'-34°10' ö. L. v. Ferro).
-Numer to pierwsze 4 cyfry nazwy pliku. Opisy w narożnikach skanu pozwalają go sprawdzić.
+Numer to pierwsze 4 cyfry nazwy pliku. Numery w nawiasach, czyli stara numeracja pruska
+("5076_(2963)_..."), są pomijane. Numer można też podać ręcznie: --sheet 5076.
+Skrypt przerywa, gdy wyliczona ramka nie leży na rastrze (zły albo stary numer w nazwie).
+Opisy w narożnikach skanu (stopnie od Ferro) pozwalają numer sprawdzić.
 
 Tryb 1 — georeferencja jest dobra: ramka liczona z numeru wycina arkusz.
     python messtischblatt.py oryginaly\\5264_*.tif rastry\\
@@ -103,13 +106,29 @@ def write_cutline(geom: ogr.Geometry, srs: osr.SpatialReference, path: Path) -> 
     ds = None
 
 
+def sheet_from_name(name: str) -> str | None:
+    """Numer TK25 z początku nazwy pliku. Numery w nawiasach (stara numeracja pruska,
+    np. "5076_(2963)_...") są pomijane — mają też 4 cyfry i dawałyby ramkę setki km dalej."""
+    m = re.match(r"[\s_\-]*(\d{4})(?!\d)", re.sub(r"\(\s*\d+\s*\)", "", name))
+    return m.group(1) if m else None
+
+
+def raster_footprint(ds: gdal.Dataset) -> ogr.Geometry:
+    gt = ds.GetGeoTransform()
+    ring = ogr.Geometry(ogr.wkbLinearRing)
+    for px, py in ((0, 0), (ds.RasterXSize, 0), (ds.RasterXSize, ds.RasterYSize), (0, ds.RasterYSize), (0, 0)):
+        ring.AddPoint_2D(gt[0] + px * gt[1] + py * gt[2], gt[3] + px * gt[4] + py * gt[5])
+    poly = ogr.Geometry(ogr.wkbPolygon)
+    poly.AddGeometry(ring)
+    return poly
+
+
 def process(src: Path, out_dir: Path, margin: float, check: bool,
-            corners: list[tuple[float, float]] | None) -> None:
-    m = re.match(r"(\d{4})", src.name)
-    if not m:
-        print(f"!! {src.name}: nazwa nie zaczyna się od numeru arkusza (RRCC) — pomijam")
+            corners: list[tuple[float, float]] | None, sheet: str | None = None) -> None:
+    number = sheet or sheet_from_name(src.name)
+    if not number:
+        print(f"!! {src.name}: nazwa nie zaczyna się od numeru arkusza (RRCC) — podaj --sheet")
         return
-    number = m.group(1)
     ds = gdal.Open(str(src))
     srs = ds.GetSpatialRef()
     if srs is None:
@@ -120,9 +139,23 @@ def process(src: Path, out_dir: Path, margin: float, check: bool,
     w, s, e, n = sheet_bounds(number)
     print(f"{src.name}: arkusz {number}  {s:.4f}-{n:.4f} N, {w:.4f}-{e:.4f} E (Bessel)")
 
+    # Kontrola numeru: wyliczona ramka musi leżeć na rastrze (zły numer = ramka setki km dalej).
+    frame = neatline(number, srs.Clone(), margin)
+    foot = raster_footprint(ds)
+    covered = frame.Intersection(foot).GetArea() / frame.GetArea() if frame.Intersects(foot) else 0.0
+    if covered < 0.5:
+        dist_km = frame.Centroid().Distance(foot.Centroid()) / 1000
+        msg = (f"ramka arkusza {number} pokrywa się z rastrem w {covered:.0%} (środki {dist_km:.0f} km od siebie). "
+               f"Zły numer (stary numer w nazwie?) — podaj właściwy: --sheet RRCC")
+        if corners and covered > 0:
+            print(f"    !! {msg} — kontynuuję, bo podano --corners")
+        else:
+            print(f"!! {src.name}: {msg}")
+            return
+
     out_dir.mkdir(parents=True, exist_ok=True)
     cut = out_dir / f"{src.stem}.ramka.geojson"
-    write_cutline(neatline(number, srs.Clone(), margin), srs, cut)
+    write_cutline(frame, srs, cut)
     if check:
         print(f"    ramka: {cut}")
         return
@@ -170,16 +203,20 @@ def main() -> int:
     ap.add_argument("--check", action="store_true", help="tylko zapisz ramkę jako GeoJSON")
     ap.add_argument("--corners", nargs=4, metavar="X,Y",
                     help="piksele narożników ramki NW NE SW SE w rastrze wejściowym (jeden plik)")
+    ap.add_argument("--sheet", metavar="RRCC",
+                    help="numer TK25, gdy nazwa pliku go nie zawiera albo zaczyna się od starego numeru")
     a = ap.parse_args()
     files = [Path(p) for pattern in a.inputs for p in (glob.glob(pattern) or [pattern])]
     corners = [tuple(float(v) for v in c.split(",")) for c in a.corners] if a.corners else None
     if corners and len(files) != 1:
         ap.error("--corners działa dla jednego pliku")
+    if a.sheet and (len(files) != 1 or not re.fullmatch(r"\d{4}", a.sheet)):
+        ap.error("--sheet: jeden plik i numer w postaci RRCC (4 cyfry)")
     for f in files:
         if f.resolve().parent == a.out_dir.resolve():
             print(f"!! {f.name}: plik wejściowy w katalogu wyjściowym — pomijam")
             continue
-        process(f, a.out_dir, a.margin, a.check, corners)
+        process(f, a.out_dir, a.margin, a.check, corners, a.sheet)
     return 0
 
 

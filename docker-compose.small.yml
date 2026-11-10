@@ -38,7 +38,10 @@ services:
       FCGID_IO_TIMEOUT: 120
       QGIS_SERVER_MAX_THREADS: 2
       GDAL_CACHEMAX: 256                     # MB na proces
-      GDAL_DISABLE_READDIR_ON_OPEN: EMPTY_DIR
+      # TRUE: bez listowania katalogów, ale pliki obok rastra (.ovr, .aux.xml) są sprawdzane.
+      # NIE "EMPTY_DIR": wtedy GDAL nie widzi piramid VRT (tk25.vrt.ovr) i oddalony widok
+      # mozaiki czyta pełną rozdzielczość (zmierzone: 150 s zamiast 0,3 s).
+      GDAL_DISABLE_READDIR_ON_OPEN: "TRUE"
       VSI_CACHE: "TRUE"
       VSI_CACHE_SIZE: 50000000
     deploy:

@@ -102,9 +102,15 @@
 - [ ] Dodawanie obiektów potomnych z formularza rodzica, edycja tabel bez geometrii
 - [ ] Narzędzia: dzielenie/łączenie poligonów, przyciąganie do innych warstw, wpisywanie współrzędnych, undo
 - [ ] Blokada optymistyczna (wersja/`xmin`) przy równoczesnej edycji
+- [ ] **Prosty edytor schematu bazy** (WebUI, rola admin/manager): tworzenie tabel w schemacie
+      danych (np. `dane`) z kolumnami i typem geometrii/układem, klucz główny, indeks przestrzenny;
+      relacje (klucz obcy + relacja w projekcie QGIS, `Composition`/`Association`); słowniki.
+      Na razie robione w QGIS Desktop (DB Manager / Właściwości warstwy → Relacje).
 
 **Etap 3 — eksploatacja**
-- [ ] Cache kafli (WMTS z QGIS Server lub MapProxy) dla mozaik rastrowych
+- [x] Cache kafli rastrów (nginx przed QGIS Server, kafle WMS na stałej siatce)
+- [ ] Wspólna biblioteka rastrów (`data/rasters/<seria>/`) dla wielu projektów + narzędzie
+      do synchronizacji (wgrywa tylko nowe/zmienione arkusze, przebudowuje VRT, czyści cache kafli)
 - [ ] Wyszukiwarka (pełnotekstowa po wskazanych polach), tabela atrybutów z filtrowaniem i eksportem
 - [ ] Historia zmian obiektu z `audit_log`, przywracanie wersji
 - [ ] Kopie zapasowe (pg_dump + wolumen załączników), monitoring

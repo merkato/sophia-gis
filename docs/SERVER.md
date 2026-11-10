@@ -90,12 +90,14 @@ z przezroczystym tłem używaj `COMPRESS=WEBP` (stratne, zachowuje alfę, rozmia
 ustaw w warstwie **Właściwości → Przezroczystość → Pasmo przezroczystości: Pasmo 4**.
 
 **Messtischblatt (TK25): przycięcie do ramki** — `scripts/rasters/messtischblatt.py` liczy ramkę
-z numeru arkusza (pierwsze 4 cyfry nazwy pliku) i wycina arkusz z przezroczystością poza nią:
+z numeru arkusza (pierwsze 4 cyfry nazwy pliku; stary numer w nawiasie jest pomijany, `--sheet RRCC`
+podaje numer ręcznie) i wycina arkusz z przezroczystością poza nią. Uruchamiaj przez
+`messtischblatt.bat`, który ustawia Pythona z GDAL z OSGeo4W/QGIS (systemowy `python` nie ma `osgeo`):
 
 ```bat
-python scripts\rasters\messtischblatt.py oryginaly\*.tif rastry\ --margin 4
+D:\dev\sophia\scripts\rasters\messtischblatt.bat oryginaly\*.tif E:\gis\rasters\tk25 --margin 4
 rem gdy georeferencja skanu jest zła: piksele narożników ramki NW NE SW SE w rastrze wejściowym
-python scripts\rasters\messtischblatt.py oryginaly\5364_*.tif rastry\ --margin 4 --corners 400,472 3171,461 406,3089 3180,3072
+D:\dev\sophia\scripts\rasters\messtischblatt.bat oryginaly\5364_*.tif E:\gis\rasters\tk25 --margin 4 --corners 400,472 3171,461 406,3089 3180,3072
 ```
 
 `--check` zapisuje samą ramkę jako GeoJSON. Wczytaj ją w QGIS na tle skanu: jeśli nie pokrywa się
@@ -116,6 +118,32 @@ działają wtedy po obu stronach bez zmian. Kopia zapasowa pomija pliki rastrowe
 ```powershell
 scp -r E:\gis\archiwalne\sokolec\rastry sophia:/opt/sophia/data/projects/sokolec/
 ```
+
+### Biblioteka rastrów dla wielu projektów
+
+Serie używane w kilku projektach (np. TK25) trzymaj w jednym miejscu, jako jeden VRT:
+
+```
+E:\gis\rasters\tk25\  (arkusze .tif, tk25.vrt, tk25.vrt.ovr)  ->  /opt/sophia/data/rasters/tk25/
+E:\gis\<folder>\<projekt>\<projekt>.qgz                       ->  /opt/sophia/data/projects/<slug>/<slug>.qgz
+```
+
+Projekt musi leżeć dwa poziomy pod `E:\gis`. Wtedy ścieżka względna `../../rasters/tk25/tk25.vrt`
+działa lokalnie i na serwerze (w kontenerze `/projects/<slug>/../../rasters` = `/rasters`).
+W QGIS warstwa VRT potrzebuje pasma 4 jako pasma przezroczystości.
+
+Po dodaniu arkusza (w OSGeo4W Shell, w `E:\gis\rasters\tk25`):
+
+```bat
+dir /b *.tif > lista.txt && gdalbuildvrt -resolution highest -r average -input_file_list lista.txt tk25.vrt && del lista.txt
+del tk25.vrt.ovr
+gdaladdo -r average --config COMPRESS_OVERVIEW WEBP --config WEBP_LEVEL_OVERVIEW 85 --config SPARSE_OK_OVERVIEW YES --config GDAL_TIFF_OVR_BLOCKSIZE 512 tk25.vrt 2 4 8 16 32 64 128 256
+```
+
+**Piramidy VRT (`tk25.vrt.ovr`) są obowiązkowe.** Arkusze mają różne rozdzielczości, więc GDAL nie
+użyje piramid samych arkuszy i bez `.ovr` oddalony widok czyta pełną rozdzielczość: 150 s zamiast
+0,3 s na jeden obraz. Potem wyślij nowe pliki, `tk25.vrt` i `tk25.vrt.ovr`, zrestartuj `qgis`
+i wyczyść cache kafli.
 
 ### Kafle i cache
 
