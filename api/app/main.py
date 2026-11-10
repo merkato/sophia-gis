@@ -6,7 +6,7 @@ from fastapi import FastAPI
 from .config import get_settings
 from .db import close_pools, portal_conn
 from .migrations import run_migrations
-from .routers import admin, attachments, auth, basemaps, features, ows, projects, reports
+from .routers import admin, attachments, auth, basemaps, features, fields, ows, projects, reports
 from .security import hash_password
 
 log = logging.getLogger("sophia")
@@ -37,7 +37,7 @@ async def lifespan(_: FastAPI):
 app = FastAPI(title="Sophia API", version="0.1.0", lifespan=lifespan,
               docs_url="/api/docs", openapi_url="/api/openapi.json")
 
-for r in (auth, projects, features, attachments, reports, ows, admin, basemaps):
+for r in (auth, projects, features, fields, attachments, reports, ows, admin, basemaps):
     app.include_router(r.router)
 app.include_router(basemaps.admin)
 

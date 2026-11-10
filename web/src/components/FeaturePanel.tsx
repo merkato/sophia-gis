@@ -114,6 +114,7 @@ export function FeaturePanel({ config, layerId, feature, isNew, onSaved, onDelet
             <label key={f.name} className="field">
               <span>{f.alias ?? f.name}{f.not_null && f.editable ? " *" : ""}</span>
               <FieldInput field={f} value={values[f.name]} readOnly={!canEdit}
+                source={{ slug: config.slug, layerId, version: config.version }}
                 onChange={(v) => setValues((s) => ({ ...s, [f.name]: v }))} />
             </label>
           ))}

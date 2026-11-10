@@ -71,6 +71,11 @@ export const api = {
     `/api/projects/${enc(slug)}/reports/${enc(layout)}?${new URLSearchParams(params)}`,
 
   basemaps: () => request<Basemap[]>("/api/basemaps"),
+
+  // RelationReference / ValueRelation: wartości do wyboru dla pola formularza
+  fieldOptions: (slug: string, layerId: string, field: string) =>
+    request<{ layer_id: string; layer_name: string; options: { value: string; label: string }[] }>(
+      `/api/projects/${enc(slug)}/layers/${enc(layerId)}/fields/${enc(field)}/options`),
 };
 
 const json = (method: string, body: unknown): RequestInit => ({ method, body: JSON.stringify(body) });
