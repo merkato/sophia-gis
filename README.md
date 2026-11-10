@@ -14,6 +14,7 @@ z kontrolą uprawnień i zasięgów przestrzennych.
 | `db/init/` | Schemat `portal` (tworzony przy pierwszym starcie bazy) |
 | `docs/ARCHITECTURE.md` | Architektura, model uprawnień, roadmapa |
 | `docs/SERVER.md` | Wdrożenie na VPS: klucz SSH na Windows, konfiguracja Ubuntu, rastry, kopie zapasowe |
+| `docs/TODO.md` | Bieżąca lista zadań (WebUI, Fia) w kolejności realizacji |
 | `scripts/` | `windows/setup-ssh.ps1`, `server/setup-ubuntu.sh`, `server/backup.sh` |
 
 ## Szybki start
