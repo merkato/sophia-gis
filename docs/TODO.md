@@ -1,6 +1,6 @@
 # TO DO — WebUI i Fia
 
-Lista z 10.11.2026 (aktualizacja 11.11.2026). Kolejność jest kolejnością realizacji.
+Lista z 10.11.2026 (aktualizacja 11.11.2026, wieczór). Kolejność jest kolejnością realizacji.
 
 ## Główne zadania
 
@@ -120,6 +120,19 @@ Potrzebny do projektów z podziałem danych na jednostki terenowe (centrala widz
 - [ ] `config/pg_service.conf` poza gitem (w repo tylko `pg_service.conf.example`), żeby
       hasło na serwerze nie blokowało `git pull`.
 - [x] Mapa (z podkładami) także bez wybranego projektu / dla niezalogowanych (razem z wydrukiem).
+- [x] Fia: VRT z piramidami dla rastrów RGBA (kompresja piramid zależna od pasm, `hideNodata`) (11.11).
+- [x] Panel warstw: podkład i nakładki na dole, suwak przezroczystości ◐ dla rastrów, podkładów
+      i nakładek — zapamiętany w przeglądarce, uwzględniany na wydruku (af0ccb6).
+- [x] Atrybucja warstw z projektu QGIS (QGIS Server → Atrybucja, zapasowo Metadane → Prawa) na mapie
+      i w „Źródłach” wydruku (56a4ef9).
+
+## Do sprawdzenia (zrobione, nieprzetestowane w pełni)
+
+- [ ] Wydruk z szablonu QGIS przez Sophię — żaden projekt na serwerze nie ma jeszcze szablonu.
+- [ ] Mapa bez projektu (same podkłady), także dla niezalogowanych.
+- [ ] Zakładki Fii w QGIS: „Zakres danych”, „Narzędzia pobierania”, zapamiętane poświadczenia.
+- [ ] Wydruk w układzie Sophii przy dużych rastrach projektu: kafle z zimnego cache bywają wolne
+      (QGIS Server: 3 procesy), limit 60 s.
 
 ## Na sam koniec
 
