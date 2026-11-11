@@ -107,6 +107,15 @@ button.block, .reports .button { display: block; width: 100%; text-align: left; 
 .photo-missing { word-break: break-all; }
 .gallery h4 { margin: 4px 0 8px; }
 .gallery .toolgroup { margin-bottom: 10px; }
+.file-field { display: flex; flex-direction: column; gap: 6px; }
+.file-field .upload, .documents .upload { margin-top: 0; }
+.file-link { word-break: break-all; }
+.documents h4 { margin: 4px 0 8px; }
+.documents .toolgroup { margin-bottom: 8px; }
+.documents ul { list-style: none; padding: 0; margin: 0; }
+.documents li { display: flex; align-items: center; gap: 6px; padding: 5px 0; border-bottom: 1px solid var(--line); }
+.documents li a { flex: 1; min-width: 0; word-break: break-all; }
+.documents .row-actions { white-space: nowrap; }
 .visit + .visit { margin-top: 12px; }
 .visit h5 { margin: 0 0 6px; font-size: 13px; }
 .thumbs { display: grid; grid-template-columns: repeat(auto-fill, minmax(96px, 1fr)); gap: 6px; }

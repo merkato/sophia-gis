@@ -1,5 +1,5 @@
 import type {
-  AdminProject, AdminUser, Attachment, Basemap, GeoJSONFeature, Group, PhotoMeta, ProjectAccess, ProjectConfig,
+  AdminProject, AdminUser, Basemap, FileMeta, GeoJSONFeature, Group, PhotoMeta, ProjectAccess, ProjectConfig,
   ProjectSummary, RelatedGroup, User, WmtsCapabilities,
 } from "./types";
 
@@ -54,19 +54,6 @@ export const api = {
   related: (slug: string, layerId: string, pk: string, crs: string) =>
     request<RelatedGroup[]>(`${featuresUrl(slug, layerId)}/${enc(pk)}/related?crs=${enc(crs)}`),
 
-  attachments: (slug: string, layerId: string, pk: string) =>
-    request<Attachment[]>(`${featuresUrl(slug, layerId)}/${enc(pk)}/attachments`),
-  attachmentUrl: (slug: string, layerId: string, pk: string, id: string) =>
-    `${featuresUrl(slug, layerId)}/${enc(pk)}/attachments/${id}`,
-  uploadAttachment: (slug: string, layerId: string, pk: string, file: File, description?: string) => {
-    const fd = new FormData();
-    fd.append("file", file);
-    if (description) fd.append("description", description);
-    return request<Attachment>(`${featuresUrl(slug, layerId)}/${enc(pk)}/attachments`, { method: "POST", body: fd });
-  },
-  deleteAttachment: (slug: string, layerId: string, pk: string, id: string) =>
-    request<void>(`${featuresUrl(slug, layerId)}/${enc(pk)}/attachments/${id}`, { method: "DELETE" }),
-
   /** Zdjęcie do pola „Załącznik”. Z parent: od razu rekord w tabeli zdjęć powiązanej relacją. */
   uploadPhoto: (slug: string, layerId: string, field: string, file: File, crs: string,
     parent?: { layerId: string; pk: string }) => {
@@ -77,6 +64,17 @@ export const api = {
     if (parent) { fd.append("parent_layer", parent.layerId); fd.append("parent_pk", parent.pk); }
     return request<PhotoMeta & Partial<GeoJSONFeature> & { photo?: PhotoMeta }>(
       `/api/projects/${enc(slug)}/layers/${enc(layerId)}/photos`, { method: "POST", body: fd });
+  },
+  /** Dokument (PDF, GML…) do pola „Załącznik” — bez zmian; z parent: rekord w tabeli dokumentów. */
+  uploadFile: (slug: string, layerId: string, field: string, file: File, crs: string,
+    parent?: { layerId: string; pk: string }) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("field", field);
+    fd.append("crs", crs);
+    if (parent) { fd.append("parent_layer", parent.layerId); fd.append("parent_pk", parent.pk); }
+    return request<FileMeta & Partial<GeoJSONFeature> & { file?: FileMeta }>(
+      `/api/projects/${enc(slug)}/layers/${enc(layerId)}/files`, { method: "POST", body: fd });
   },
   /** Plik z pola „Załącznik” zapisanego obiektu; v = wartość pola, żeby zmiana zdjęcia omijała cache. */
   fileUrl: (slug: string, layerId: string, pk: string, field: string, value: unknown, thumb = false) =>

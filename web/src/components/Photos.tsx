@@ -103,13 +103,13 @@ export function PhotoField({ field, value, saved, onChange, disabled, slug, laye
 const DATE_NAMES = ["data_wizytacji", "wizytacja", "data_zdjecia", "data", "dodano", "created_at", "date"];
 
 /** Pole daty w tabeli zdjęć do grupowania galerii: pierwsze z widżetem Data/czas, inaczej po nazwie. */
-function dateFieldOf(layer: LayerInfo): FieldDef | undefined {
+export function dateFieldOf(layer: LayerInfo): FieldDef | undefined {
   return layer.fields.find((f) => f.widget === "DateTime")
     ?? DATE_NAMES.map((n) => layer.fields.find((f) => f.name.toLowerCase() === n && f.widget !== "Hidden")).find(Boolean);
 }
 
 /** Dzień (YYYY-MM-DD, czas lokalny) z wartości daty/znacznika czasu z bazy. */
-function dayOf(v: unknown): string | null {
+export function dayOf(v: unknown): string | null {
   const s = v === null || v === undefined ? "" : String(v);
   if (/^\d{4}-\d{2}-\d{2}$/.test(s)) return s;
   const d = new Date(s);

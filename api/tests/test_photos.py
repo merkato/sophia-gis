@@ -133,3 +133,43 @@ def test_photo_table_visibility_follows_parent_extent():
 def test_photo_table_hidden_when_parent_layer_not_viewable():
     with_extent, _ = _visibility_sql({"zdjecia"})
     assert with_extent.endswith("false")
+
+
+# ---------------------------------------------------------------- dokumenty (PDF, GML…)
+
+def _file_field(flt: str | None) -> FieldDef:
+    return FieldDef("dokument", widget="ExternalResource", widget_config={"DocumentViewer": 0, "FileWidgetFilter": flt})
+
+
+def test_allowed_extensions_from_qgis_filter():
+    assert photos.allowed_extensions(_file_field("PDF (*.pdf);;GML z podpisem (*.gml *.xml)")) == {"pdf", "gml", "xml"}
+    assert photos.allowed_extensions(_file_field("Wszystkie pliki (*.*)")) is None
+    assert photos.allowed_extensions(_file_field("")) is None
+    assert photos.allowed_extensions(_file_field(None)) is None
+
+
+def test_check_extension():
+    f = _file_field("PDF (*.pdf);;GML (*.gml)")
+    assert photos.check_extension(f, "decyzja.PDF") == "pdf"
+    with pytest.raises(photos.PhotoError, match="Dozwolone"):
+        photos.check_extension(f, "skan.docx")
+    with pytest.raises(photos.PhotoError, match="niedozwolone"):
+        photos.check_extension(_file_field(None), "strona.html")   # zawsze blokowane, nawet bez filtra
+
+
+@pytest.mark.parametrize("name,expected", [
+    ("Decyzja nr 12_2026.pdf", "Decyzja nr 12_2026.pdf"),
+    (r"C:\Users\x\Wniosek: ZPL?.gml", "Wniosek_ ZPL_.gml"),
+    ("../../etc/passwd", "passwd"),
+    ("   ", "plik"),
+    (None, "plik"),
+])
+def test_safe_file_name(name, expected):
+    assert photos.safe_file_name(name) == expected
+
+
+def test_new_file_path_keeps_original_name():
+    p = photos.new_file_path("decyzje", "Decyzja ZPL.gml", date(2026, 11, 11))
+    assert p.startswith("pliki/decyzje/2026-11/") and p.endswith("/Decyzja ZPL.gml")
+    assert photos.normalize_value(p) == p
+    assert photos.is_file_field(_file_field("*.pdf")) and not photos.is_photo_field(_file_field("*.pdf"))

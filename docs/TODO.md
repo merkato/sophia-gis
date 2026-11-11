@@ -34,11 +34,14 @@ Lista z 10.11.2026 (aktualizacja 11.11.2026). Kolejność jest kolejnością rea
 - Zrobione: własne SVG w stylu QGIS (`web/src/components/Icons.tsx`) — bez kopiowania grafik QGIS (GPL).
   Pomiar i wydruk dojdą do paska razem z tymi narzędziami.
 
-### 5. Załączniki (PDF i inne) z WebUI — osobny katalog na projekt
+### 5. ✅ Załączniki (PDF i inne) z WebUI — osobny katalog na projekt
 - **Stan obecny:** WebUI już dodaje PDF (zakładka „Dokumenty” w formularzu), jeśli warstwa ma
   w Fii zaznaczone „Załączniki PDF”. Ograniczenia: tylko PDF (sprawdzanie `%PDF-`), pliki we
   wspólnym wolumenie `attachments` (`xx/yy/<uuid>.pdf`), nie w katalogu projektu.
-- Do zrobienia: dozwolone typy konfigurowane w Fii (PDF, obrazy, DOCX/ODT, ZIP…), limit
+- Zrobione jak zdjęcia (`docs/user/zalaczniki.md`): pole „Załącznik” bez podglądu obrazu albo tabela
+  dokumentów w relacji; typy z filtra plików widżetu QGIS; pliki bez zmian w `data/uploads/<slug>/pliki`;
+  stary mechanizm „Załączniki PDF” usunięty (na serwerze nie było plików). Limit per warstwa — z punktem 8.
+- Pierwotny plan: dozwolone typy konfigurowane w Fii (PDF, obrazy, DOCX/ODT, ZIP…), limit
   rozmiaru per warstwa, katalog uploadów per projekt (np. `data/uploads/<slug>/…`),
   uwzględnienie w kopii zapasowej, podgląd/pobieranie z formularza.
 
@@ -77,6 +80,19 @@ Potrzebny do przeniesienia projektu RDLP (wyłączenia z produkcji leśnej) z Li
 - Kolejność: silnik filtra w API → filtr w QGIS Server → model danych i migracja obecnych zasięgów
   (`extents`, `extent_assignments`) → Fia i panel administratora → dokumentacja na przykładzie RDLP.
 - Wchłania zaległe: zasięg obiektu nadrzędnego dla tabel bez geometrii.
+
+### 9. Tabela atrybutów zamiast listy rekordów w panelu bocznym
+- Usunąć listę rekordów tabel bez geometrii z panelu bocznego (`RecordList`). Przy dużej tabeli
+  z kilkunastoma atrybutami lista z jedną etykietą nie wystarcza.
+- Kliknięcie warstwy w panelu bocznym (lub ikona „Otwórz tabelę atrybutów” na pasku, jak w QGIS)
+  otwiera **tabelę atrybutów na środku ekranu**: okno przesuwane jak formularz obiektu, na telefonie
+  pełny ekran.
+- **Sortowanie** po kliknięciu nagłówka kolumny (rosnąco / malejąco).
+- **Ukrywanie kolumn** przez użytkownika — tymczasowe (bez zapisu w projekcie; najwyżej zapamiętane
+  w przeglądarce).
+- Kliknięcie wiersza otwiera rekord w formularzu (z pytaniem o niezapisane zmiany), „Dodaj rekord”
+  z paska działa jak dotąd. Także dla warstw z geometrią (wiersz → przybliżenie do obiektu).
+- Wyszukiwanie / filtr, stronicowanie po stronie API dla dużych tabel.
 
 ## Zaległe z wcześniejszych dni
 

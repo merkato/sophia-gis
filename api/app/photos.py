@@ -1,4 +1,4 @@
-"""Zdjęcia w polach z widżetem QGIS „Załącznik” (ExternalResource).
+"""Zdjęcia i dokumenty w polach z widżetem QGIS „Załącznik” (ExternalResource).
 
 W bazie (kolumna tekstowa) zapisujemy ścieżkę WZGLĘDNĄ, np. ``zdjecia/punkty/2026-11/<uuid>.jpg`` —
 tak samo, jak zapisuje ją QGIS przy ustawieniu „Ścieżka względna do projektu”. Na serwerze plik
@@ -193,3 +193,60 @@ def ensure_thumb(src: Path, dest: Path, px: int = THUMB_PX) -> Path:
         img.save(out, "JPEG", quality=80)
     write_atomic(dest, out.getvalue())
     return dest
+
+
+# --------------------------------------------------------------------------- pliki (PDF, GML, …)
+# Dokumenty zapisujemy bajt w bajt (podpisy elektroniczne, np. XAdES w GML, muszą zostać nienaruszone),
+# z oryginalną nazwą w osobnym podkatalogu: pliki/<tabela>/<rok-miesiąc>/<id>/<nazwa>.
+
+# Zawsze odrzucane: pliki wykonywalne i treści, które przeglądarka mogłaby uruchomić
+BLOCKED_EXT = {"exe", "com", "bat", "cmd", "msi", "scr", "ps1", "vbs", "js", "jse", "wsf", "sh", "jar",
+               "html", "htm", "xhtml", "svg", "hta", "php", "dll", "lnk"}
+# Wyświetlane w przeglądarce; pozostałe są pobierane (Content-Disposition: attachment)
+INLINE_TYPES = {"application/pdf", "image/jpeg", "image/png", "image/gif", "image/webp"}
+
+_FILTER_EXT = re.compile(r"\*\.([0-9A-Za-z_+-]+)")
+
+
+def is_file_field(f: FieldDef) -> bool:
+    """Pole „Załącznik” na dokumenty (bez podglądu obrazu)."""
+    return is_resource_field(f) and not is_photo_field(f)
+
+
+def allowed_extensions(f: FieldDef) -> set[str] | None:
+    """Rozszerzenia z filtra plików widżetu (np. „PDF (*.pdf);;GML (*.gml *.xml)”). None = dowolne."""
+    flt = str((f.widget_config or {}).get("FileWidgetFilter") or "")
+    if not flt.strip() or "*.*" in flt or re.search(r"\(\s*\*\s*\)", flt):
+        return None
+    exts = {e.lower() for e in _FILTER_EXT.findall(flt)}
+    return exts or None
+
+
+def safe_file_name(name: str | None) -> str:
+    """Oryginalna nazwa pliku bez ścieżki i znaków niedozwolonych w Windows/Linux."""
+    base = re.split(r"[\\/]", name or "")[-1]
+    base = re.sub(r'[\x00-\x1f<>:"|?*]+', "_", base).strip(" .")
+    if len(base) > 120:
+        stem, dot, ext = base.rpartition(".")
+        base = (stem[:110] + dot + ext[:9]) if dot else base[:120]
+    return base or "plik"
+
+
+def check_extension(f: FieldDef, name: str) -> str:
+    ext = name.rpartition(".")[2].lower() if "." in name else ""
+    if ext in BLOCKED_EXT:
+        raise PhotoError(f"Pliki .{ext} są niedozwolone")
+    allowed = allowed_extensions(f)
+    if allowed is not None and ext not in allowed:
+        raise PhotoError("Dozwolone typy plików: " + ", ".join(f".{e}" for e in sorted(allowed)))
+    return ext
+
+
+def new_file_path(table: str, name: str, today: date | None = None) -> str:
+    today = today or date.today()
+    safe = re.sub(r"[^0-9A-Za-z_-]+", "_", table).strip("_").lower() or "warstwa"
+    return f"pliki/{safe}/{today:%Y-%m}/{uuid.uuid4().hex[:12]}/{safe_file_name(name)}"
+
+
+def display_name(rel: str) -> str:
+    return rel.rsplit("/", 1)[-1]

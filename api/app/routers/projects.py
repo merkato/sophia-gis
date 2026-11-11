@@ -64,7 +64,6 @@ async def project_config(slug: str, user: CurrentUser | None = Depends(optional_
             "geometry_type": lyr.geometry_type,
             "crs": lyr.crs,
             "popup": lyr.popup,
-            "attachments": lyr.attachments,
             "display_expression": lyr.display_expression,
             "primary_key": lyr.pg.key if lyr.pg else None,
             "fields": [asdict(f) for f in lyr.fields],

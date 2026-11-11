@@ -39,7 +39,6 @@ export interface LayerInfo {
   geometry_type: "Point" | "Line" | "Polygon" | null;
   crs: string | null;
   popup: boolean;
-  attachments: boolean;
   display_expression: string | null;
   primary_key: string | null;
   fields: FieldDef[];
@@ -92,15 +91,6 @@ export interface GeoJSONFeature {
   properties: Record<string, unknown>;
 }
 
-export interface Attachment {
-  id: string;
-  file_name: string;
-  size_bytes: number;
-  description: string | null;
-  uploaded_at: string;
-  uploaded_by: string | null;
-}
-
 /** Zdjęcie po przetworzeniu na serwerze (ścieżka względna do wpisania w pole „Załącznik”). */
 export interface PhotoMeta {
   path: string;
@@ -109,6 +99,14 @@ export interface PhotoMeta {
   taken_at: string | null;
   lon: number | null;
   lat: number | null;
+}
+
+/** Dokument zapisany na serwerze bez zmian (suma SHA-256 — np. do weryfikacji pliku z podpisem). */
+export interface FileMeta {
+  path: string;
+  name: string;
+  size: number;
+  sha256: string;
 }
 
 export interface RelatedGroup {

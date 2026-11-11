@@ -8,6 +8,7 @@ Dla osób, które **przygotowują projekty w QGIS** (autor projektu) i **pracuj�
 | Temat | Co opisuje |
 |---|---|
 | [Zdjęcia w obiektach](zdjecia.md) | pole „Załącznik” w tabeli albo tabela zdjęć w relacji, aparat w telefonie |
+| [Dokumenty w obiektach](zalaczniki.md) | PDF, GML z podpisem, DOCX… — te same dwa warianty, pliki bez zmian |
 
 Zasady ogólne, wspólne dla wszystkich tematów:
 - warstwy edytowalne w WebUI muszą pochodzić z **PostGIS**, z połączenia przez usługę `sophia`
@@ -15,7 +16,7 @@ Zasady ogólne, wspólne dla wszystkich tematów:
 - formularz w WebUI powstaje z ustawień *Właściwości warstwy → Formularz atrybutów*: aliasy,
   widżety (lista wartości, odwołanie do relacji, data, pole wyboru, załącznik…), pola ukryte
   i tylko do odczytu, pola wymagane,
-- relacje (*Projekt → Właściwości → Relacje*) dają w formularzu zakładki **Powiązane** i **Zdjęcia**,
+- relacje (*Projekt → Właściwości → Relacje*) dają w formularzu zakładki **Powiązane**, **Zdjęcia** i **Dokumenty**,
 - przed publikacją sprawdź zakładkę **Diagnostyka** w Fii,
 - hasło do Sophii Fia trzyma w **menedżerze uwierzytelniania QGIS** (zakładka **Serwer**,
   „Zapamiętaj…”). Służy do publikacji i do pobierania zdjęć.

@@ -33,10 +33,7 @@ tar -czf "$DEST/projects.tar.gz" -C "$APP_DIR/data" \
   --exclude='*.jp2' --exclude='*.ecw' --exclude='*.vrt' --exclude='*.aux.xml' \
   projects
 
-# 3. Załączniki PDF (wolumen Dockera) — czytane przez kontener api, bez znajomości ścieżek wolumenu
-docker compose exec -T api tar -czf - -C / attachments > "$DEST/attachments.tar.gz"
-
-# 3b. Zdjęcia i pliki wysłane z WebUI (bez miniatur — odtwarzają się same)
+# 3. Zdjęcia i dokumenty wysłane z WebUI (bez miniatur — odtwarzają się same)
 if [[ -d "$APP_DIR/data/uploads" ]]; then
   tar -czf "$DEST/uploads.tar.gz" -C "$APP_DIR/data" --exclude='.miniatury' uploads
 fi

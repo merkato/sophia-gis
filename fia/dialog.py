@@ -69,7 +69,7 @@ def _check_item(checked: bool, enabled: bool = True) -> QTableWidgetItem:
 
 
 class FiaDialog(QDialog):
-    LAYER_COLS = ["Warstwa", "Edycja", "Załączniki PDF", "Popup", "Tylko w QGIS", "Stan"]
+    LAYER_COLS = ["Warstwa", "Edycja", "Zdjęcia / pliki", "Popup", "Tylko w QGIS", "Stan"]
 
     def __init__(self, iface, parent=None):
         super().__init__(parent)
@@ -108,7 +108,8 @@ class FiaDialog(QDialog):
         lay = QVBoxLayout(w)
         lay.addWidget(QLabel(
             "Pola, aliasy, widżety formularza, relacje i wydruki są odczytywane automatycznie z projektu.\n"
-            "Tutaj wskazujesz tylko, co ma być edytowalne w portalu i gdzie można dołączać dokumenty PDF."))
+            "Tutaj wskazujesz tylko, co ma być edytowalne w portalu. Zdjęcia i pliki: widżet „Załącznik” "
+            "w polu albo tabela w relacji (docs/user/zalaczniki.md)."))
         lay.addWidget(self.layer_table)
         return w
 
@@ -125,7 +126,10 @@ class FiaDialog(QDialog):
             name.setFlags(Qt.ItemFlag.ItemIsEnabled)
             self.layer_table.setItem(row, 0, name)
             self.layer_table.setItem(row, 1, _check_item(c.get("editable", False), is_pg))
-            self.layer_table.setItem(row, 2, _check_item(c.get("attachments", False), is_pg))
+            att = QTableWidgetItem(checks.attachment_summary(lyr))
+            att.setFlags(Qt.ItemFlag.ItemIsEnabled)
+            att.setToolTip("Wykryte z projektu: pola z widżetem Załącznik i tabele w relacji")
+            self.layer_table.setItem(row, 2, att)
             self.layer_table.setItem(row, 3, _check_item(c.get("popup", True)))
             self.layer_table.setItem(row, 4, _check_item(c.get("hidden", False)))
             self._update_layer_status(row)
@@ -339,7 +343,6 @@ class FiaDialog(QDialog):
             lid = self.layer_table.item(row, 0).data(Qt.ItemDataRole.UserRole)
             layers[lid] = {
                 "editable": self.layer_table.item(row, 1).checkState() == Qt.CheckState.Checked,
-                "attachments": self.layer_table.item(row, 2).checkState() == Qt.CheckState.Checked,
                 "popup": self.layer_table.item(row, 3).checkState() == Qt.CheckState.Checked,
                 "hidden": self.layer_table.item(row, 4).checkState() == Qt.CheckState.Checked,
             }

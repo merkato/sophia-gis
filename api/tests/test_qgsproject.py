@@ -88,7 +88,7 @@ def project_path(tmp_path: Path) -> Path:
     with zipfile.ZipFile(path, "w") as zf:
         zf.writestr("ewid.qgs", QGS)
     (tmp_path / "ewid.portal.json").write_text(json.dumps({
-        "layers": {"dzialki_1": {"editable": True, "attachments": True},
+        "layers": {"dzialki_1": {"editable": True},
                    "bez_service": {"editable": True}},
         "raster_groups": ["Ortofotomapa 2024"],
         "reports": [{"layout": "Mapa A4", "enabled": False}],
@@ -101,7 +101,7 @@ def test_load_project(project_path: Path):
     assert p.title == "Ewidencja testowa" and p.crs == "EPSG:2180"
 
     dz = p.layers["dzialki_1"]
-    assert dz.editable and dz.attachments and dz.wms_name == "dzialki" and dz.geometry_type == "Polygon"
+    assert dz.editable and dz.wms_name == "dzialki" and dz.geometry_type == "Polygon"
     numer = next(f for f in dz.fields if f.name == "numer")
     assert numer.alias == "Numer działki" and numer.not_null
     uzytek = next(f for f in dz.fields if f.name == "uzytek")

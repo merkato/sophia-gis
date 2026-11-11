@@ -13,7 +13,9 @@ bez geometrii jest widoczny, gdy w zasięgu leży obiekt nadrzędny (relacja z p
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import logging
+import mimetypes
 
 import psycopg
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
@@ -46,12 +48,22 @@ def _uploads(ctx: ProjectContext):
     return get_settings().uploads_dir / ctx.slug
 
 
-def _photo_field(lyr: LayerDef, name: str) -> FieldDef:
+def _resource_field(lyr: LayerDef, name: str, photo: bool) -> FieldDef:
     f = next((f for f in lyr.fields if f.name == name), None)
-    if f is None or not photos.is_photo_field(f):
+    if f is None or not photos.is_resource_field(f):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Pole '{name}' nie ma widżetu „Załącznik”")
+    if photo and not photos.is_photo_field(f):
         raise HTTPException(status.HTTP_400_BAD_REQUEST,
-                            f"Pole '{name}' nie ma widżetu „Załącznik” z podglądem obrazu")
+                            f"Pole '{name}' nie ma podglądu obrazu — użyj wysyłania pliku")
+    if not lyr.pg:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Załączniki tylko w warstwach PostGIS")
     return f
+
+
+def _require_field_edit(ctx: ProjectContext, layer_id: str) -> None:
+    perms = ctx.perms(layer_id)
+    if not (perms.insert or perms.update):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Brak uprawnienia do edycji warstwy")
 
 
 async def _read_limited(file: UploadFile) -> bytes:
@@ -63,7 +75,7 @@ async def _read_limited(file: UploadFile) -> bytes:
     return data
 
 
-async def _store(ctx: ProjectContext, lyr: LayerDef, file: UploadFile) -> tuple[str, photos.Photo]:
+async def _store_photo(ctx: ProjectContext, lyr: LayerDef, file: UploadFile) -> tuple[str, photos.Photo]:
     data = await _read_limited(file)
     try:
         photo = await asyncio.to_thread(photos.process_photo, data)
@@ -79,85 +91,142 @@ async def _store(ctx: ProjectContext, lyr: LayerDef, file: UploadFile) -> tuple[
     return rel, photo
 
 
-def _meta(rel: str, photo: photos.Photo) -> dict:
+async def _store_file(ctx: ProjectContext, lyr: LayerDef, f: FieldDef, file: UploadFile) -> dict:
+    """Dokument zapisany bajt w bajt (bez konwersji), strumieniowo, z limitem i sumą SHA-256."""
+    name = photos.safe_file_name(file.filename)
+    try:
+        photos.check_extension(f, name)
+    except photos.PhotoError as e:
+        raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, str(e)) from e
+    s = get_settings()
+    rel = photos.new_file_path(lyr.pg.table if lyr.pg else lyr.id, name)
+    dest = _uploads(ctx) / rel
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    sha, size, limit = hashlib.sha256(), 0, s.max_attachment_mb * 1024 * 1024
+    try:
+        with dest.open("wb") as out:
+            while chunk := await file.read(1024 * 1024):
+                size += len(chunk)
+                if size > limit:
+                    raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                                        f"Plik większy niż {s.max_attachment_mb} MB")
+                sha.update(chunk)
+                out.write(chunk)
+        if size == 0:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Pusty plik")
+    except BaseException:
+        dest.unlink(missing_ok=True)
+        raise
+    return {"path": rel, "name": name, "size": size, "sha256": sha.hexdigest()}
+
+
+def _photo_meta(rel: str, photo: photos.Photo) -> dict:
     return {"path": rel, "width": photo.width, "height": photo.height, "taken_at": photo.taken_at,
             "lon": photo.lon, "lat": photo.lat}
 
 
-@router.post("/photos", status_code=201)
-async def upload_photo(slug: str, layer_id: str, file: UploadFile = File(...), field: str = Form(...),
-                       parent_layer: str | None = Form(None), parent_pk: str | None = Form(None),
-                       crs: str = Form("EPSG:2180"), user: CurrentUser = Depends(require_user)):
-    """Bez rodzica (wariant A): zapisuje plik i zwraca ścieżkę do wpisania w pole formularza.
-    Z rodzicem (wariant B): dodatkowo tworzy rekord w tabeli zdjęć i zwraca go jako GeoJSON."""
-    ctx = await load_project_context(slug, user)
-    lyr = ctx.layer(layer_id)
-    _photo_field(lyr, field)
-    if not lyr.pg:
-        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Zdjęcia tylko w warstwach PostGIS")
-
-    if parent_layer is None:
-        perms = ctx.perms(layer_id)
-        if not (perms.insert or perms.update):
-            raise HTTPException(status.HTTP_403_FORBIDDEN, "Brak uprawnienia do edycji warstwy")
-        rel, photo = await _store(ctx, lyr, file)
-        return _meta(rel, photo)
-
+async def _insert_child(ctx: ProjectContext, user: CurrentUser, lyr: LayerDef, field: str, rel: str,
+                        parent_layer: str, parent_pk: str | None, crs: str,
+                        gps: tuple[float, float] | None = None) -> dict:
+    """Wariant B: rekord w tabeli zdjęć/dokumentów powiązanej relacją z obiektem nadrzędnym.
+    Klucz obcy z wiersza rodzica (rodzic musi być widoczny dla użytkownika); tabela z geometrią
+    punktową dostaje punkt z GPS zdjęcia albo punkt leżący na obiekcie nadrzędnym."""
     if parent_pk is None:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Brak parent_pk")
-    ctx.require(layer_id, "insert")
+    ctx.require(lyr.id, "insert")
     parent = ctx.require(parent_layer, "view")
     relation = next((r for r in ctx.project.relations
-                     if r.parent_layer == parent_layer and r.child_layer == layer_id), None)
+                     if r.parent_layer == parent_layer and r.child_layer == lyr.id), None)
     if relation is None or not parent.pg or parent.pg.conninfo != lyr.pg.conninfo:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Brak relacji między warstwami w projekcie QGIS")
     srid = int(crs.split(":")[1]) if crs.upper().startswith("EPSG:") else 2180
     view_extent = await user_extent_ewkb(user, "view")
     edit_extent = await user_extent_ewkb(user, "edit")
 
-    rel, photo = await _store(ctx, lyr, file)
-    try:
-        async with layer_conn(lyr.pg.conninfo) as conn, conn.transaction():
-            pg = sql.Identifier(parent.pg.geometry_column) if parent.pg.geometry_column else None
-            prow = await (await conn.execute(sql.SQL(
-                "SELECT {cols}{g} FROM {t} WHERE {k}::text = {pk} AND {f} AND {e}").format(
-                cols=sql.SQL(", ").join(sql.Identifier(p) for p, _ in relation.pairs),
-                g=sql.SQL(", ST_AsGeoJSON(ST_PointOnSurface({}))::json AS __pos, ST_SRID({}) AS __srid").format(pg, pg)
-                if pg else sql.SQL(""),
-                t=_table(parent), k=sql.Identifier(parent.pg.key), pk=sql.Literal(parent_pk),
-                f=_base_filter(parent), e=_extent_condition(parent, pg, view_extent) if pg else sql.SQL("true"),
-            ))).fetchone()
-            if prow is None:
-                raise HTTPException(status.HTTP_404_NOT_FOUND, "Brak obiektu nadrzędnego")
+    async with layer_conn(lyr.pg.conninfo) as conn, conn.transaction():
+        pg = sql.Identifier(parent.pg.geometry_column) if parent.pg.geometry_column else None
+        prow = await (await conn.execute(sql.SQL(
+            "SELECT {cols}{g} FROM {t} WHERE {k}::text = {pk} AND {f} AND {e}").format(
+            cols=sql.SQL(", ").join(sql.Identifier(p) for p, _ in relation.pairs),
+            g=sql.SQL(", ST_AsGeoJSON(ST_PointOnSurface({}))::json AS __pos, ST_SRID({}) AS __srid").format(pg, pg)
+            if pg else sql.SQL(""),
+            t=_table(parent), k=sql.Identifier(parent.pg.key), pk=sql.Literal(parent_pk),
+            f=_base_filter(parent), e=_extent_condition(parent, pg, view_extent) if pg else sql.SQL("true"),
+        ))).fetchone()
+        if prow is None:
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Brak obiektu nadrzędnego")
 
-            values = {c: prow[p] for p, c in relation.pairs}
-            values[field] = rel
-            cols = [sql.Identifier(k) for k in values]
-            vals: list[sql.Composable] = [sql.Literal(v) for v in values.values()]
-            # Tabela zdjęć z geometrią punktową: miejsce z GPS zdjęcia, inaczej punkt na obiekcie nadrzędnym
-            if lyr.pg.geometry_column and lyr.geometry_type == "Point":
-                geom = None
-                if photo.lon is not None:
-                    geom = _geom_sql(lyr, {"type": "Point", "coordinates": [photo.lon, photo.lat]}, 4326)
-                elif pg and prow.get("__pos"):
-                    geom = _geom_sql(lyr, prow["__pos"], prow["__srid"] or srid)
-                if geom is not None:
-                    await _check_geometry_in_extent(conn, lyr, geom, edit_extent)
-                    cols.append(sql.Identifier(lyr.pg.geometry_column))
-                    vals.append(geom)
+        values = {c: prow[p] for p, c in relation.pairs}
+        values[field] = rel
+        cols = [sql.Identifier(k) for k in values]
+        vals: list[sql.Composable] = [sql.Literal(v) for v in values.values()]
+        if lyr.pg.geometry_column and lyr.geometry_type == "Point":
+            geom = None
+            if gps is not None:
+                geom = _geom_sql(lyr, {"type": "Point", "coordinates": list(gps)}, 4326)
+            elif pg and prow.get("__pos"):
+                geom = _geom_sql(lyr, prow["__pos"], prow["__srid"] or srid)
+            if geom is not None:
+                await _check_geometry_in_extent(conn, lyr, geom, edit_extent)
+                cols.append(sql.Identifier(lyr.pg.geometry_column))
+                vals.append(geom)
+        try:
             pk = (await (await conn.execute(sql.SQL("INSERT INTO {t} ({c}) VALUES ({v}) RETURNING {k}::text AS pk").format(
                 t=_table(lyr), c=sql.SQL(", ").join(cols), v=sql.SQL(", ").join(vals),
                 k=sql.Identifier(lyr.pg.key)))).fetchone())["pk"]
-            row = await _fetch_one(conn, lyr, pk, srid, None)
-    except BaseException as e:
-        (_uploads(ctx) / rel).unlink(missing_ok=True)
-        if isinstance(e, psycopg.errors.IntegrityError):
+        except psycopg.errors.IntegrityError as e:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
-                                f"Nie można dodać rekordu zdjęcia: {e.diag.message_primary}") from e
-        raise
+                                f"Nie można dodać rekordu: {e.diag.message_primary}") from e
+        row = await _fetch_one(conn, lyr, pk, srid, None)
     feature = _row_to_feature(row)
-    await _audit(ctx, layer_id, pk, "insert", None, feature)
-    return {**feature, "photo": _meta(rel, photo)}
+    await _audit(ctx, lyr.id, pk, "insert", None, feature)
+    return feature
+
+
+@router.post("/photos", status_code=201)
+async def upload_photo(slug: str, layer_id: str, file: UploadFile = File(...), field: str = Form(...),
+                       parent_layer: str | None = Form(None), parent_pk: str | None = Form(None),
+                       crs: str = Form("EPSG:2180"), user: CurrentUser = Depends(require_user)):
+    """Zdjęcie. Bez rodzica (wariant A): zapisuje plik i zwraca ścieżkę do wpisania w pole formularza.
+    Z rodzicem (wariant B): dodatkowo tworzy rekord w tabeli zdjęć i zwraca go jako GeoJSON."""
+    ctx = await load_project_context(slug, user)
+    lyr = ctx.layer(layer_id)
+    _resource_field(lyr, field, photo=True)
+    if parent_layer is None:
+        _require_field_edit(ctx, layer_id)
+        rel, photo = await _store_photo(ctx, lyr, file)
+        return _photo_meta(rel, photo)
+    ctx.require(layer_id, "insert")
+    rel, photo = await _store_photo(ctx, lyr, file)
+    try:
+        feature = await _insert_child(ctx, user, lyr, field, rel, parent_layer, parent_pk, crs,
+                                      (photo.lon, photo.lat) if photo.lon is not None else None)
+    except BaseException:
+        (_uploads(ctx) / rel).unlink(missing_ok=True)
+        raise
+    return {**feature, "photo": _photo_meta(rel, photo)}
+
+
+@router.post("/files", status_code=201)
+async def upload_file(slug: str, layer_id: str, file: UploadFile = File(...), field: str = Form(...),
+                      parent_layer: str | None = Form(None), parent_pk: str | None = Form(None),
+                      crs: str = Form("EPSG:2180"), user: CurrentUser = Depends(require_user)):
+    """Dokument (PDF, GML z podpisem, DOCX…) zapisany bez zmian. Warianty A i B jak przy zdjęciach;
+    dozwolone typy z filtra plików widżetu „Załącznik” w QGIS."""
+    ctx = await load_project_context(slug, user)
+    lyr = ctx.layer(layer_id)
+    f = _resource_field(lyr, field, photo=False)
+    if parent_layer is None:
+        _require_field_edit(ctx, layer_id)
+        return await _store_file(ctx, lyr, f, file)
+    ctx.require(layer_id, "insert")
+    meta = await _store_file(ctx, lyr, f, file)
+    try:
+        feature = await _insert_child(ctx, user, lyr, field, meta["path"], parent_layer, parent_pk, crs)
+    except BaseException:
+        (_uploads(ctx) / meta["path"]).unlink(missing_ok=True)
+        raise
+    return {**feature, "file": meta}
 
 
 T = "__t"          # alias tabeli w zapytaniach z warunkiem widoczności
@@ -216,14 +285,19 @@ async def feature_file(slug: str, layer_id: str, pk: str, field: str, thumb: boo
     src = photos.resolve_file(rel, _uploads(ctx), ctx.path.parent)
     if src is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, f"Brak pliku na serwerze: {rel}")
-    headers = {"Cache-Control": "private, max-age=86400"}
+    headers = {"Cache-Control": "private, max-age=86400", "X-Content-Type-Options": "nosniff"}
     if thumb and photos.is_photo_field(f):
         try:
             t = await asyncio.to_thread(photos.ensure_thumb, src, photos.thumb_path(_uploads(ctx), src))
         except OSError as e:
             raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, "Nie da się odczytać obrazu") from e
         return FileResponse(t, media_type="image/jpeg", headers=headers)
-    return FileResponse(src, filename=src.name, content_disposition_type="inline", headers=headers)
+    media = mimetypes.guess_type(src.name)[0] or "application/octet-stream"
+    if src.suffix.lower().lstrip(".") in photos.BLOCKED_EXT:
+        media = "application/octet-stream"
+    inline = media in photos.INLINE_TYPES
+    return FileResponse(src, media_type=media, filename=src.name, headers=headers,
+                        content_disposition_type="inline" if inline else "attachment")
 
 
 projects_router = APIRouter(prefix="/api/projects/{slug}", tags=["photos"])

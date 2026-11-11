@@ -49,10 +49,37 @@ def _resource_field_issues(layer: QgsVectorLayer) -> list[tuple[str, str]]:
         if int(cfg.get("RelativeStorage") or 0) != 1:
             out.append(("warning", (f"Pole „{name}”: ustaw „Ścieżka względna do projektu” — "
                                     "inaczej WebUI nie znajdzie zdjęć")))
-        flt = str(cfg.get("FileWidgetFilter") or "").lower()
-        if str(cfg.get("DocumentViewer")) != "1" and not any(e in flt for e in IMAGE_EXT):
-            out.append(("info", f"Pole „{name}”: bez podglądu „Obraz” — WebUI pokaże plik, nie zdjęcie z aparatem"))
+        if not _is_photo(cfg) and not str(cfg.get("FileWidgetFilter") or "").strip():
+            out.append(("info", f"Pole „{name}”: brak filtra plików — WebUI przyjmie każdy typ "
+                                "(poza wykonywalnymi). Ustaw np. „PDF (*.pdf);;GML (*.gml)”."))
     return out
+
+
+def _is_photo(cfg: dict) -> bool:
+    flt = str(cfg.get("FileWidgetFilter") or "").lower()
+    return str(cfg.get("DocumentViewer")) == "1" or any(e in flt for e in IMAGE_EXT)
+
+
+def _resource_kinds(layer: QgsVectorLayer) -> list[str]:
+    kinds = []
+    for idx, fld in enumerate(layer.fields()):
+        setup = layer.editorWidgetSetup(idx)
+        if setup.type() == "ExternalResource":
+            kinds.append(("zdjęcie" if _is_photo(setup.config() or {}) else "plik") + f" ({fld.name()})")
+    return kinds
+
+
+def attachment_summary(layer: QgsMapLayer) -> str:
+    """Opis do tabeli warstw Fii: pola „Załącznik” i tabele zdjęć/plików w relacji (wariant A i B)."""
+    if not isinstance(layer, QgsVectorLayer):
+        return ""
+    parts = _resource_kinds(layer)
+    for rel in QgsProject.instance().relationManager().referencedRelations(layer):
+        child = rel.referencingLayer()
+        if child is not None and _resource_kinds(child):
+            photo = any(k.startswith("zdjęcie") for k in _resource_kinds(child))
+            parts.append(f"{'zdjęcia' if photo else 'pliki'}: {child.name()}")
+    return "; ".join(parts)
 
 
 def layer_issues(layer: QgsMapLayer, want_edit: bool = False) -> list[tuple[str, str]]:

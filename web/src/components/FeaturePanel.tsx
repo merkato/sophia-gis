@@ -1,7 +1,8 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { api } from "../api";
-import type { Attachment, GeoJSONFeature, ProjectConfig, RelatedGroup } from "../types";
+import type { GeoJSONFeature, ProjectConfig, RelatedGroup } from "../types";
 import { FieldInput } from "./FieldInput";
+import { DocumentList, fileFieldOf } from "./Files";
 import { PhotoGallery, photoFieldOf } from "./Photos";
 
 interface Props {
@@ -111,7 +112,6 @@ export const FeaturePanel = forwardRef<FeaturePanelHandle, Props>(function Featu
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [related, setRelated] = useState<RelatedGroup[]>([]);
-  const [attachments, setAttachments] = useState<Attachment[]>([]);
   const pk = isNew ? null : feature?.id ?? null;
   const canEdit = isNew ? layer.perms.insert : layer.perms.update;
   const reports = config.reports.filter((r) => r.layer_id === layerId);
@@ -130,20 +130,22 @@ export const FeaturePanel = forwardRef<FeaturePanelHandle, Props>(function Featu
   }, [pk, layerId, config]);
 
   useEffect(() => {
-    if (!pk) { setRelated([]); setAttachments([]); return; }
+    if (!pk) { setRelated([]); return; }
     loadRelated();
-    if (layer.attachments) {
-      api.attachments(config.slug, layerId, pk).then(setAttachments).catch(() => setAttachments([]));
-    }
-  }, [pk, layerId, config, layer.attachments, loadRelated]);
+  }, [pk, loadRelated]);
 
   // Wariant B zdjęć: tabela dzieci z polem „Załącznik” (obraz) -> galeria zamiast listy powiązanych
+  // Wariant B dokumentów: tabela dzieci z polem „Załącznik” na pliki -> lista w zakładce „Dokumenty”
   const photoGroups = related.filter((g) => g.direction === "child" && photoFieldOf(config.layers[g.layer_id]));
-  const otherGroups = related.filter((g) => !photoGroups.includes(g));
+  const docGroups = related.filter((g) => g.direction === "child" && fileFieldOf(config.layers[g.layer_id]));
+  const otherGroups = related.filter((g) => !photoGroups.includes(g) && !docGroups.includes(g));
   const photoCount = photoGroups.reduce((n, g) => n + g.features.length, 0);
+  const docCount = docGroups.reduce((n, g) => n + g.features.length, 0);
   useEffect(() => {
-    if ((tab === "related" && !otherGroups.length && related.length) || (tab === "photos" && !photoGroups.length && related.length)) setTab("attrs");
-  }, [tab, related.length, otherGroups.length, photoGroups.length]);
+    if (!related.length) return;
+    if ((tab === "related" && !otherGroups.length) || (tab === "photos" && !photoGroups.length)
+      || (tab === "docs" && !docGroups.length)) setTab("attrs");
+  }, [tab, related.length, otherGroups.length, photoGroups.length, docGroups.length]);
 
   const visibleFields = layer.fields.filter((f) => f.widget !== "Hidden" && f.name !== layer.primary_key);
 
@@ -193,15 +195,6 @@ export const FeaturePanel = forwardRef<FeaturePanelHandle, Props>(function Featu
     }
   };
 
-  const upload = async (file: File) => {
-    try {
-      await api.uploadAttachment(config.slug, layerId, pk!, file);
-      setAttachments(await api.attachments(config.slug, layerId, pk!));
-    } catch (e) {
-      setError((e as Error).message);
-    }
-  };
-
   return (
     <aside ref={win.ref} style={win.style} className={`feature-window${collapsed ? " collapsed" : ""}`}
       role="dialog" aria-label={`${layer.name}: ${isNew ? "nowy obiekt" : `#${pk}`}`}>
@@ -222,7 +215,7 @@ export const FeaturePanel = forwardRef<FeaturePanelHandle, Props>(function Featu
           <button className={tab === "attrs" ? "active" : ""} onClick={() => setTab("attrs")}>Atrybuty</button>
           {photoGroups.length > 0 && <button className={tab === "photos" ? "active" : ""} onClick={() => setTab("photos")}>Zdjęcia ({photoCount})</button>}
           {otherGroups.length > 0 && <button className={tab === "related" ? "active" : ""} onClick={() => setTab("related")}>Powiązane</button>}
-          {layer.attachments && <button className={tab === "docs" ? "active" : ""} onClick={() => setTab("docs")}>Dokumenty ({attachments.length})</button>}
+          {docGroups.length > 0 && <button className={tab === "docs" ? "active" : ""} onClick={() => setTab("docs")}>Dokumenty ({docCount})</button>}
           {reports.length > 0 && <button className={tab === "reports" ? "active" : ""} onClick={() => setTab("reports")}>Raporty</button>}
         </nav>
       )}
@@ -269,32 +262,10 @@ export const FeaturePanel = forwardRef<FeaturePanelHandle, Props>(function Featu
         </section>
       ))}
 
-      {tab === "docs" && pk && (
-        <section className="docs">
-          <ul>
-            {attachments.map((a) => (
-              <li key={a.id}>
-                <a href={api.attachmentUrl(config.slug, layerId, pk, a.id)} target="_blank" rel="noreferrer">📄 {a.file_name}</a>
-                <span className="muted"> {(a.size_bytes / 1024 / 1024).toFixed(1)} MB · {a.uploaded_by ?? "?"}</span>
-                {layer.perms.update && (
-                  <button className="icon" title="Usuń dokument" onClick={async () => {
-                    if (!confirm(`Usunąć ${a.file_name}?`)) return;
-                    await api.deleteAttachment(config.slug, layerId, pk, a.id);
-                    setAttachments(await api.attachments(config.slug, layerId, pk));
-                  }}>✕</button>
-                )}
-              </li>
-            ))}
-          </ul>
-          {layer.perms.update && (
-            <label className="upload">
-              Dodaj PDF
-              <input type="file" accept="application/pdf" hidden
-                onChange={(e) => { const f = e.target.files?.[0]; if (f) upload(f); e.target.value = ""; }} />
-            </label>
-          )}
-        </section>
-      )}
+      {tab === "docs" && pk && docGroups.map((g) => (
+        <DocumentList key={g.relation} config={config} group={g} parentLayerId={layerId} parentPk={String(pk)}
+          onChanged={loadRelated} onOpenRecord={onOpenRelated} />
+      ))}
 
       {tab === "reports" && pk && (
         <section className="reports">

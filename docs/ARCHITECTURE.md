@@ -43,7 +43,7 @@
   * `qgsproject.py` — parser `.qgs/.qgz` (lxml, bez PyQGIS), cache unieważniany po zmianie pliku,
   * `permissions.py` — rola grupy w projekcie → nadpisania per warstwa → zasięgi,
   * `routers/features.py` — CRUD GeoJSON, `bbox`, transformacje układów, relacje,
-  * `routers/attachments.py` — PDF na wolumenie `attachments`, metadane + SHA-256 w bazie,
+  * `routers/photos.py` — zdjęcia i dokumenty z pól „Załącznik” (ExternalResource) w `data/uploads/<slug>`,
   * `routers/reports.py` — layouty QGIS przez `GetPrint` (atlas ⇒ raport dla obiektu),
   * `routers/admin.py` — użytkownicy, grupy, zasięgi, projekty, uprawnienia, publikacja.
 * **WebUI** (`web/src`): wybór projektu z menu, drzewo warstw zgodne z QGIS (grupy, wzajemne wykluczanie,
@@ -103,7 +103,7 @@ zostaje. Wydruk widoku mapy zawiera tylko warstwy włączone w WebUI, na razie b
 {
   "version": 1,
   "layers": {
-    "dzialki_7a1f…": { "editable": true, "attachments": true, "popup": true, "hidden": false }
+    "dzialki_7a1f…": { "editable": true, "popup": true, "hidden": false }
   },
   "raster_groups": ["Ortofotomapa 2024"],
   "reports": [{ "layout": "Karta działki", "title": "Karta działki", "enabled": true }],

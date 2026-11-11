@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import type { FieldDef } from "../types";
+import { FileField } from "./Files";
 import { PhotoField, isPhotoField } from "./Photos";
 
 interface Source {
@@ -105,15 +106,9 @@ export function FieldInput({ field, value, onChange, readOnly, source, saved }: 
         return <PhotoField field={field} value={value} saved={saved} onChange={onChange} disabled={disabled}
           slug={source.slug} layerId={source.layerId} pk={source.pk ?? null} crs={source.crs ?? "EPSG:2180"} />;
       }
-      if (source?.pk && str && str === String(saved ?? "")) {
-        // inne pliki (PDF, DOCX…): pobieranie; wysyłanie z WebUI — punkt 5 TODO
-        return (
-          <div className="inline">
-            <input value={str} disabled={disabled} onChange={(e) => onChange(e.target.value || null)} />
-            <a className="button" href={api.fileUrl(source.slug, source.layerId, source.pk, field.name, str)}
-              target="_blank" rel="noreferrer" title="Otwórz plik">📄</a>
-          </div>
-        );
+      if (source) {
+        return <FileField field={field} value={value} saved={saved} onChange={onChange} disabled={disabled}
+          slug={source.slug} layerId={source.layerId} pk={source.pk ?? null} crs={source.crs ?? "EPSG:2180"} />;
       }
       return <input value={str} disabled={disabled} onChange={(e) => onChange(e.target.value || null)} />;
     case "RelationReference":

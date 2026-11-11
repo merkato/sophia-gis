@@ -58,7 +58,6 @@ class LayerDef:
     display_expression: str | None = None
     # z pliku .portal.json
     editable: bool = False
-    attachments: bool = False
     popup: bool = True
     hidden: bool = False
     tile_format: str | None = None      # rastry: format kafli w WebUI (None = wektor, bez kafli)
@@ -339,7 +338,6 @@ def load_project(path: Path) -> Project:
         over = layer_cfg.get(lid, {})
         # Edycja możliwa tylko dla warstw PostGIS z kluczem głównym.
         lyr.editable = bool(over.get("editable", False)) and lyr.pg is not None and lyr.pg.key is not None
-        lyr.attachments = bool(over.get("attachments", False)) and lyr.pg is not None
         lyr.popup = bool(over.get("popup", True))
         lyr.hidden = bool(over.get("hidden", False))
         if over.get("display_expression"):
