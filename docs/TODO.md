@@ -106,8 +106,9 @@ Potrzebny do projektów z podziałem danych na jednostki terenowe (centrala widz
 ## Zaległe z wcześniejszych dni
 
 - [ ] Edytor schematu bazy w WebUI (tabele, kolumny, relacje, słowniki) — patrz ARCHITECTURE.md.
-- [ ] `sync-rasters.ps1`: wysyła nowe arkusze biblioteki, przebudowuje VRT i piramidy,
-      restartuje QGIS Server i czyści cache kafli.
+- [x] `sync-rasters.ps1`: wysyła nowe/zmienione rastry (MD5) do biblioteki albo katalogu projektu,
+      restartuje QGIS Server, czyści cache kafli po podmianie; VRT i piramidy buduje Fia lokalnie.
+      Opis: `docs/SERVER.md` („Wysyłanie rastrów”).
 - [x] Podkład z katalogu w wydruku widoku mapy — wydruk w przeglądarce (`web/src/print.ts`): bieżący widok
       z podkładami i warstwami na A4/A3, tytuł, skala, podziałka, data, źródła. QGIS Server 4.2 nie tworzy
       warstw zewnętrznych (`EXTERNAL_WMS:`). Szablony QGIS: panel „Wydruk” (stałe skale, ramka na mapie,

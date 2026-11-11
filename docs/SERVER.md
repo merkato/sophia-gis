@@ -128,20 +128,37 @@ D:\dev\sophia\scripts\rasters\messtischblatt.bat oryginaly\5364_*.tif E:\gis\ras
 z ramką na mapie, georeferencja jest zła i trzeba użyć `--corners`. `--margin 4` (ok. 1 piksel)
 usuwa szparę między sąsiednimi arkuszami.
 
-Wiele arkuszy → wtyczka **Fia** → „Zbuduj VRT + piramidy”. Na serwer:
-
-```powershell
-scp -r D:\mapy\mapa_1900 sophia:/opt/sophia/data/rasters/
-```
+Wiele arkuszy → wtyczka **Fia** → „Zbuduj VRT + piramidy”. Na serwer wysyła je
+`scripts\windows\sync-rasters.ps1` (opis niżej, „Wysyłanie rastrów”).
 
 W projekcie QGIS ścieżki muszą być **względne**. Fia publikuje projekt do
 `data/projects/<slug>/<slug>.qgz`, więc najprościej trzymać rastry w podkatalogu obok projektu
 (lokalnie `moj-projekt\rastry\`, na serwerze `data/projects/moj-projekt/rastry/`). Ścieżki `./rastry/…`
 działają wtedy po obu stronach bez zmian. Kopia zapasowa pomija pliki rastrowe także w tym miejscu.
 
+### Wysyłanie rastrów (`sync-rasters.ps1`)
+
+Jedno polecenie z Windows (PowerShell, w katalogu repozytorium) wysyła folder z rastrami we właściwe
+miejsce na serwerze:
+
 ```powershell
-scp -r E:\gis\projekty\moj-projekt\rastry sophia:/opt/sophia/data/projects/moj-projekt/
+.\scripts\windows\sync-rasters.ps1 -Source E:\gis\projekty\moj-projekt\rastry\mapa_1900 -DryRun
+.\scripts\windows\sync-rasters.ps1 -Source E:\gis\projekty\moj-projekt\rastry\mapa_1900
+.\scripts\windows\sync-rasters.ps1 -Source E:\gis\rasters\tk25
 ```
+
+- **Cel wynika z folderu**: folder w `E:\gis\rasters\<seria>` → biblioteka `data/rasters/<seria>`;
+  folder w projekcie → `data/projects/<slug>/<ta sama ścieżka względna>` (projekt = najbliższy folder
+  nadrzędny z plikiem `.qgz`; slug = nazwa pliku `.qgz` albo `-Project <slug>`). Projekt musi być
+  wcześniej opublikowany przez Fię.
+- Wysyła tylko pliki **nowe i zmienione** (`.tif`, `.vrt`, `.ovr`, `.jp2` — porównanie MD5); każdy plik
+  trafia najpierw pod nazwą tymczasową, więc QGIS Server nie czyta niedokończonego pliku.
+- Na koniec **restartuje QGIS Server** (trzyma otwarte rastry i pamięta warstwy, których brakowało),
+  a gdy coś podmieniono lub usunięto — **czyści cache kafli**.
+- `-DryRun` — tylko plan; `-Delete` — usuwa na serwerze pliki, których nie ma lokalnie (bez tej
+  opcji są tylko wypisane); `-NoRestart` — bez restartu.
+- Katalog projektu na serwerze należy do roota (tworzy go API przy publikacji) — skrypt przygotowuje
+  podkatalog przez kontener `api`, bez `sudo`.
 
 ### Biblioteka rastrów dla wielu projektów
 
@@ -166,8 +183,8 @@ gdaladdo -r average --config COMPRESS_OVERVIEW WEBP --config WEBP_LEVEL_OVERVIEW
 
 **Piramidy VRT (`tk25.vrt.ovr`) są obowiązkowe.** Arkusze mają różne rozdzielczości, więc GDAL nie
 użyje piramid samych arkuszy i bez `.ovr` oddalony widok czyta pełną rozdzielczość: 150 s zamiast
-0,3 s na jeden obraz. Potem wyślij nowe pliki, `tk25.vrt` i `tk25.vrt.ovr`, zrestartuj `qgis`
-i wyczyść cache kafli.
+0,3 s na jeden obraz. Potem `sync-rasters.ps1 -Source E:\gis\rasters\tk25` — wyśle nowe arkusze,
+`tk25.vrt` i `tk25.vrt.ovr`, zrestartuje `qgis` i wyczyści cache kafli.
 
 ### Kafle i cache
 
