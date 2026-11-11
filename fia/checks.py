@@ -44,6 +44,8 @@ def _resource_field_issues(layer: QgsVectorLayer) -> list[tuple[str, str]]:
             continue
         cfg = setup.config() or {}
         name = fld.name()
+        if _holds_urls(layer, idx):
+            continue                    # pole z adresami internetowymi: WebUI pokazuje je jako linki
         if fld.isNumeric():
             out.append(("error", f"Pole „{name}”: widżet Załącznik wymaga pola tekstowego"))
         if int(cfg.get("RelativeStorage") or 0) != 1:
@@ -53,6 +55,15 @@ def _resource_field_issues(layer: QgsVectorLayer) -> list[tuple[str, str]]:
             out.append(("info", f"Pole „{name}”: brak filtra plików — WebUI przyjmie każdy typ "
                                 "(poza wykonywalnymi). Ustaw np. „PDF (*.pdf);;GML (*.gml)”."))
     return out
+
+
+def _holds_urls(layer: QgsVectorLayer, idx: int) -> bool:
+    """Pole „Załącznik” użyte na adresy internetowe (wartości http/https), nie na pliki."""
+    try:
+        values = [str(v) for v in layer.uniqueValues(idx, 50) if v not in (None, "") and str(v) != "NULL"]
+    except Exception:  # noqa: BLE001 — np. warstwa niedostępna
+        return False
+    return bool(values) and all(v.strip().lower().startswith(("http://", "https://")) for v in values)
 
 
 def _is_photo(cfg: dict) -> bool:
@@ -65,7 +76,8 @@ def _resource_kinds(layer: QgsVectorLayer) -> list[str]:
     for idx, fld in enumerate(layer.fields()):
         setup = layer.editorWidgetSetup(idx)
         if setup.type() == "ExternalResource":
-            kinds.append(("zdjęcie" if _is_photo(setup.config() or {}) else "plik") + f" ({fld.name()})")
+            kind = "link" if _holds_urls(layer, idx) else "zdjęcie" if _is_photo(setup.config() or {}) else "plik"
+            kinds.append(f"{kind} ({fld.name()})")
     return kinds
 
 

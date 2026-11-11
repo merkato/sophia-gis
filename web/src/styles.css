@@ -110,6 +110,7 @@ button.block, .reports .button { display: block; width: 100%; text-align: left; 
 .file-field { display: flex; flex-direction: column; gap: 6px; }
 .file-field .upload, .documents .upload { margin-top: 0; }
 .file-link { word-break: break-all; }
+.url-link { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; word-break: normal; }
 .documents h4 { margin: 4px 0 8px; }
 .documents .toolgroup { margin-bottom: 8px; }
 .documents ul { list-style: none; padding: 0; margin: 0; }

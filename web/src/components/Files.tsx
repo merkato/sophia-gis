@@ -26,6 +26,20 @@ function acceptOf(f: FieldDef): string | undefined {
   return exts.length ? [...new Set(exts)].join(",") : undefined;
 }
 
+/** Adres internetowy zamiast pliku (np. strona obiektu) — otwierany w nowej karcie. Tylko http(s). */
+export function isUrl(v: unknown): boolean {
+  return /^https?:\/\/\S+$/i.test(String(v ?? "").trim());
+}
+
+/** Link zewnętrzny: nowa karta, bez dostępu strony docelowej do okna Sophii. */
+function ExternalLink({ href }: { href: string }) {
+  return (
+    <a className="file-link url-link" href={href.trim()} target="_blank" rel="noopener noreferrer" title={href}>
+      ↗ {href.replace(/^https?:\/\//i, "")}
+    </a>
+  );
+}
+
 export function fileName(path: unknown): string {
   return String(path ?? "").replace(/\\/g, "/").split("/").pop() ?? "";
 }
@@ -55,6 +69,7 @@ export function FileField({ field, value, saved, onChange, disabled, slug, layer
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [draft, setDraft] = useState("");
   const str = value === null || value === undefined ? "" : String(value);
   const isSaved = !!str && !!pk && str === String(saved ?? "");
   const name = fileName(str);
@@ -72,6 +87,22 @@ export function FileField({ field, value, saved, onChange, disabled, slug, layer
     }
   };
 
+  // Adres internetowy: link do nowej karty + edycja adresu (bez wysyłania plików)
+  if (isUrl(str)) {
+    return (
+      <div className="file-field">
+        <ExternalLink href={str} />
+        {!disabled && (
+          <div className="inline">
+            <input type="url" value={str} aria-label={`${field.alias ?? field.name} — adres`}
+              onChange={(e) => onChange(e.target.value.trim() || null)} />
+            <button type="button" className="danger" onClick={() => onChange(null)}>Usuń</button>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className="file-field">
       {str ? (
@@ -87,6 +118,11 @@ export function FileField({ field, value, saved, onChange, disabled, slug, layer
           {str && <button type="button" className="danger" disabled={busy} onClick={() => onChange(null)}>Usuń plik</button>}
           {busy && <span className="muted">Wysyłanie…</span>}
         </div>
+      )}
+      {!disabled && !str && (
+        <input type="url" placeholder="…albo wklej adres internetowy (https://…)" value={draft}
+          aria-label={`${field.alias ?? field.name} — adres internetowy`}
+          onChange={(e) => { setDraft(e.target.value); if (isUrl(e.target.value)) { onChange(e.target.value.trim()); setDraft(""); } }} />
       )}
       {!disabled && str && !isSaved && !busy && <div className="muted">Plik zostanie przypisany po zapisaniu formularza.</div>}
       {error && <div className="error">{error}</div>}
@@ -147,12 +183,15 @@ export function DocumentList({ config, group, parentLayerId, parentPk, onChanged
       {error && <div className="error" style={{ whiteSpace: "pre-line" }}>{error}</div>}
       <ul>
         {rows.map((f) => {
-          const name = fileName(f.properties[field.name]);
+          const value = f.properties[field.name];
+          const name = fileName(value);
           const day = dateField ? dayOf(f.properties[dateField.name]) : null;
           return (
             <li key={f.id}>
-              <a href={api.fileUrl(config.slug, layer.id, String(f.id), field.name, f.properties[field.name])}
-                target="_blank" rel="noreferrer" title="Otwórz / pobierz">{iconFor(name)} {name}</a>
+              {isUrl(value) ? <ExternalLink href={String(value)} /> : (
+                <a href={api.fileUrl(config.slug, layer.id, String(f.id), field.name, value)}
+                  target="_blank" rel="noreferrer" title="Otwórz / pobierz">{iconFor(name)} {name}</a>
+              )}
               {day && <span className="muted"> {day.split("-").reverse().join(".")}</span>}
               <span className="row-actions">
                 <button className="icon" title="Otwórz rekord dokumentu" onClick={() => onOpenRecord(layer.id, String(f.id))}>✎</button>

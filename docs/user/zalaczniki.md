@@ -43,6 +43,14 @@ W formularzu WebUI pole pokazuje nazwę pliku (kliknięcie otwiera PDF w przegl�
 pobierane) oraz przyciski **📎 Wybierz plik / Zmień plik** i **Usuń plik**. Plik jest przypisany do
 obiektu po kliknięciu **Zapisz**.
 
+### Adres internetowy zamiast pliku
+
+To samo pole „Załącznik” może przechowywać **adres strony** (np. wątek na forum, kartę obiektu
+w innym serwisie). Wartość zaczynająca się od `http://` lub `https://` jest w WebUI pokazywana jako
+**link otwierany w nowej karcie**, z polem do edycji adresu. Puste pole pozwala wybrać plik **albo**
+wkleić adres. Fia rozpoznaje pole z samymi adresami i nie ostrzega o ścieżce względnej (w kolumnie
+„Zdjęcia / pliki” widać `link (pole)`).
+
 ## Wariant B — tabela dokumentów w relacji
 
 ```sql
