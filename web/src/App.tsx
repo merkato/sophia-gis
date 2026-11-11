@@ -2,12 +2,13 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type OlMap from "ol/Map";
 import { api, ApiError } from "./api";
 import { ensureProjection } from "./projections";
-import type { Basemap, GeoJSONFeature, ProjectConfig, ProjectSummary, TreeNode, User } from "./types";
+import type { Basemap, FetchResult, GeoJSONFeature, ProjectConfig, ProjectSummary, TreeNode, User } from "./types";
 import { MapView, type Tool } from "./components/MapView";
 import { LayerTree, initialVisibility, nodeKey, visibleWmsNames } from "./components/LayerTree";
 import { FeaturePanel, type FeaturePanelHandle } from "./components/FeaturePanel";
 import { RecordList } from "./components/RecordList";
 import { Toolbar } from "./components/Toolbar";
+import { FetchCard } from "./components/FetchCard";
 import { AdminPanel } from "./components/AdminPanel";
 import { BasemapSwitcher, initialBasemapChoice, saveBasemapChoice } from "./components/BasemapSwitcher";
 
@@ -72,6 +73,11 @@ export default function App() {
   const mapRef = useRef<OlMap | null>(null);
   const panelRef = useRef<FeaturePanelHandle>(null);
   const [sidebarOpen, setSidebarOpen] = useState(() => !matchMedia("(max-width: 800px)").matches);
+  // narzędzie pobierania (ULDK…): aktywne narzędzie i wynik ostatniego kliknięcia
+  const [fetchToolId, setFetchToolId] = useState<string | null>(null);
+  const [fetchState, setFetchState] = useState<{ loading: boolean; error: string | null; result: FetchResult | null }>(
+    { loading: false, error: null, result: null });
+  const fetchSeq = useRef(0);
   const [pending, setPending] = useState<(() => void) | null>(null);
 
   /**
@@ -173,13 +179,58 @@ export default function App() {
     setEditLayerId(id);
     // tabela bez geometrii: nic do zaznaczania na mapie — lista rekordów w panelu bocznym
     const geom = id ? config?.layers[id]?.geometry_type : null;
-    setTool(geom ? "select" : "identify");
+    chooseTool(geom ? "select" : "identify");
     if (id && !geom) setSidebarOpen(true);
     setSelection(null);
   });
 
   const newRecord = () => editLayer && guard(() =>
     setSelection({ layerId: editLayer.id, isNew: true, feature: { type: "Feature", id: "", geometry: null, properties: {} } }));
+
+  const fetchTool = tool === "fetch" ? config?.tools?.find((t) => t.id === fetchToolId) ?? null : null;
+
+  const chooseTool = (t: Tool) => {
+    setTool(t);
+    if (t !== "fetch") setFetchState({ loading: false, error: null, result: null });
+  };
+
+  const startFetchTool = (id: string) => {
+    if (tool === "fetch" && fetchToolId === id) { chooseTool(editLayerId ? "select" : "identify"); return; }
+    setFetchToolId(id);
+    setFetchState({ loading: false, error: null, result: null });
+    setTool("fetch");
+  };
+
+  const fetchAt = async (coordinate: number[]) => {
+    if (!config || !fetchTool) return;
+    const seq = ++fetchSeq.current;
+    setFetchState({ loading: true, error: null, result: null });
+    try {
+      const result = await api.fetchTool(config.slug, fetchTool.id, coordinate[0], coordinate[1], config.crs);
+      if (seq === fetchSeq.current) setFetchState({ loading: false, error: null, result });
+    } catch (e) {
+      if (seq === fetchSeq.current) setFetchState({ loading: false, error: (e as Error).message, result: null });
+    }
+  };
+
+  /** Dodanie pobranego obiektu: formularz nowego obiektu z wypełnionymi polami albo od razu zapis. */
+  const addFetched = (r: FetchResult) => {
+    if (!config) return;
+    if (r.open_form) {
+      guard(() => {
+        setSelection({ layerId: r.layer_id, isNew: true, feature: { type: "Feature", id: "", geometry: r.geometry, properties: { ...r.mapped } } });
+        setFetchState({ loading: false, error: null, result: null });
+      });
+      return;
+    }
+    api.createFeature(config.slug, r.layer_id, { type: "Feature", geometry: r.geometry, properties: r.mapped }, config.crs)
+      .then((f) => {
+        setFetchState({ loading: false, error: null, result: null });
+        setReloadToken((t) => t + 1);
+        setMessage(`Dodano do warstwy ${config.layers[r.layer_id]?.name ?? ""}: #${f.id}${r.key ? ` (${r.key})` : ""}`);
+      })
+      .catch((e) => setFetchState((s) => ({ ...s, error: (e as Error).message })));
+  };
 
   const canDelete = !!(selection && editLayer && selection.layerId === editLayer.id && !selection.isNew && editLayer.perms.delete);
   const deleteSelected = async () => {
@@ -214,9 +265,10 @@ export default function App() {
         )}
       </header>
 
-      <Toolbar config={config} editLayerId={editLayerId} onEditLayer={chooseEditLayer} tool={tool} onTool={setTool}
+      <Toolbar config={config} editLayerId={editLayerId} onEditLayer={chooseEditLayer} tool={tool} onTool={chooseTool}
         canDelete={canDelete} onDelete={deleteSelected} onNewRecord={newRecord}
-        sidebarOpen={sidebarOpen} onToggleSidebar={() => setSidebarOpen((o) => !o)} />
+        sidebarOpen={sidebarOpen} onToggleSidebar={() => setSidebarOpen((o) => !o)}
+        fetchToolId={fetchToolId} onFetchTool={startFetchTool} />
 
       <div className="body">
         {sidebarOpen && <aside className="sidebar">
@@ -264,6 +316,8 @@ export default function App() {
               reloadToken={reloadToken} mapRef={mapRef}
               basemaps={basemaps} baseId={baseId} overlayIds={overlayIds}
               onIdentify={openFeature}
+              onFetchClick={fetchAt}
+              preview={fetchTool ? fetchState.result?.geometry ?? null : null}
               onSelect={(layerId, feature) => guard(() => setSelection({ layerId, feature, isNew: false }))}
               onDrawn={(layerId, geometry) => guard(() =>
                 setSelection({ layerId, isNew: true, feature: { type: "Feature", id: "", geometry, properties: {} } }))}
@@ -277,6 +331,11 @@ export default function App() {
                 }
               }}
             />
+          )}
+          {config && fetchTool && (
+            <FetchCard config={config} tool={fetchTool} state={fetchState} onAdd={addFetched}
+              onOpenExisting={(r) => openFeature(r.layer_id, r.existing_pk!)}
+              onClose={() => chooseTool(editLayerId ? "select" : "identify")} />
           )}
           {message && <div className="toast" onClick={() => setMessage(null)}>{message}</div>}
           {config && selection && (

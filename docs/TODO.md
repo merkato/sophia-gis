@@ -45,7 +45,7 @@ Lista z 10.11.2026 (aktualizacja 11.11.2026). Kolejność jest kolejnością rea
   rozmiaru per warstwa, katalog uploadów per projekt (np. `data/uploads/<slug>/…`),
   uwzględnienie w kopii zapasowej, podgląd/pobieranie z formularza.
 
-### 6. Narzędzie ULDK: działka z kliknięcia do warstwy projektu
+### 6. ✅ Narzędzie ULDK: działka z kliknięcia do warstwy projektu
 - Kliknięcie w mapę → zapytanie do ULDK (GUGiK, `uldk.gugik.gov.pl`, `GetParcelByXY`) →
   pokazanie działki (obrys na mapie, identyfikator TERYT, obręb, gmina) → pytanie „Dodać
   do warstwy …?” → zapis geometrii i atrybutów do warstwy wskazanej w Fii.
@@ -55,6 +55,9 @@ Lista z 10.11.2026 (aktualizacja 11.11.2026). Kolejność jest kolejnością rea
   i dodaj do warstwy” z wtyczkami źródeł (ULDK działki, ULDK budynki, PRG adresy, BDOT…).
   Każde źródło: zapytanie po punkcie/identyfikatorze, normalizacja wyniku, mapowanie pól z Fii.
   Zapytania przez API Sophii (bez CORS, z logiem i limitem).
+- Zrobione: `api/app/fetchers.py` (źródła ULDK działka i budynek), `routers/fetch.py`, zakładka Fii
+  „Narzędzia pobierania” (`fia/tools.py`), przycisk na pasku i karta wyniku w WebUI; `docs/user/uldk.md`.
+  Kolejne źródła (PRG adresy, BDOT10k) — nowy wpis w SOURCES i w `fia/tools.py`.
 
 ### 7. ✅ Górny pasek narzędzi edycji
 - Wszystkie narzędzia edycyjne (wybierz, rysuj, zmień geometrię, usuń, ULDK…) w pasku

@@ -4,6 +4,7 @@ from dataclasses import asdict
 from fastapi import APIRouter, Depends
 
 from ..db import portal_conn
+from ..fetchers import SOURCES
 from ..permissions import load_project_context
 from ..qgsproject import TreeNode
 from ..security import CurrentUser, optional_user
@@ -86,5 +87,11 @@ async def project_config(slug: str, user: CurrentUser | None = Depends(optional_
         ],
         "reports": [
             asdict(r) for r in p.reports if r.layer_id is None or r.layer_id in visible
+        ],
+        # narzędzia pobierania (ULDK…) — tylko z warstwą docelową, do której użytkownik może dodawać
+        "tools": [
+            {"id": t.id, "label": t.label, "source": t.source, "layer_id": t.layer_id, "open_form": t.open_form,
+             "source_name": SOURCES[t.source].name}
+            for t in p.tools if t.source in SOURCES and t.layer_id in layers and layers[t.layer_id]["perms"]["insert"]
         ],
     }

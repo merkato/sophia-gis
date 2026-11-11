@@ -40,7 +40,7 @@ function tileFormats(config: ProjectConfig): Map<string, string> {
   return out;
 }
 
-export type Tool = "identify" | "select" | "draw" | "modify";
+export type Tool = "identify" | "select" | "draw" | "modify" | "fetch";
 
 interface Props {
   config: ProjectConfig;
@@ -55,6 +55,8 @@ interface Props {
   onSelect: (layerId: string, feature: GeoJSONFeature) => void;
   onDrawn: (layerId: string, geometry: GeoJSONFeature["geometry"]) => void;
   onGeometryModified: (layerId: string, pk: string, geometry: GeoJSONFeature["geometry"]) => void;
+  onFetchClick?: (coordinate: number[]) => void;         // narzędzie pobierania (ULDK…)
+  preview?: GeoJSONFeature["geometry"] | null;           // obrys pobranego obiektu przed dodaniem
   mapRef: MutableRefObject<OlMap | null>;
 }
 
@@ -62,6 +64,12 @@ const editStyle = new Style({
   stroke: new Stroke({ color: "#d9480f", width: 2 }),
   fill: new Fill({ color: "rgba(217,72,15,0.15)" }),
   image: new Circle({ radius: 6, fill: new Fill({ color: "#d9480f" }), stroke: new Stroke({ color: "#fff", width: 2 }) }),
+});
+
+const previewStyle = new Style({
+  stroke: new Stroke({ color: "#1c7ed6", width: 2.5, lineDash: [8, 5] }),
+  fill: new Fill({ color: "rgba(28,126,214,0.12)" }),
+  image: new Circle({ radius: 7, fill: new Fill({ color: "#1c7ed6" }), stroke: new Stroke({ color: "#fff", width: 2 }) }),
 });
 
 const DRAW_TYPE = { Point: "Point", Line: "LineString", Polygon: "Polygon" } as const;
@@ -76,6 +84,7 @@ export function MapView(props: Props) {
   const basemapLayersRef = useRef(new Map<string, TileLayer>());
   const tileLayersRef = useRef(new Map<string, TileLayer<TileWMS>>());
   const editSourceRef = useRef(new VectorSource<Feature<Geometry>>());
+  const previewSourceRef = useRef(new VectorSource<Feature<Geometry>>());
   const selectRef = useRef<Select | null>(null);
   const cbRef = useRef(props);
   cbRef.current = props;
@@ -108,6 +117,7 @@ export function MapView(props: Props) {
         rasterGroup,
         wmsLayer,
         new VectorLayer({ source: editSourceRef.current, style: editStyle }),
+        new VectorLayer({ source: previewSourceRef.current, style: previewStyle }),
       ],
       // Poziomy powiększenia = rozdzielczości siatki kafli: kafle wyświetlane 1:1, ostre.
       view: new View({
@@ -206,6 +216,25 @@ export function MapView(props: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editLayerId, reloadToken, config.slug]);
 
+  // --- podgląd obiektu z narzędzia pobierania
+  const { preview } = props;
+  useEffect(() => {
+    const src = previewSourceRef.current;
+    src.clear();
+    if (!preview) return;
+    const f = format.readFeature({ type: "Feature", geometry: preview, properties: {} }) as Feature<Geometry>;
+    src.addFeature(f);
+    const map = mapRef.current;
+    const ext = f.getGeometry()?.getExtent();
+    if (map && ext) {
+      const view = map.getView();
+      const visible = view.calculateExtent(map.getSize());
+      const inside = ext[0] >= visible[0] && ext[1] >= visible[1] && ext[2] <= visible[2] && ext[3] <= visible[3];
+      if (!inside) view.fit(ext, { padding: [80, 80, 80, 80], maxZoom: view.getZoom(), duration: 250 });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [preview]);
+
   // --- narzędzia
   useEffect(() => {
     const map = mapRef.current;
@@ -242,6 +271,10 @@ export function MapView(props: Props) {
         if (lyr) cbRef.current.onIdentify(lyr.id, id.slice(dot + 1));
       };
       clickKey = map.on("singleclick", handler as never) as EventsKey;
+    }
+
+    if (tool === "fetch") {
+      clickKey = map.on("singleclick", ((evt: { coordinate: number[] }) => cbRef.current.onFetchClick?.(evt.coordinate)) as never) as EventsKey;
     }
 
     if (layerInfo && tool === "select") {

@@ -44,6 +44,7 @@
   * `permissions.py` — rola grupy w projekcie → nadpisania per warstwa → zasięgi,
   * `routers/features.py` — CRUD GeoJSON, `bbox`, transformacje układów, relacje,
   * `routers/photos.py` — zdjęcia i dokumenty z pól „Załącznik” (ExternalResource) w `data/uploads/<slug>`,
+  * `fetchers.py` + `routers/fetch.py` — narzędzia pobierania (ULDK: działki, budynki) z mapowaniem pól z Fii,
   * `routers/reports.py` — layouty QGIS przez `GetPrint` (atlas ⇒ raport dla obiektu),
   * `routers/admin.py` — użytkownicy, grupy, zasięgi, projekty, uprawnienia, publikacja.
 * **WebUI** (`web/src`): wybór projektu z menu, drzewo warstw zgodne z QGIS (grupy, wzajemne wykluczanie,

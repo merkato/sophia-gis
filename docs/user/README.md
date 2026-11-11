@@ -8,6 +8,7 @@ Dla osób, które **przygotowują projekty w QGIS** (autor projektu) i **pracuj�
 | Temat | Co opisuje |
 |---|---|
 | [Zdjęcia w obiektach](zdjecia.md) | pole „Załącznik” w tabeli albo tabela zdjęć w relacji, aparat w telefonie |
+| [Działki i budynki z ULDK](uldk.md) | kliknięcie na mapie → działka z TERYT do wskazanej w Fii warstwy |
 | [Dokumenty w obiektach](zalaczniki.md) | PDF, GML z podpisem, DOCX… — te same dwa warianty, pliki bez zmian |
 
 Zasady ogólne, wspólne dla wszystkich tematów:
@@ -47,6 +48,7 @@ wyszarzone.
 | tabela z zielonym plusem | **Dodaj rekord** — dla tabel bez geometrii | Dodaj rekord |
 | poligon z czerwonym węzłem | **Narzędzie wierzchołków** — przeciąganie wierzchołków; zwykłe kliknięcie otwiera obiekt | Narzędzie wierzchołków |
 | czerwony kosz | **Usuń zaznaczony obiekt** (z potwierdzeniem) | Usuń zaznaczone |
+| obrys działki / domek z niebieską strzałką | **Pobierz z ULDK** — działka lub budynek z kliknięcia do warstwy ([uldk.md](uldk.md)) | — (wtyczki ULDK) |
 
 ### Edycja
 - Warstwę do edycji wybierasz na pasku narzędzi (lista obok ołówka) albo ołówkiem w drzewie warstw.

@@ -121,4 +121,33 @@ export const IconLayers = (p: P) => (
   </Svg>
 );
 
+/** Strzałka „pobierz” (niebieska, prawy dolny róg). */
+const Fetch = () => (
+  <>
+    <circle cx="18" cy="17.5" r="5" fill={C.blue} />
+    <path d="M18 14.5v5.2M15.8 17.6l2.2 2.2 2.2-2.2" stroke="#fff" strokeWidth="1.6" />
+  </>
+);
+
+/** Pobierz działkę z usługi (ULDK): obrys działki z punktami granicznymi + strzałka. */
+export const IconFetchParcel = (p: P) => (
+  <Svg {...p}>
+    <path d="M2.5 15.5L4.5 4l9-1.5 1.5 7.5" fill="#f6e7c8" stroke="#a5681c" strokeWidth="1.4" />
+    <path d="M2.5 15.5l9 1" stroke="#a5681c" strokeWidth="1.4" />
+    {[[2.5, 15.5], [4.5, 4], [13.5, 2.5]].map(([x, y]) => <circle key={`${x}`} cx={x} cy={y} r="1.4" fill="#a5681c" />)}
+    <Fetch />
+  </Svg>
+);
+
+/** Pobierz budynek z usługi (ULDK): obrys budynku + strzałka. */
+export const IconFetchBuilding = (p: P) => (
+  <Svg {...p}>
+    <path d="M2.5 11L9 4.5l6.5 6.5" stroke="#a83a2f" strokeWidth="1.5" />
+    <path d="M4.5 9.5V19h7.5" fill="#f1d3cd" stroke="#a83a2f" strokeWidth="1.4" />
+    <path d="M13.5 9.5v2" stroke="#a83a2f" strokeWidth="1.4" />
+    <rect x="7.5" y="13" width="3" height="6" fill="#a83a2f" />
+    <Fetch />
+  </Svg>
+);
+
 export const GEOMETRY_ICON = { Point: IconAddPoint, Line: IconAddLine, Polygon: IconAddPolygon } as const;

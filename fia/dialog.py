@@ -36,6 +36,7 @@ from qgis.PyQt.QtWidgets import (
 )
 
 from . import checks, credentials, photosync, publish, rasters
+from .tools import ToolsTab
 
 SCOPE = "sophia"
 LEVEL_COLORS = {"error": QColor("#c92a2a"), "warning": QColor("#e67700"), "info": QColor("#1971c2")}
@@ -83,6 +84,8 @@ class FiaDialog(QDialog):
         self.tabs.addTab(self._build_layers_tab(), "Warstwy")
         self.tabs.addTab(self._build_rasters_tab(), "Rastry")
         self.tabs.addTab(self._build_reports_tab(), "Raporty")
+        self.tools_tab = ToolsTab(self.cfg.get("tools", []))
+        self.tabs.addTab(self.tools_tab, "Narzędzia pobierania")
         self.tabs.addTab(self._build_diag_tab(), "Diagnostyka")
         self.tabs.addTab(self._build_publish_tab(), "Serwer")
 
@@ -351,6 +354,7 @@ class FiaDialog(QDialog):
             self.raster_table.item(r, 0).text() for r in range(self.raster_table.rowCount())
             if self.raster_table.item(r, 1).checkState() == Qt.CheckState.Checked
         ]
+        cfg["tools"] = self.tools_tab.value()
         cfg["reports"] = [
             {"layout": self.report_table.item(r, 0).text(), "title": self.report_table.item(r, 1).text(),
              "enabled": self.report_table.item(r, 2).checkState() == Qt.CheckState.Checked}
@@ -363,7 +367,7 @@ class FiaDialog(QDialog):
         return cfg
 
     def _portal_json(self, cfg: dict) -> dict:
-        return {k: cfg[k] for k in ("version", "layers", "raster_groups", "reports", "map") if k in cfg}
+        return {k: cfg[k] for k in ("version", "layers", "raster_groups", "reports", "tools", "map") if k in cfg}
 
     def on_save(self):
         self.cfg = self._collect()
@@ -442,7 +446,7 @@ class FiaDialog(QDialog):
 
     def on_publish(self):
         if self.run_diagnostics():
-            self.tabs.setCurrentIndex(3)
+            self.tabs.setCurrentIndex(self.tabs.indexOf(self.diag_tree.parentWidget()))
             if QMessageBox.question(self, "Fia", "Projekt zawiera błędy. Opublikować mimo to?") \
                     != QMessageBox.StandardButton.Yes:
                 return

@@ -82,6 +82,32 @@ export interface ProjectConfig {
   layers: Record<string, LayerInfo>;
   relations: RelationDef[];
   reports: ReportDef[];
+  tools: ToolInfo[];
+}
+
+/** Narzędzie pobierania z Fii (np. działka z ULDK -> warstwa projektu). */
+export interface ToolInfo {
+  id: string;
+  label: string;
+  source: string;                    // uldk_dzialka | uldk_budynek | …
+  source_name: string;
+  layer_id: string;
+  open_form: boolean;
+}
+
+/** Wynik zapytania narzędzia: obiekt z usługi, atrybuty zmapowane na pola warstwy docelowej. */
+export interface FetchResult {
+  tool_id: string;
+  layer_id: string;
+  source: string;
+  source_name: string;
+  key: string | null;
+  properties: Record<string, string | null>;
+  labels: Record<string, string>;
+  mapped: Record<string, string | null>;
+  geometry: GeoJSONFeature["geometry"];
+  existing_pk: string | null;
+  open_form: boolean;
 }
 
 export interface GeoJSONFeature {

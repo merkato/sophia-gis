@@ -110,6 +110,32 @@ class ReportDef:
 
 
 @dataclass
+class ToolDef:
+    """Narzędzie pobierania z Fii: obiekt z usługi zewnętrznej (np. działka z ULDK) -> warstwa projektu."""
+    id: str
+    source: str                         # klucz w fetchers.SOURCES
+    label: str
+    layer_id: str                       # warstwa docelowa
+    fields: dict[str, str]              # pole źródła -> pole warstwy docelowej
+    open_form: bool = True              # po pobraniu otwórz formularz (uzupełnienie atrybutów)
+
+
+def parse_tools(cfg: dict, layers: dict[str, LayerDef]) -> list[ToolDef]:
+    """Narzędzia z .portal.json; pomija wpisy z nieznaną warstwą lub polami spoza warstwy."""
+    out = []
+    for i, t in enumerate(cfg.get("tools", []) or []):
+        lyr = layers.get(t.get("layer", ""))
+        if not lyr or not lyr.pg or not t.get("source"):
+            continue
+        names = {f.name for f in lyr.fields}
+        fields = {src: dst for src, dst in (t.get("fields") or {}).items() if dst in names}
+        out.append(ToolDef(id=str(t.get("id") or f"narzedzie{i + 1}"), source=t["source"],
+                           label=t.get("label") or t["source"], layer_id=lyr.id, fields=fields,
+                           open_form=bool(t.get("open_form", True))))
+    return out
+
+
+@dataclass
 class Project:
     title: str
     crs: str
@@ -120,6 +146,7 @@ class Project:
     reports: list[ReportDef]
     options: dict[str, Any]
     mtime: float
+    tools: list[ToolDef] = field(default_factory=list)
 
     def layer_by_wms_name(self, name: str) -> LayerDef | None:
         return next((lyr for lyr in self.layers.values() if lyr.wms_name == name), None)
@@ -385,6 +412,7 @@ def load_project(path: Path) -> Project:
         reports=reports,
         options=cfg.get("map", {}),
         mtime=path.stat().st_mtime,
+        tools=parse_tools(cfg, layers),
     )
 
 

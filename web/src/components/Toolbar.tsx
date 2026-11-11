@@ -2,7 +2,8 @@ import type { ComponentType, SVGProps } from "react";
 import type { LayerInfo, ProjectConfig } from "../types";
 import type { Tool } from "./MapView";
 import {
-  GEOMETRY_ICON, IconAddPolygon, IconAddRecord, IconDelete, IconEdit, IconIdentify, IconLayers, IconSelect, IconVertex,
+  GEOMETRY_ICON, IconAddPolygon, IconAddRecord, IconDelete, IconEdit, IconFetchBuilding, IconFetchParcel, IconIdentify,
+  IconLayers, IconSelect, IconVertex,
 } from "./Icons";
 
 const DRAW_LABEL = { Point: "Dodaj obiekt punktowy", Line: "Dodaj obiekt liniowy", Polygon: "Dodaj obiekt poligonowy" };
@@ -23,7 +24,7 @@ function ToolButton({ icon: Icon, label, active, disabled, onClick }: {
  * Narzędzia edycji są zawsze widoczne; bez aktywnej warstwy edycyjnej są wyszarzone.
  */
 export function Toolbar({ config, editLayerId, onEditLayer, tool, onTool, canDelete, onDelete, onNewRecord,
-  sidebarOpen, onToggleSidebar }: {
+  sidebarOpen, onToggleSidebar, fetchToolId, onFetchTool }: {
   config: ProjectConfig | null;
   editLayerId: string | null;
   onEditLayer: (id: string | null) => void;
@@ -34,6 +35,8 @@ export function Toolbar({ config, editLayerId, onEditLayer, tool, onTool, canDel
   onNewRecord: () => void;
   sidebarOpen: boolean;
   onToggleSidebar: () => void;
+  fetchToolId: string | null;      // aktywne narzędzie pobierania (ULDK…)
+  onFetchTool: (id: string) => void;
 }) {
   const editable: LayerInfo[] = Object.values(config?.layers ?? {})
     .filter((l) => l.perms.insert || l.perms.update || l.perms.delete)
@@ -72,6 +75,17 @@ export function Toolbar({ config, editLayerId, onEditLayer, tool, onTool, canDel
           <ToolButton icon={IconVertex} label="Narzędzie wierzchołków (zmiana geometrii)" active={tool === "modify"}
             disabled={!geom || !layer?.perms.update} onClick={() => onTool("modify")} />
           <ToolButton icon={IconDelete} label="Usuń zaznaczony obiekt" disabled={!canDelete} onClick={onDelete} />
+        </>
+      )}
+
+      {config && (config.tools ?? []).length > 0 && (
+        <>
+          <span className="sep" />
+          {(config.tools ?? []).map((t) => (
+            <ToolButton key={t.id} icon={t.source.includes("budynek") ? IconFetchBuilding : IconFetchParcel}
+              label={`${t.label} → ${config.layers[t.layer_id]?.name ?? t.layer_id}`}
+              active={tool === "fetch" && fetchToolId === t.id} onClick={() => onFetchTool(t.id)} />
+          ))}
         </>
       )}
     </div>

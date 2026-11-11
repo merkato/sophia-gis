@@ -1,5 +1,5 @@
 import type {
-  AdminProject, AdminUser, Basemap, FileMeta, GeoJSONFeature, Group, PhotoMeta, ProjectAccess, ProjectConfig,
+  AdminProject, AdminUser, Basemap, FetchResult, FileMeta, GeoJSONFeature, Group, PhotoMeta, ProjectAccess, ProjectConfig,
   ProjectSummary, RelatedGroup, User, WmtsCapabilities,
 } from "./types";
 
@@ -80,6 +80,10 @@ export const api = {
   fileUrl: (slug: string, layerId: string, pk: string, field: string, value: unknown, thumb = false) =>
     `${featuresUrl(slug, layerId)}/${enc(pk)}/files/${enc(field)}?${new URLSearchParams({
       ...(thumb ? { thumb: "1" } : {}), v: String(value ?? "") })}`,
+
+  fetchTool: (slug: string, toolId: string, x: number, y: number, crs: string) =>
+    request<FetchResult>(`/api/projects/${enc(slug)}/tools/${enc(toolId)}/fetch?${new URLSearchParams({
+      x: String(x), y: String(y), crs })}`),
 
   reportUrl: (slug: string, layout: string, params: Record<string, string>) =>
     `/api/projects/${enc(slug)}/reports/${enc(layout)}?${new URLSearchParams(params)}`,

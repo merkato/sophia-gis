@@ -128,6 +128,16 @@ button.block, .reports .button { display: block; width: 100%; text-align: left; 
 .lightbox-bar button, .lightbox-bar .button { background: rgba(255,255,255,.12); color: #fff; border-color: rgba(255,255,255,.3); }
 .lightbox-bar button.danger { color: #ff8787; border-color: #ff8787; }
 
+/* --- karta narzędzia pobierania (ULDK…) */
+.fetch-card { position: absolute; z-index: 5; left: 12px; bottom: 32px; width: min(360px, calc(100% - 24px));
+  max-height: calc(100% - 60px); overflow: auto; background: var(--surface); border: 1px solid var(--line);
+  border-radius: 10px; padding: 10px 12px; box-shadow: 0 8px 24px rgba(0,0,0,.2); }
+.fetch-card header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px; }
+.fetch-props { width: 100%; border-collapse: collapse; margin: 4px 0 8px; }
+.fetch-props th { text-align: left; font-weight: 400; color: var(--muted); font-size: 12px; padding: 2px 8px 2px 0; white-space: nowrap; vertical-align: top; }
+.fetch-props td { padding: 2px 0; word-break: break-all; }
+.fetch-card .actions { flex-wrap: wrap; margin-top: 8px; }
+
 .toast { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--ink);
   color: var(--bg); padding: 10px 16px; border-radius: 8px; cursor: pointer; max-width: 80%; }
 .modal { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: grid; place-items: center; z-index: 30; }
