@@ -59,8 +59,22 @@ button.block, .reports .button { display: block; width: 100%; text-align: left; 
 .records .link-row.active { background: color-mix(in srgb, var(--edit) 18%, transparent); color: inherit; }
 .toolgroup { display: flex; flex-wrap: wrap; gap: 6px; }
 
-.feature-panel { width: 360px; overflow: auto; background: var(--surface); border-left: 1px solid var(--line); padding: 12px 14px; }
-.feature-panel header { display: flex; justify-content: space-between; align-items: start; margin-bottom: 8px; }
+/* --- formularz obiektu: pływające okno nad mapą (mapa pod spodem zostaje klikalna) */
+.feature-window { position: absolute; z-index: 6; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  width: 460px; height: min(640px, calc(100% - 40px)); min-width: 300px; min-height: 160px; max-width: calc(100% - 20px);
+  max-height: calc(100% - 10px); display: flex; flex-direction: column; overflow: hidden; resize: both;
+  background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0,0,0,.25), 0 2px 6px rgba(0,0,0,.12); }
+.fw-head { display: flex; align-items: center; gap: 4px; padding: 8px 8px 8px 14px; cursor: move; user-select: none;
+  touch-action: none; border-bottom: 1px solid var(--line); background: color-mix(in srgb, var(--accent) 6%, var(--surface)); }
+.fw-title { flex: 1; min-width: 0; }
+.fw-title strong { display: block; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fw-head button.icon { font-size: 15px; line-height: 1; padding: 6px 8px; border-radius: 6px; }
+.fw-head button.icon:hover { background: color-mix(in srgb, var(--ink) 10%, transparent); }
+.fw-body { flex: 1; overflow: auto; padding: 10px 14px 14px; }
+.feature-window.collapsed { height: auto !important; min-height: 0; resize: none; }
+.feature-window.collapsed .fw-body { display: none; }
+.feature-window.collapsed .fw-head { border-bottom: none; }
 .tabs { display: flex; gap: 4px; border-bottom: 1px solid var(--line); margin-bottom: 10px; flex-wrap: wrap; }
 .tabs button { border: none; border-radius: 6px 6px 0 0; background: none; }
 .tabs button.active { color: var(--accent); background: none; box-shadow: inset 0 -2px 0 var(--accent); }
@@ -125,7 +139,11 @@ ul.plain li { padding: 4px 0; }
 
 @media (max-width: 800px) {
   .sidebar { position: absolute; z-index: 5; height: calc(100% - 49px); width: 260px; }
-  .feature-panel { position: absolute; right: 0; z-index: 6; height: calc(100% - 49px); width: 100%; }
+  .feature-window { position: fixed; inset: 0 !important; transform: none !important; width: auto !important;
+    height: auto !important; max-width: none; max-height: none; min-width: 0; border: none; border-radius: 0;
+    resize: none; z-index: 15; }
+  .fw-head { cursor: default; }
+  .fw-collapse { display: none; }
   .admin-split { flex-direction: column; }
   .admin-form, .basemap-form, .preview { width: 100%; position: static; }
   .preview { height: 360px; }

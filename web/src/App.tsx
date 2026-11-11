@@ -223,17 +223,16 @@ export default function App() {
             />
           )}
           {message && <div className="toast" onClick={() => setMessage(null)}>{message}</div>}
+          {config && selection && (
+            <FeaturePanel
+              config={config} layerId={selection.layerId} feature={selection.feature} isNew={selection.isNew}
+              onSaved={(f) => { setSelection({ layerId: selection.layerId, feature: f, isNew: false }); setReloadToken((t) => t + 1); }}
+              onDeleted={() => { setSelection(null); setReloadToken((t) => t + 1); }}
+              onClose={() => { if (selection.isNew) setReloadToken((t) => t + 1); setSelection(null); }}
+              onOpenRelated={openFeature}
+            />
+          )}
         </main>
-
-        {config && selection && (
-          <FeaturePanel
-            config={config} layerId={selection.layerId} feature={selection.feature} isNew={selection.isNew}
-            onSaved={(f) => { setSelection({ layerId: selection.layerId, feature: f, isNew: false }); setReloadToken((t) => t + 1); }}
-            onDeleted={() => { setSelection(null); setReloadToken((t) => t + 1); }}
-            onClose={() => { if (selection.isNew) setReloadToken((t) => t + 1); setSelection(null); }}
-            onOpenRelated={openFeature}
-          />
-        )}
       </div>
 
       {showAdmin && user?.is_admin && (
