@@ -41,6 +41,7 @@ class CurrentUser:
     is_admin: bool
     group_ids: list[int]
     group_names: list[str]
+    can_publish: bool = False           # autor projektów: publikacja przez Fię
 
 
 def _token_from_request(request: Request) -> str | None:
@@ -62,7 +63,7 @@ async def optional_user(request: Request) -> CurrentUser | None:
         row = await (
             await conn.execute(
                 """
-                SELECT u.id, u.login, u.full_name, u.is_admin,
+                SELECT u.id, u.login, u.full_name, u.is_admin, u.can_publish,
                        coalesce(array_agg(g.id) FILTER (WHERE g.id IS NOT NULL), '{}') AS group_ids,
                        coalesce(array_agg(g.name) FILTER (WHERE g.id IS NOT NULL), '{}') AS group_names
                 FROM portal.users u
@@ -80,6 +81,12 @@ async def optional_user(request: Request) -> CurrentUser | None:
 async def require_user(user: CurrentUser | None = Depends(optional_user)) -> CurrentUser:
     if user is None:
         raise HTTPException(status.HTTP_401_UNAUTHORIZED, "Wymagane logowanie")
+    return user
+
+
+async def require_publisher(user: CurrentUser = Depends(require_user)) -> CurrentUser:
+    if not (user.is_admin or user.can_publish):
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Publikacja wymaga konta administratora albo autora projektów")
     return user
 
 

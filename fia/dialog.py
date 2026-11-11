@@ -36,6 +36,7 @@ from qgis.PyQt.QtWidgets import (
 )
 
 from . import checks, credentials, photosync, publish, rasters
+from .scope_tab import ScopeTab
 from .tools import ToolsTab
 
 SCOPE = "sophia"
@@ -86,6 +87,8 @@ class FiaDialog(QDialog):
         self.tabs.addTab(self._build_reports_tab(), "Raporty")
         self.tools_tab = ToolsTab(self.cfg.get("tools", []))
         self.tabs.addTab(self.tools_tab, "Narzędzia pobierania")
+        self.scope_tab = ScopeTab(self.cfg.get("scope") or {}, self.cfg.get("layers", {}))
+        self.tabs.addTab(self.scope_tab, "Zakres danych")
         self.tabs.addTab(self._build_diag_tab(), "Diagnostyka")
         self.tabs.addTab(self._build_publish_tab(), "Serwer")
 
@@ -326,7 +329,7 @@ class FiaDialog(QDialog):
         form.addRow("Tytuł projektu (menu)", self.title)
         form.addRow("Identyfikator (URL)", self.slug)
         form.addRow("", btn)
-        note = QLabel("Publikacja (konto administratora) wysyła tylko plik projektu i konfigurację; "
+        note = QLabel("Publikacja (administrator albo autor projektów) wysyła tylko plik projektu i konfigurację; "
                       "rastry biblioteki (data/rasters) kopiuj na serwer osobno.")
         note.setWordWrap(True)
         form.addRow(note)
@@ -349,7 +352,16 @@ class FiaDialog(QDialog):
                 "popup": self.layer_table.item(row, 3).checkState() == Qt.CheckState.Checked,
                 "hidden": self.layer_table.item(row, 4).checkState() == Qt.CheckState.Checked,
             }
+        rules = self.scope_tab.layer_rules()
+        for lid, rule in rules.items():
+            if lid in layers:
+                layers[lid]["scope"] = rule
         cfg["layers"] = layers
+        scope = self.scope_tab.scope_value()
+        if scope:
+            cfg["scope"] = scope
+        else:
+            cfg.pop("scope", None)
         cfg["raster_groups"] = [
             self.raster_table.item(r, 0).text() for r in range(self.raster_table.rowCount())
             if self.raster_table.item(r, 1).checkState() == Qt.CheckState.Checked
@@ -367,7 +379,7 @@ class FiaDialog(QDialog):
         return cfg
 
     def _portal_json(self, cfg: dict) -> dict:
-        return {k: cfg[k] for k in ("version", "layers", "raster_groups", "reports", "tools", "map") if k in cfg}
+        return {k: cfg[k] for k in ("version", "layers", "raster_groups", "reports", "tools", "scope", "map") if k in cfg}
 
     def on_save(self):
         self.cfg = self._collect()

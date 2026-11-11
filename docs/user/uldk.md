@@ -15,11 +15,11 @@ Przykład:
 ```sql
 CREATE TABLE dane.dzialki (
     fid       bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
-    teryt     text UNIQUE,          -- np. 160805_2.0065.721
+    teryt     text UNIQUE,          -- np. 999901_1.0001.123 (przykład)
     numer     text,                 -- 721
-    obreb     text,                 -- Radłów
-    obreb_nr  text,                 -- 0065
-    gmina     text,                 -- Radłów
+    obreb     text,                 -- Przykładowo
+    obreb_nr  text,                 -- 0001
+    gmina     text,                 -- Przykładowo
     powiat    text,
     uwagi     text,                 -- pozostałe pola uzupełniasz w formularzu
     geom      geometry(MultiPolygon, 2180) NOT NULL
@@ -47,16 +47,16 @@ Dodaj warstwę do projektu i zaznacz ją w Fii jako **edytowalną** (zakładka *
 
 Dane do zmapowania:
 
-| Dana | Przykład | Działka | Budynek |
+| Dana | Przykład (fikcyjny) | Działka | Budynek |
 |---|---|---|---|
-| Identyfikator (TERYT) | `160805_2.0065.721` / `160803_4.0068.5045_BUD` | ✓ | ✓ |
+| Identyfikator (TERYT) | `999901_1.0001.123` / `999901_1.0001.45_BUD` | ✓ | ✓ |
 | Numer działki | `721` | ✓ | |
-| Obręb (nazwa) | `Radłów` | ✓ | ✓ |
-| Obręb (numer) | `0065` | ✓ | ✓ |
-| Gmina | `Radłów` | ✓ | ✓ |
-| Gmina (TERYT) | `160805_2` | ✓ | ✓ |
-| Powiat | `powiat oleski` | ✓ | ✓ |
-| Województwo | `opolskie` | ✓ | ✓ |
+| Obręb (nazwa) | `Przykładowo` | ✓ | ✓ |
+| Obręb (numer) | `0001` | ✓ | ✓ |
+| Gmina | `Przykładowo` | ✓ | ✓ |
+| Gmina (TERYT) | `999901_1` | ✓ | ✓ |
+| Powiat | `powiat przykładowy` | ✓ | ✓ |
+| Województwo | `przykładowe` | ✓ | ✓ |
 
 Fia sama podpowiada mapowanie, gdy pola warstwy mają typowe nazwy (`teryt`, `numer`/`nr_dzialki`,
 `obreb`, `gmina`…). Pole, do którego trafia **identyfikator TERYT**, służy też do wykrywania

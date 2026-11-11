@@ -41,7 +41,9 @@
   parametr `MAP` od klienta jest zawsze nadpisywany.
 * **API** (`api/app`):
   * `qgsproject.py` — parser `.qgs/.qgz` (lxml, bez PyQGIS), cache unieważniany po zmianie pliku,
-  * `permissions.py` — rola grupy w projekcie → nadpisania per warstwa → zasięgi,
+  * `permissions.py` — rola grupy w projekcie → nadpisania per warstwa → prawa i zakres danych,
+  * `scope.py` — zakres danych (wymiar z Fii, reguły warstw); ten sam SQL dla API i QGIS Server
+    (`qgis-server-plugins/sophia_filter`, nagłówek `X-Sophia-Filter` z forward_auth),
   * `routers/features.py` — CRUD GeoJSON, `bbox`, transformacje układów, relacje,
   * `routers/photos.py` — zdjęcia i dokumenty z pól „Załącznik” (ExternalResource) w `data/uploads/<slug>`,
   * `fetchers.py` + `routers/fetch.py` — narzędzia pobierania (ULDK: działki, budynki) z mapowaniem pól z Fii,

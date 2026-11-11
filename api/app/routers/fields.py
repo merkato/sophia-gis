@@ -16,8 +16,9 @@ from psycopg import sql
 from ..db import layer_conn
 from ..permissions import ProjectContext, load_project_context
 from ..qgsproject import LayerDef
+from ..scope import row_filter
 from ..security import CurrentUser, optional_user
-from .features import _base_filter, _table
+from .features import _table
 
 router = APIRouter(prefix="/api/projects/{slug}/layers/{layer_id}/fields", tags=["features"])
 MAX_OPTIONS = 5000
@@ -80,9 +81,9 @@ async def field_options(slug: str, layer_id: str, field_name: str,
     ctx.require(target.id, "view")
     k = sql.Identifier(key)
     lbl = sql.Identifier(label) if label else k
-    q = sql.SQL("SELECT {k}::text AS value, coalesce({l}::text, {k}::text) AS label FROM {t} WHERE {w} "
+    q = sql.SQL("SELECT {k}::text AS value, coalesce({l}::text, {k}::text) AS label FROM {t} AS __t WHERE {w} "
                 "ORDER BY 2 LIMIT {lim}").format(
-        k=k, l=lbl, t=_table(target), w=_base_filter(target), lim=sql.Literal(MAX_OPTIONS))
+        k=k, l=lbl, t=_table(target), w=row_filter(ctx, target), lim=sql.Literal(MAX_OPTIONS))
     async with layer_conn(target.pg.conninfo) as conn:
         rows = await (await conn.execute(q)).fetchall()
     return {"layer_id": target.id, "layer_name": target.name, "options": rows}

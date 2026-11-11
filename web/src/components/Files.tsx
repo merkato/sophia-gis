@@ -63,9 +63,9 @@ function PickFiles({ field, multiple, busy, onFiles, label }: {
 }
 
 /** Wariant A: jeden plik w polu obiektu. Wartość pola = ścieżka względna zwrócona przez serwer. */
-export function FileField({ field, value, saved, onChange, disabled, slug, layerId, pk, crs }: {
+export function FileField({ field, value, saved, onChange, disabled, slug, layerId, pk, crs, canUpload }: {
   field: FieldDef; value: unknown; saved: unknown; onChange: (v: unknown) => void; disabled: boolean;
-  slug: string; layerId: string; pk: string | null; crs: string;
+  slug: string; layerId: string; pk: string | null; crs: string; canUpload: boolean;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -114,7 +114,7 @@ export function FileField({ field, value, saved, onChange, disabled, slug, layer
       ) : <span className="muted">Brak pliku</span>}
       {!disabled && (
         <div className="toolgroup">
-          <PickFiles field={field} busy={busy} onFiles={upload} label={str ? "Zmień plik" : "Wybierz plik"} />
+          {canUpload && <PickFiles field={field} busy={busy} onFiles={upload} label={str ? "Zmień plik" : "Wybierz plik"} />}
           {str && <button type="button" className="danger" disabled={busy} onClick={() => onChange(null)}>Usuń plik</button>}
           {busy && <span className="muted">Wysyłanie…</span>}
         </div>
@@ -174,7 +174,7 @@ export function DocumentList({ config, group, parentLayerId, parentPk, onChanged
   return (
     <section className="documents">
       <h4>{group.name} <span className="muted">({rows.length})</span></h4>
-      {layer.perms.insert && (
+      {layer.perms.insert && config.rights?.files && (
         <div className="toolgroup">
           <PickFiles field={field} multiple busy={!!progress} onFiles={upload} label="Dodaj pliki" />
           {progress && <span className="muted">{progress}</span>}

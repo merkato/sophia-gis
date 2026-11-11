@@ -24,8 +24,6 @@ class Settings(BaseSettings):
 
     qgis_server_url: str = "http://qgis:80/"
 
-    # Układ, w którym przechowywane są zasięgi (portal.extents)
-    extents_srid: int = 2180
 
 
 @lru_cache

@@ -5,6 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
 from ..permissions import load_project_context
 from ..qgsproject import TreeNode
+from ..scope import FILTER_HEADER, wms_filter_header
 from ..security import CurrentUser, optional_user
 
 router = APIRouter(prefix="/api/ows", tags=["ows"])
@@ -63,4 +64,6 @@ async def authorize(request: Request, user: CurrentUser | None = Depends(optiona
         "X-Portal-Map": str(ctx.path),
         "X-Portal-User": user.login if user else "",
         "X-Portal-Groups": ",".join(user.group_names) if user else "",
+        # zakres danych użytkownika — QGIS Server filtruje nim obraz mapy i identyfikację
+        FILTER_HEADER: wms_filter_header(ctx),
     })

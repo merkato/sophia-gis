@@ -7,6 +7,7 @@ Dla osób, które **przygotowują projekty w QGIS** (autor projektu) i **pracuj�
 
 | Temat | Co opisuje |
 |---|---|
+| [Uprawnienia i zakres danych](uprawnienia.md) | autor projektów, grupy w projekcie, zdjęcia/dokumenty, zakres (np. oddziały terenowe) |
 | [Zdjęcia w obiektach](zdjecia.md) | pole „Załącznik” w tabeli albo tabela zdjęć w relacji, aparat w telefonie |
 | [Działki i budynki z ULDK](uldk.md) | kliknięcie na mapie → działka z TERYT do wskazanej w Fii warstwy |
 | [Dokumenty w obiektach](zalaczniki.md) | PDF, GML z podpisem, DOCX… — te same dwa warianty, pliki bez zmian |

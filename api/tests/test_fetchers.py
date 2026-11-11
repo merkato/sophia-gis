@@ -5,17 +5,18 @@ from app.qgsproject import FieldDef, LayerDef, PgSource, parse_tools
 
 PARCEL = fetchers.SOURCES["uldk_dzialka"]
 
-# Odpowiedź ULDK (GetParcelByXY, result=id,voivodeship,county,commune,region,parcel,geom_wkt)
-OK = ("0\n160805_2.0065.721|opolskie|powiat oleski|Radłów|Radłów|721|"
-      "SRID=2180;POLYGON((466527.6 339829.4,466445.3 339592.6,466434.5 339561.6,466527.6 339829.4))\n")
+# Odpowiedź w formacie ULDK (GetParcelByXY, result=id,voivodeship,county,commune,region,parcel,geom_wkt);
+# wartości fikcyjne
+OK = ("0\n999901_1.0001.123|przykładowe|powiat przykładowy|Przykładowo|Przykładowo|721|"
+      "SRID=2180;POLYGON((500000 450000,500100 450000,500100 450100,500000 450000))\n")
 
 
 def test_parse_and_normalize_parcel():
     raw = fetchers.parse_uldk(OK, PARCEL.uldk_result)
     assert raw["geom_wkt"].startswith("SRID=2180;POLYGON")
     p = fetchers.normalize_uldk(raw)
-    assert p == {"teryt": "160805_2.0065.721", "wojewodztwo": "opolskie", "powiat": "powiat oleski",
-                 "gmina": "Radłów", "obreb": "Radłów", "gmina_teryt": "160805_2", "obreb_nr": "0065",
+    assert p == {"teryt": "999901_1.0001.123", "wojewodztwo": "przykładowe", "powiat": "powiat przykładowy",
+                 "gmina": "Przykładowo", "obreb": "Przykładowo", "gmina_teryt": "999901_1", "obreb_nr": "0001",
                  "numer": "721"}
     assert set(p) == {k for k, _ in PARCEL.fields}           # Fia i API znają te same pola
 
@@ -31,17 +32,17 @@ def test_parse_uldk_errors():
 
 def test_building_fields_without_number():
     b = fetchers.SOURCES["uldk_budynek"]
-    raw = fetchers.parse_uldk("0\n160803_4.0068.5045_BUD|opolskie|powiat oleski|Olesno|Olesno|POLYGON((1 1,2 2,3 1,1 1))",
+    raw = fetchers.parse_uldk("0\n999901_1.0001.45_BUD|przykładowe|powiat przykładowy|Przykładowo|Przykładowo|POLYGON((1 1,2 2,3 1,1 1))",
                               b.uldk_result)
     p = fetchers.normalize_uldk(raw)
-    assert p["teryt"] == "160803_4.0068.5045_BUD" and "numer" not in p
+    assert p["teryt"] == "999901_1.0001.45_BUD" and "numer" not in p
     assert set(p) == {k for k, _ in b.fields}
 
 
 def test_to_2180_identity_and_transform():
-    assert fetchers.to_2180(466300, 338700, 2180) == (466300, 338700)
-    x, y = fetchers.to_2180(18.4205, 50.8759, 4326)
-    assert abs(x - 459240.7) < 1 and abs(y - 334493.1) < 1
+    assert fetchers.to_2180(500000, 450000, 2180) == (500000, 450000)
+    x, y = fetchers.to_2180(19.0, 52.0, 4326)        # południk osiowy PUWG 1992
+    assert abs(x - 500000.0) < 0.01 and abs(y - 459309.2) < 1
 
 
 def test_rate_limiter():

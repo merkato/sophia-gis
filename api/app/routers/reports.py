@@ -8,9 +8,13 @@ from urllib.parse import quote
 import httpx
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import Response
+from psycopg import sql
 
 from ..config import get_settings
+from ..db import layer_conn
 from ..permissions import load_project_context
+from ..scope import FILTER_HEADER, T, col, row_filter, wms_filter_header
+from ..scope import table as _table
 from ..security import CurrentUser, optional_user
 
 router = APIRouter(prefix="/api/projects/{slug}/reports", tags=["reports"])
@@ -38,7 +42,14 @@ async def render_report(
     if report.layer_id:
         if not pk:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "Raport wymaga parametru pk")
-        ctx.require(report.layer_id, "view")
+        lyr = ctx.require(report.layer_id, "view")
+        if lyr.pg:   # obiekt raportu musi być w zakresie danych użytkownika
+            async with layer_conn(lyr.pg.conninfo) as conn:
+                ok = await (await conn.execute(sql.SQL(
+                    "SELECT 1 FROM {t} AS __t WHERE {k}::text = {pk} AND {f}").format(
+                    t=_table(lyr), k=col(T, lyr.pg.key), pk=sql.Literal(pk), f=row_filter(ctx, lyr)))).fetchone()
+            if not ok:
+                raise HTTPException(status.HTTP_404_NOT_FOUND, "Brak obiektu")
         params["ATLAS_PK"] = pk
     else:
         if extent:
@@ -52,7 +63,8 @@ async def render_report(
             params["map0:LAYERS"] = ",".join(requested)
 
     async with httpx.AsyncClient(timeout=120) as client:
-        r = await client.get(get_settings().qgis_server_url, params=params)
+        r = await client.get(get_settings().qgis_server_url, params=params,
+                             headers={FILTER_HEADER: wms_filter_header(ctx)})
     if r.status_code != 200 or not r.content.startswith(b"%PDF"):
         raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"QGIS Server: {r.text[:500]}")
     fname = f"{report.title}{'_' + pk if pk else ''}.pdf".replace("/", "_")

@@ -24,9 +24,9 @@ async def list_projects(user: CurrentUser | None = Depends(optional_user)):
                 """SELECT DISTINCT p.slug, p.title, p.description, p.sort_order
                    FROM portal.projects p
                    LEFT JOIN portal.project_access pa ON pa.project_id = p.id AND pa.group_id = ANY(%s)
-                   WHERE p.is_public OR pa.group_id IS NOT NULL
+                   WHERE p.is_public OR pa.group_id IS NOT NULL OR p.owner_id = %s
                    ORDER BY p.sort_order, p.title""",
-                (user.group_ids if user else [],),
+                (user.group_ids if user else [], user.id if user else None),
             )).fetchall()
     return [{"slug": r["slug"], "title": r["title"], "description": r["description"]} for r in rows]
 
@@ -88,6 +88,9 @@ async def project_config(slug: str, user: CurrentUser | None = Depends(optional_
         "reports": [
             asdict(r) for r in p.reports if r.layer_id is None or r.layer_id in visible
         ],
+        # zakres danych i prawa użytkownika w projekcie (WebUI: przyciski zdjęć/plików, informacja o zakresie)
+        "scope": ({"label": p.scope.label, "codes": ctx.scope_codes} if p.scope else None),
+        "rights": {"photos": ctx.can_photos, "files": ctx.can_files},
         # narzędzia pobierania (ULDK…) — tylko z warstwą docelową, do której użytkownik może dodawać
         "tools": [
             {"id": t.id, "label": t.label, "source": t.source, "layer_id": t.layer_id, "open_form": t.open_form,

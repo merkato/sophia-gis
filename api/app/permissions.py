@@ -1,4 +1,4 @@
-"""Rozstrzyganie uprawnień: projekt -> rola grupy -> nadpisania warstw -> zasięgi przestrzenne."""
+"""Rozstrzyganie uprawnień: projekt -> rola grupy -> nadpisania warstw -> zakres danych (scope.py)."""
 from __future__ import annotations
 
 from dataclasses import dataclass
@@ -36,6 +36,11 @@ class ProjectContext:
     role: str | None                    # None = dostęp publiczny (anonim)
     user: CurrentUser | None
     _layer_overrides: dict[str, LayerPerms]
+    # Zakres danych: None = bez ograniczeń (administrator, autor projektu, grupa „cały obszar”,
+    # projekt publiczny, projekt bez wymiaru zakresu); lista = suma kodów z grup użytkownika
+    scope_codes: list[str] | None = None
+    can_photos: bool = False            # dodawanie zdjęć (z grup w projekcie; domyślnie włączone)
+    can_files: bool = False             # dodawanie dokumentów
 
     def layer(self, layer_id: str) -> LayerDef:
         lyr = self.project.layers.get(layer_id)
@@ -70,7 +75,8 @@ async def load_project_context(slug: str, user: CurrentUser | None) -> ProjectCo
     async with portal_conn() as conn:
         proj = await (
             await conn.execute(
-                "SELECT id, slug, title, file_name, is_public FROM portal.projects WHERE slug = %s", (slug,)
+                "SELECT id, slug, title, file_name, is_public, owner_id FROM portal.projects WHERE slug = %s",
+                (slug,)
             )
         ).fetchone()
         if proj is None:
@@ -78,17 +84,25 @@ async def load_project_context(slug: str, user: CurrentUser | None) -> ProjectCo
 
         role: str | None = None
         overrides: dict[str, LayerPerms] = {}
-        if user and user.is_admin:
+        scope_codes: list[str] | None = None
+        can_photos = can_files = False
+        if user and (user.is_admin or proj["owner_id"] == user.id):
             role = "manager"
+            can_photos = can_files = True
         elif user and user.group_ids:
             rows = await (
                 await conn.execute(
-                    "SELECT role FROM portal.project_access WHERE project_id = %s AND group_id = ANY(%s)",
+                    """SELECT role, can_photos, can_files, scope_all, scope_codes FROM portal.project_access
+                       WHERE project_id = %s AND group_id = ANY(%s)""",
                     (proj["id"], user.group_ids),
                 )
             ).fetchall()
             if rows:
                 role = max((r["role"] for r in rows), key=ROLE_RANK.__getitem__)
+                can_photos = any(r["can_photos"] for r in rows)
+                can_files = any(r["can_files"] for r in rows)
+                if not any(r["scope_all"] for r in rows):
+                    scope_codes = sorted({c for r in rows for c in r["scope_codes"]})
                 # Suma (OR) uprawnień ze wszystkich grup użytkownika
                 for r in await (
                     await conn.execute(
@@ -114,25 +128,6 @@ async def load_project_context(slug: str, user: CurrentUser | None) -> ProjectCo
     return ProjectContext(
         id=proj["id"], slug=proj["slug"], title=proj["title"], path=path,
         project=get_project(path), role=role, user=user, _layer_overrides=overrides,
+        scope_codes=scope_codes, can_photos=can_photos, can_files=can_files,
     )
 
-
-async def user_extent_ewkb(user: CurrentUser | None, mode: str) -> bytes | None:
-    """Suma zasięgów użytkownika (bezpośrednich i z grup) jako EWKB w układzie zasięgów.
-
-    Zwraca None, gdy użytkownik nie ma ograniczeń. mode='edit' uwzględnia zasięgi 'view'
-    i 'edit' (kto nie widzi, ten nie edytuje); mode='view' tylko zasięgi 'view'.
-    """
-    if user is None or user.is_admin:
-        return None
-    modes = ["view", "edit"] if mode == "edit" else ["view"]
-    async with portal_conn() as conn:
-        row = await (
-            await conn.execute(
-                """SELECT ST_AsEWKB(ST_Union(e.geom)) AS g, count(*) AS n
-                   FROM portal.extent_assignments a JOIN portal.extents e ON e.id = a.extent_id
-                   WHERE a.mode = ANY(%s) AND (a.user_id = %s OR a.group_id = ANY(%s))""",
-                (modes, user.id, user.group_ids),
-            )
-        ).fetchone()
-    return row["g"] if row and row["n"] else None

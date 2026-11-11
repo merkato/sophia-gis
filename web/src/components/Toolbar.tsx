@@ -88,6 +88,12 @@ export function Toolbar({ config, editLayerId, onEditLayer, tool, onTool, canDel
           ))}
         </>
       )}
+
+      {config?.scope && config.scope.codes && (
+        <span className="scope-badge" title={`Twój zakres danych: ${config.scope.codes.join(", ") || "brak"}`}>
+          {config.scope.label}: {config.scope.codes.length ? config.scope.codes.join(", ") : "brak"}
+        </span>
+      )}
     </div>
   );
 }

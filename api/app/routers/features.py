@@ -1,7 +1,9 @@
 """CRUD obiektów warstw PostGIS (GeoJSON).
 
 Zapis idzie bezpośrednio do PostGIS (nie przez WFS-T), co pozwala:
-  * wymusić zasięg przestrzenny użytkownika (ST_CoveredBy) przy insert/update/delete,
+  * wymusić zakres danych użytkownika (app/scope.py) przy odczycie i przy insert/update/delete —
+    edycja sprawdzana przed zmianą i po niej, w tej samej transakcji (przesunięcie obiektu albo
+    zmiana kodu poza własny zakres cofa zapis),
   * walidować pola wg konfiguracji formularza z projektu QGIS (tylko edytowalne pola),
   * obsłużyć relacje rodzic–dziecko i dziennik zmian w jednej transakcji.
 """
@@ -14,15 +16,18 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from psycopg import sql
 from pydantic import BaseModel
 
-from ..config import get_settings
 from ..db import layer_conn, portal_conn
-from ..permissions import ProjectContext, load_project_context, user_extent_ewkb
+from ..permissions import ProjectContext, load_project_context
 from ..qgsproject import LayerDef
+from ..scope import Mode, T, col, row_filter, single_code
+from ..scope import base_filter as _base_filter
+from ..scope import table as _table
 from ..security import CurrentUser, optional_user, require_user
 
 router = APIRouter(prefix="/api/projects/{slug}/layers/{layer_id}/features", tags=["features"])
 
 MAX_FEATURES = 5000
+OUT_OF_SCOPE = "Obiekt poza Twoim zakresem danych"
 
 
 class FeatureIn(BaseModel):
@@ -37,21 +42,17 @@ def _srid(crs: str | None) -> int:
     raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Nieobsługiwany układ: {crs}")
 
 
-def _table(lyr: LayerDef) -> sql.Composed:
-    return sql.Identifier(lyr.pg.schema, lyr.pg.table)
-
-
 def _select_list(lyr: LayerDef, out_srid: int) -> sql.Composed:
     names = [f.name for f in lyr.fields if f.widget != "Hidden" and f.name != lyr.pg.geometry_column]
-    parts = [sql.SQL("{}::text AS __pk").format(sql.Identifier(lyr.pg.key))]
+    parts = [sql.SQL("{}::text AS __pk").format(col(T, lyr.pg.key))]
     if lyr.pg.geometry_column:
         parts.append(sql.SQL("ST_AsGeoJSON(ST_Transform({g}, {s}), 9)::json AS __geom").format(
-            g=sql.Identifier(lyr.pg.geometry_column), s=sql.Literal(out_srid)))
+            g=col(T, lyr.pg.geometry_column), s=sql.Literal(out_srid)))
     if names:
         # jsonb_build_object nie ma limitu 100 argumentów jak json_build_object — łączymy po 50 pól
         chunks = [names[i:i + 50] for i in range(0, len(names), 50)]
         objs = [sql.SQL("jsonb_build_object({})").format(sql.SQL(", ").join(
-            sql.SQL("{}, {}").format(sql.Literal(n), sql.Identifier(n)) for n in chunk)) for chunk in chunks]
+            sql.SQL("{}, {}").format(sql.Literal(n), col(T, n)) for n in chunk)) for chunk in chunks]
         parts.append(sql.SQL(" || ").join(objs) + sql.SQL(" AS __props"))
     return sql.SQL(", ").join(parts)
 
@@ -59,18 +60,6 @@ def _select_list(lyr: LayerDef, out_srid: int) -> sql.Composed:
 def _row_to_feature(row: dict) -> dict:
     return {"type": "Feature", "id": row["__pk"], "geometry": row.get("__geom"),
             "properties": row.get("__props") or {}}
-
-
-def _base_filter(lyr: LayerDef) -> sql.Composable:
-    # Filtr z definicji warstwy QGIS (sql=...) — zaufany, bo pochodzi z projektu administratora.
-    return sql.SQL("({})").format(sql.SQL(lyr.pg.sql_filter)) if lyr.pg.sql_filter else sql.SQL("true")
-
-
-def _extent_condition(lyr: LayerDef, geom_expr: sql.Composable, extent: bytes | None) -> sql.Composable:
-    if extent is None or not lyr.pg.geometry_column:
-        return sql.SQL("true")
-    return sql.SQL("ST_Intersects(ST_Transform({g}, {es}), ST_GeomFromEWKB({e}))").format(
-        g=geom_expr, es=sql.Literal(get_settings().extents_srid), e=sql.Literal(extent))
 
 
 def _writable_values(lyr: LayerDef, props: dict[str, Any]) -> dict[str, Any]:
@@ -93,14 +82,8 @@ def _geom_sql(lyr: LayerDef, geometry: dict, in_srid: int) -> sql.Composable:
     return g
 
 
-async def _check_geometry_in_extent(conn, lyr: LayerDef, geom: sql.Composable, extent: bytes | None):
-    if extent is None:
-        return
-    ok = await (await conn.execute(sql.SQL(
-        "SELECT ST_CoveredBy(ST_Transform({g}, {es}), ST_GeomFromEWKB({e})) AS ok").format(
-        g=geom, es=sql.Literal(get_settings().extents_srid), e=sql.Literal(extent)))).fetchone()
-    if not ok["ok"]:
-        raise HTTPException(status.HTTP_403_FORBIDDEN, "Geometria wykracza poza przydzielony zasięg")
+def _pk_is(lyr: LayerDef, pk: str) -> sql.Composable:
+    return sql.SQL("{}::text = {}").format(col(T, lyr.pg.key), sql.Literal(pk))
 
 
 async def _audit(ctx: ProjectContext, layer_id: str, pk: str, action: str, old: Any, new: Any):
@@ -114,12 +97,36 @@ async def _audit(ctx: ProjectContext, layer_id: str, pk: str, action: str, old: 
         )
 
 
-async def _fetch_one(conn, lyr: LayerDef, pk: str, srid: int, extent: bytes | None) -> dict | None:
-    g = sql.Identifier(lyr.pg.geometry_column) if lyr.pg.geometry_column else sql.SQL("NULL")
-    q = sql.SQL("SELECT {cols} FROM {t} WHERE {k}::text = {pk} AND {f} AND {ext}").format(
-        cols=_select_list(lyr, srid), t=_table(lyr), k=sql.Identifier(lyr.pg.key), pk=sql.Literal(pk),
-        f=_base_filter(lyr), ext=_extent_condition(lyr, g, extent))
+async def _fetch_one(conn, ctx: ProjectContext | None, lyr: LayerDef, pk: str, srid: int,
+                     mode: Mode | None = "view") -> dict | None:
+    """Jeden obiekt; mode=None — bez zakresu (odczyt własnego, właśnie zapisanego rekordu)."""
+    cond = row_filter(ctx, lyr, T, mode) if ctx is not None and mode else _base_filter(lyr)
+    q = sql.SQL("SELECT {cols} FROM {t} AS {a} WHERE {pk} AND {c}").format(
+        cols=_select_list(lyr, srid), t=_table(lyr), a=sql.Identifier(*T), pk=_pk_is(lyr, pk), c=cond)
     return await (await conn.execute(q)).fetchone()
+
+
+async def in_scope(conn, ctx: ProjectContext, lyr: LayerDef, pk: str, mode: Mode = "edit") -> bool:
+    q = sql.SQL("SELECT 1 FROM {t} AS {a} WHERE {pk} AND {c}").format(
+        t=_table(lyr), a=sql.Identifier(*T), pk=_pk_is(lyr, pk), c=row_filter(ctx, lyr, T, mode))
+    return await (await conn.execute(q)).fetchone() is not None
+
+
+def _autofill_scope(ctx: ProjectContext, lyr: LayerDef, values: dict[str, Any]) -> None:
+    """Reguła „atrybut”: puste pole kodu przy jednym kodzie użytkownika — wpisujemy go sami."""
+    if lyr.scope_mode == "attribute" and lyr.scope_field and values.get(lyr.scope_field) in (None, ""):
+        code = single_code(ctx)
+        if code:
+            values[lyr.scope_field] = code
+
+
+def _scope_error(ctx: ProjectContext, lyr: LayerDef) -> HTTPException:
+    if lyr.scope_mode == "attribute" and ctx.scope_codes is not None:
+        return HTTPException(status.HTTP_403_FORBIDDEN,
+                             f"Pole „{lyr.scope_field}” musi mieć jedną z wartości: {', '.join(ctx.scope_codes) or '—'}")
+    if lyr.scope_mode == "spatial":
+        return HTTPException(status.HTTP_403_FORBIDDEN, "Obiekt musi leżeć w Twoim obszarze (punkt wewnątrz obiektu)")
+    return HTTPException(status.HTTP_403_FORBIDDEN, OUT_OF_SCOPE)
 
 
 # ---------------------------------------------------------------------------- endpointy
@@ -138,21 +145,19 @@ async def list_features(
     if not lyr.pg:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Warstwa nie jest warstwą PostGIS")
     srid = _srid(crs)
-    extent = await user_extent_ewkb(user, "view")
-    g = sql.Identifier(lyr.pg.geometry_column) if lyr.pg.geometry_column else None
-
-    where = [_base_filter(lyr), _extent_condition(lyr, g, extent) if g else sql.SQL("true")]
-    if bbox and g:
+    where = [row_filter(ctx, lyr)]
+    if bbox and lyr.pg.geometry_column:
         try:
             minx, miny, maxx, maxy = (float(v) for v in bbox.split(","))
         except ValueError as exc:
             raise HTTPException(status.HTTP_400_BAD_REQUEST, "Błędny bbox") from exc
         where.append(sql.SQL("{g} && ST_Transform(ST_MakeEnvelope({a},{b},{c},{d},{s}), {ls})").format(
-            g=g, a=sql.Literal(minx), b=sql.Literal(miny), c=sql.Literal(maxx), d=sql.Literal(maxy),
-            s=sql.Literal(srid), ls=sql.Literal(lyr.pg.srid or srid)))
+            g=col(T, lyr.pg.geometry_column), a=sql.Literal(minx), b=sql.Literal(miny), c=sql.Literal(maxx),
+            d=sql.Literal(maxy), s=sql.Literal(srid), ls=sql.Literal(lyr.pg.srid or srid)))
 
-    q = sql.SQL("SELECT {cols} FROM {t} WHERE {w} LIMIT {lim}").format(
-        cols=_select_list(lyr, srid), t=_table(lyr), w=sql.SQL(" AND ").join(where), lim=sql.Literal(limit))
+    q = sql.SQL("SELECT {cols} FROM {t} AS {a} WHERE {w} LIMIT {lim}").format(
+        cols=_select_list(lyr, srid), t=_table(lyr), a=sql.Identifier(*T), w=sql.SQL(" AND ").join(where),
+        lim=sql.Literal(limit))
     async with layer_conn(lyr.pg.conninfo) as conn:
         rows = await (await conn.execute(q)).fetchall()
     return {"type": "FeatureCollection", "features": [_row_to_feature(r) for r in rows],
@@ -165,7 +170,7 @@ async def get_feature(slug: str, layer_id: str, pk: str, crs: str = "EPSG:3857",
     ctx = await load_project_context(slug, user)
     lyr = ctx.require(layer_id, "view")
     async with layer_conn(lyr.pg.conninfo) as conn:
-        row = await _fetch_one(conn, lyr, pk, _srid(crs), await user_extent_ewkb(user, "view"))
+        row = await _fetch_one(conn, ctx, lyr, pk, _srid(crs))
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Brak obiektu")
     return _row_to_feature(row)
@@ -178,27 +183,26 @@ async def create_feature(slug: str, layer_id: str, body: FeatureIn, crs: str = "
     lyr = ctx.require(layer_id, "insert")
     srid = _srid(crs)
     values = _writable_values(lyr, body.properties)
-    extent = await user_extent_ewkb(user, "edit")
+    _autofill_scope(ctx, lyr, values)
 
     cols = [sql.Identifier(k) for k in values]
     vals: list[sql.Composable] = [sql.Literal(v) for v in values.values()]
     if lyr.pg.geometry_column:
         if body.geometry is None:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Brak geometrii")
-        geom = _geom_sql(lyr, body.geometry, srid)
         cols.append(sql.Identifier(lyr.pg.geometry_column))
-        vals.append(geom)
+        vals.append(_geom_sql(lyr, body.geometry, srid))
 
     async with layer_conn(lyr.pg.conninfo) as conn, conn.transaction():
-        if lyr.pg.geometry_column:
-            await _check_geometry_in_extent(conn, lyr, geom, extent)
         q = sql.SQL("INSERT INTO {t} ({c}) VALUES ({v}) RETURNING {k}::text AS pk").format(
             t=_table(lyr), c=sql.SQL(", ").join(cols), v=sql.SQL(", ").join(vals), k=sql.Identifier(lyr.pg.key))
         if not cols:
             q = sql.SQL("INSERT INTO {t} DEFAULT VALUES RETURNING {k}::text AS pk").format(
                 t=_table(lyr), k=sql.Identifier(lyr.pg.key))
         pk = (await (await conn.execute(q)).fetchone())["pk"]
-        row = await _fetch_one(conn, lyr, pk, srid, None)
+        if not await in_scope(conn, ctx, lyr, pk, "edit"):
+            raise _scope_error(ctx, lyr)          # wyjątek w transakcji = wycofanie wstawienia
+        row = await _fetch_one(conn, None, lyr, pk, srid, None)
     feature = _row_to_feature(row)
     await _audit(ctx, layer_id, pk, "insert", None, feature)
     return feature
@@ -211,21 +215,23 @@ async def update_feature(slug: str, layer_id: str, pk: str, body: FeatureIn, crs
     lyr = ctx.require(layer_id, "update")
     srid = _srid(crs)
     values = _writable_values(lyr, body.properties)
-    extent = await user_extent_ewkb(user, "edit")
 
     sets = [sql.SQL("{} = {}").format(sql.Identifier(k), sql.Literal(v)) for k, v in values.items()]
     async with layer_conn(lyr.pg.conninfo) as conn, conn.transaction():
-        old = await _fetch_one(conn, lyr, pk, srid, extent)   # istniejący obiekt musi być w zasięgu
+        old = await _fetch_one(conn, ctx, lyr, pk, srid, "view")
         if old is None:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Brak obiektu lub poza zasięgiem")
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Brak obiektu")
+        if not await in_scope(conn, ctx, lyr, pk, "edit"):
+            raise HTTPException(status.HTTP_403_FORBIDDEN, f"{OUT_OF_SCOPE} — tylko podgląd")
         if body.geometry is not None and lyr.pg.geometry_column:
-            geom = _geom_sql(lyr, body.geometry, srid)
-            await _check_geometry_in_extent(conn, lyr, geom, extent)
-            sets.append(sql.SQL("{} = {}").format(sql.Identifier(lyr.pg.geometry_column), geom))
+            sets.append(sql.SQL("{} = {}").format(sql.Identifier(lyr.pg.geometry_column),
+                                                 _geom_sql(lyr, body.geometry, srid)))
         if sets:
             await conn.execute(sql.SQL("UPDATE {t} SET {s} WHERE {k}::text = {pk}").format(
                 t=_table(lyr), s=sql.SQL(", ").join(sets), k=sql.Identifier(lyr.pg.key), pk=sql.Literal(pk)))
-        new = await _fetch_one(conn, lyr, pk, srid, None)
+            if not await in_scope(conn, ctx, lyr, pk, "edit"):
+                raise _scope_error(ctx, lyr)
+        new = await _fetch_one(conn, None, lyr, pk, srid, None)
     await _audit(ctx, layer_id, pk, "update", _row_to_feature(old), _row_to_feature(new))
     return _row_to_feature(new)
 
@@ -234,11 +240,12 @@ async def update_feature(slug: str, layer_id: str, pk: str, body: FeatureIn, crs
 async def delete_feature(slug: str, layer_id: str, pk: str, user: CurrentUser = Depends(require_user)):
     ctx = await load_project_context(slug, user)
     lyr = ctx.require(layer_id, "delete")
-    extent = await user_extent_ewkb(user, "edit")
     async with layer_conn(lyr.pg.conninfo) as conn, conn.transaction():
-        old = await _fetch_one(conn, lyr, pk, 3857, extent)
+        old = await _fetch_one(conn, ctx, lyr, pk, 3857, "view")
         if old is None:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Brak obiektu lub poza zasięgiem")
+            raise HTTPException(status.HTTP_404_NOT_FOUND, "Brak obiektu")
+        if not await in_scope(conn, ctx, lyr, pk, "edit"):
+            raise HTTPException(status.HTTP_403_FORBIDDEN, f"{OUT_OF_SCOPE} — tylko podgląd")
         # Relacje typu "Composition" z projektu QGIS: usuń dzieci razem z rodzicem.
         for rel in ctx.project.relations:
             if rel.parent_layer != layer_id or rel.strength != "Composition":
@@ -262,13 +269,10 @@ async def related_features(slug: str, layer_id: str, pk: str, crs: str = "EPSG:3
     ctx = await load_project_context(slug, user)
     lyr = ctx.require(layer_id, "view")
     srid = _srid(crs)
-    extent = await user_extent_ewkb(user, "view")
     out = []
     async with layer_conn(lyr.pg.conninfo) as conn:
-        g = sql.Identifier(lyr.pg.geometry_column) if lyr.pg.geometry_column else sql.SQL("NULL")
-        me = await (await conn.execute(sql.SQL("SELECT * FROM {t} WHERE {k}::text = {pk} AND {f} AND {e}").format(
-            t=_table(lyr), k=sql.Identifier(lyr.pg.key), pk=sql.Literal(pk), f=_base_filter(lyr),
-            e=_extent_condition(lyr, g, extent)))).fetchone()
+        me = await (await conn.execute(sql.SQL("SELECT {a}.* FROM {t} AS {a} WHERE {pk} AND {c}").format(
+            t=_table(lyr), a=sql.Identifier(*T), pk=_pk_is(lyr, pk), c=row_filter(ctx, lyr)))).fetchone()
         if me is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Brak obiektu")
         for rel in ctx.project.relations:
@@ -282,12 +286,11 @@ async def related_features(slug: str, layer_id: str, pk: str, crs: str = "EPSG:3
             if not other.pg or other.pg.conninfo != lyr.pg.conninfo:
                 continue  # relacje między bazami — poza zakresem v1
             cond = sql.SQL(" AND ").join(
-                sql.SQL("{} = {}").format(sql.Identifier(c if as_parent else p), sql.Literal(me[p if as_parent else c]))
+                sql.SQL("{} = {}").format(col(T, c if as_parent else p), sql.Literal(me[p if as_parent else c]))
                 for p, c in rel.pairs)
-            og = sql.Identifier(other.pg.geometry_column) if other.pg.geometry_column else None
-            q = sql.SQL("SELECT {cols} FROM {t} WHERE {c} AND {f} AND {e} LIMIT 500").format(
-                cols=_select_list(other, srid), t=_table(other), c=cond, f=_base_filter(other),
-                e=_extent_condition(other, og, extent) if og else sql.SQL("true"))
+            q = sql.SQL("SELECT {cols} FROM {t} AS {a} WHERE {c} AND {f} LIMIT 500").format(
+                cols=_select_list(other, srid), t=_table(other), a=sql.Identifier(*T), c=cond,
+                f=row_filter(ctx, other))
             rows = await (await conn.execute(q)).fetchall()
             out.append({"relation": rel.id, "name": rel.name, "direction": "child" if as_parent else "parent",
                         "layer_id": other_id, "pairs": rel.pairs,

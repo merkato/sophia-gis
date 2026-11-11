@@ -13,10 +13,10 @@ from psycopg import sql
 
 from .. import fetchers
 from ..db import layer_conn, portal_conn
-from ..permissions import load_project_context, user_extent_ewkb
+from ..permissions import load_project_context
+from ..scope import T, col, row_filter
 from ..security import CurrentUser, require_user
 from .features import _srid, _table
-from .photos import T, visible_condition
 
 log = logging.getLogger("sophia.fetch")
 
@@ -58,13 +58,11 @@ async def fetch_feature(slug: str, tool_id: str, x: float, y: float, crs: str = 
     key_dst = tool.fields.get(source.key_field)
     key_val = found.properties.get(source.key_field)
     if key_dst and key_val:
-        extent = await user_extent_ewkb(user, "view")
         async with layer_conn(lyr.pg.conninfo) as conn:
             hit = await (await conn.execute(sql.SQL(
                 "SELECT {k}::text AS pk FROM {t} AS {a} WHERE {f}::text = {v} AND {vis} LIMIT 1").format(
-                k=sql.Identifier(T, lyr.pg.key), t=_table(lyr), a=sql.Identifier(T),
-                f=sql.Identifier(T, key_dst), v=sql.Literal(key_val),
-                vis=visible_condition(ctx, lyr, extent)))).fetchone()
+                k=col(T, lyr.pg.key), t=_table(lyr), a=sql.Identifier(*T),
+                f=col(T, key_dst), v=sql.Literal(key_val), vis=row_filter(ctx, lyr)))).fetchone()
         existing_pk = hit["pk"] if hit else None
 
     return {

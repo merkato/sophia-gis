@@ -1,5 +1,5 @@
 import type {
-  AdminProject, AdminUser, Basemap, FetchResult, FileMeta, GeoJSONFeature, Group, PhotoMeta, ProjectAccess, ProjectConfig,
+  AdminProject, AdminUser, Basemap, FetchResult, FileMeta, GeoJSONFeature, Group, PhotoMeta, ProjectAccess, ProjectConfig, ProjectScopeInfo,
   ProjectSummary, RelatedGroup, User, WmtsCapabilities,
 } from "./types";
 
@@ -117,6 +117,7 @@ export const adminApi = {
   deleteProject: (id: number) => request<void>(`/api/admin/projects/${id}`, { method: "DELETE" }),
   projectAccess: (id: number) => request<ProjectAccess>(`/api/admin/projects/${id}/access`),
   setProjectAccess: (id: number, a: ProjectAccess) => request(`/api/admin/projects/${id}/access`, json("PUT", a)),
+  projectScope: (id: number) => request<ProjectScopeInfo>(`/api/admin/projects/${id}/scope`),
 
   basemaps: () => request<Basemap[]>("/api/admin/basemaps"),
   createBasemap: (b: BasemapInput) => request<Basemap>("/api/admin/basemaps", json("POST", b)),

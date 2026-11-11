@@ -40,6 +40,7 @@ app = FastAPI(title="Sophia API", version="0.1.0", lifespan=lifespan,
 for r in (auth, projects, features, fields, photos, fetch, reports, ows, admin, basemaps):
     app.include_router(r.router)
 app.include_router(basemaps.admin)
+app.include_router(admin.publish_router)
 app.include_router(photos.projects_router)
 
 

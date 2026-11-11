@@ -10,6 +10,8 @@ interface Source {
   version: number;
   pk?: string | null;                 // zapisany obiekt (null = nowy) — podgląd plików z pól „Załącznik”
   crs?: string;
+  canPhotos?: boolean;                // prawo dodawania zdjęć / dokumentów (grupa w projekcie)
+  canFiles?: boolean;
 }
 type Option = { value: string; label: string };
 
@@ -104,11 +106,13 @@ export function FieldInput({ field, value, onChange, readOnly, source, saved }: 
     case "ExternalResource":
       if (source && isPhotoField(field)) {
         return <PhotoField field={field} value={value} saved={saved} onChange={onChange} disabled={disabled}
-          slug={source.slug} layerId={source.layerId} pk={source.pk ?? null} crs={source.crs ?? "EPSG:2180"} />;
+          slug={source.slug} layerId={source.layerId} pk={source.pk ?? null} crs={source.crs ?? "EPSG:2180"}
+          canUpload={source.canPhotos ?? false} />;
       }
       if (source) {
         return <FileField field={field} value={value} saved={saved} onChange={onChange} disabled={disabled}
-          slug={source.slug} layerId={source.layerId} pk={source.pk ?? null} crs={source.crs ?? "EPSG:2180"} />;
+          slug={source.slug} layerId={source.layerId} pk={source.pk ?? null} crs={source.crs ?? "EPSG:2180"}
+          canUpload={source.canFiles ?? false} />;
       }
       return <input value={str} disabled={disabled} onChange={(e) => onChange(e.target.value || null)} />;
     case "RelationReference":

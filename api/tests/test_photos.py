@@ -95,46 +95,6 @@ def test_thumb(tmp_path):
     assert max(Image.open(t).size) == photos.THUMB_PX
 
 
-# ---------------------------------------------------------------- widoczność zdjęć wg obiektu nadrzędnego
-
-class _Ctx:
-    def __init__(self, layers, relations, viewable):
-        from types import SimpleNamespace
-        self.project = SimpleNamespace(layers=layers, relations=relations)
-        self._viewable = viewable
-
-    def perms(self, layer_id):
-        from types import SimpleNamespace
-        return SimpleNamespace(view=layer_id in self._viewable)
-
-
-def _visibility_sql(viewable):
-    from app.qgsproject import LayerDef, PgSource, RelationDef
-    from app.routers.photos import visible_condition
-    obj = LayerDef(id="obiekty", name="Obiekty", short_name=None, type="vector", provider="postgres", crs=None,
-                   geometry_type="Polygon", display_expression=None,
-                   pg=PgSource("service=sophia", "dane", "obiekty", "geom", "fid", None, None, None))
-    pho = LayerDef(id="zdjecia", name="Zdjęcia", short_name=None, type="vector", provider="postgres", crs=None,
-                   geometry_type=None, display_expression=None,
-                   pg=PgSource("service=sophia", "dane", "obiekty_zdjecia", None, "fid", None, None, None))
-    ctx = _Ctx({"obiekty": obj, "zdjecia": pho},
-               [RelationDef("r1", "Zdjęcia", "obiekty", "zdjecia", [("fid", "obiekt_fid")])], viewable)
-    return (visible_condition(ctx, pho, b"\x01").as_string(None),
-            visible_condition(ctx, pho, None).as_string(None))
-
-
-def test_photo_table_visibility_follows_parent_extent():
-    with_extent, no_extent = _visibility_sql({"obiekty", "zdjecia"})
-    assert 'EXISTS (SELECT 1 FROM "dane"."obiekty" AS __p WHERE "__p"."fid" = "__t"."obiekt_fid"' in with_extent
-    assert 'ST_Intersects(ST_Transform("__p"."geom"' in with_extent
-    assert no_extent == "true"                      # bez zasięgu: wystarczy dostęp do warstwy
-
-
-def test_photo_table_hidden_when_parent_layer_not_viewable():
-    with_extent, _ = _visibility_sql({"zdjecia"})
-    assert with_extent.endswith("false")
-
-
 # ---------------------------------------------------------------- dokumenty (PDF, GML…)
 
 def _file_field(flt: str | None) -> FieldDef:

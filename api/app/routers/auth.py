@@ -47,5 +47,5 @@ async def logout(response: Response):
 async def me(user: CurrentUser = Depends(require_user)):
     return {
         "id": user.id, "login": user.login, "full_name": user.full_name,
-        "is_admin": user.is_admin, "groups": user.group_names,
+        "is_admin": user.is_admin, "can_publish": user.can_publish, "groups": user.group_names,
     }

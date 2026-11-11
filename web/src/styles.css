@@ -46,6 +46,8 @@ button.block, .reports .button { display: block; width: 100%; text-align: left; 
 .toolbar .tool.active { background: color-mix(in srgb, var(--accent) 20%, transparent); border-color: var(--accent); }
 .toolbar .tool:disabled { opacity: .35; filter: grayscale(1); cursor: default; }
 .toolbar .sep { width: 1px; height: 24px; background: var(--line); margin: 0 6px; flex: none; }
+.toolbar .scope-badge { margin-left: auto; flex: none; font-size: 12px; padding: 3px 10px; border-radius: 12px;
+  border: 1px solid var(--line); color: var(--muted); white-space: nowrap; max-width: 40%; overflow: hidden; text-overflow: ellipsis; }
 .toolbar .edit-layer { max-width: 240px; min-width: 120px; height: 30px; padding: 2px 6px; flex: 0 1 auto; }
 
 .body { flex: 1; display: flex; min-height: 0; position: relative; }
@@ -191,6 +193,20 @@ ul.plain li { padding: 4px 0; }
 .preview { position: sticky; top: 0; display: flex; flex-direction: column; gap: 6px; height: calc(100vh - 110px); min-width: 300px; }
 .preview-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .preview-map { flex: 1; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: #f2f2ee; }
+
+/* --- dostęp grup do projektu */
+.access-editor { width: 440px; }
+.access-editor fieldset.grant.off { opacity: .75; }
+.access-editor fieldset.grant > select { width: 100%; margin-bottom: 6px; }
+.inline-checks { display: flex; gap: 14px; flex-wrap: wrap; }
+.scope-pick { margin-top: 6px; border-top: 1px dashed var(--line); padding-top: 6px; }
+.scope-pick input[type="text"], .scope-pick input:not([type]) { width: 100%; margin: 4px 0; }
+.codes { display: flex; flex-wrap: wrap; gap: 4px; max-height: 180px; overflow: auto; margin-top: 4px; }
+.code { display: inline-flex; align-items: center; gap: 4px; padding: 2px 8px; border: 1px solid var(--line);
+  border-radius: 12px; font-size: 12px; cursor: pointer; }
+.code.on { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 14%, transparent); }
+.scope-info { margin-bottom: 10px; font-size: 13px; }
+.scope-info summary { cursor: pointer; }
 
 @media (max-width: 800px) {
   .sidebar { position: absolute; z-index: 5; top: 0; bottom: 0; width: min(300px, 85vw);

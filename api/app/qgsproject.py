@@ -61,6 +61,9 @@ class LayerDef:
     popup: bool = True
     hidden: bool = False
     tile_format: str | None = None      # rastry: format kafli w WebUI (None = wektor, bez kafli)
+    # zakres danych (app/scope.py): spatial | attribute | relation | none; "auto" rozstrzygane po wczytaniu
+    scope_mode: str = "none"
+    scope_field: str | None = None
 
     @property
     def wms_name(self) -> str:
@@ -110,6 +113,42 @@ class ReportDef:
 
 
 @dataclass
+class ScopeDef:
+    """Wymiar zakresu z Fii: warstwa granic (np. oddziały terenowe) i pole z kodem obszaru."""
+    label: str
+    layer_id: str
+    field: str
+
+
+SCOPE_MODES = {"auto", "spatial", "attribute", "relation", "none"}
+
+
+def resolve_scope(cfg: dict, layer_cfg: dict, layers: dict[str, LayerDef], relations: list) -> ScopeDef | None:
+    """Wymiar zakresu i reguły warstw. „auto”: warstwa z geometrią — przestrzennie, tabela bez geometrii
+    będąca dzieckiem w relacji — przez relację, pozostałe (i sama warstwa granic) — bez ograniczeń."""
+    sc = cfg.get("scope") or {}
+    b = layers.get(sc.get("layer", ""))
+    if not b or not b.pg or not b.geometry_type or not sc.get("field"):
+        return None
+    dim = ScopeDef(label=sc.get("label") or "Obszar", layer_id=b.id, field=sc["field"])
+    children = {r.child_layer for r in relations}
+    for lid, lyr in layers.items():
+        if not lyr.pg:
+            continue
+        rule = (layer_cfg.get(lid, {}).get("scope") or {})
+        mode = rule.get("mode", "auto") if rule.get("mode") in SCOPE_MODES else "auto"
+        if lid == b.id and mode == "auto":
+            mode = "none"
+        if mode == "auto":
+            mode = "spatial" if lyr.pg.geometry_column else "relation" if lid in children else "none"
+        if mode == "spatial" and not lyr.pg.geometry_column:
+            mode = "none"
+        lyr.scope_mode = mode
+        lyr.scope_field = rule.get("field") if mode == "attribute" else None
+    return dim
+
+
+@dataclass
 class ToolDef:
     """Narzędzie pobierania z Fii: obiekt z usługi zewnętrznej (np. działka z ULDK) -> warstwa projektu."""
     id: str
@@ -147,6 +186,7 @@ class Project:
     options: dict[str, Any]
     mtime: float
     tools: list[ToolDef] = field(default_factory=list)
+    scope: ScopeDef | None = None
 
     def layer_by_wms_name(self, name: str) -> LayerDef | None:
         return next((lyr for lyr in self.layers.values() if lyr.wms_name == name), None)
@@ -413,6 +453,7 @@ def load_project(path: Path) -> Project:
         options=cfg.get("map", {}),
         mtime=path.stat().st_mtime,
         tools=parse_tools(cfg, layers),
+        scope=resolve_scope(cfg, layer_cfg, layers, relations),
     )
 
 

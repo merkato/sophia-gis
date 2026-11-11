@@ -7,8 +7,9 @@ Dwa warianty konfiguracji w QGIS (docs/user/zdjecia.md):
      i tworzy rekord z kluczem obcym rodzica (i punktem z GPS, jeśli tabela ma geometrię).
 
 Pliki są udostępniane tylko przez obiekt (warstwa + klucz + pole): zdjęcie widzi każdy, kto widzi
-obiekt — dostęp do projektu i warstwy oraz zasięg przestrzenny użytkownika. Rekord w tabeli zdjęć
-bez geometrii jest widoczny, gdy w zasięgu leży obiekt nadrzędny (relacja z projektu QGIS).
+obiekt — dostęp do projektu i warstwy oraz zakres danych użytkownika (app/scope.py; tabela zdjęć
+bez geometrii — zakres obiektu nadrzędnego). Dodawanie: prawo edycji warstwy i prawo do zdjęć /
+dokumentów nadane grupie w projekcie.
 """
 from __future__ import annotations
 
@@ -25,19 +26,11 @@ from psycopg import sql
 from .. import photos
 from ..config import get_settings
 from ..db import layer_conn
-from ..permissions import ProjectContext, load_project_context, user_extent_ewkb
+from ..permissions import ProjectContext, load_project_context
 from ..qgsproject import FieldDef, LayerDef
+from ..scope import T, col, row_filter
 from ..security import CurrentUser, optional_user, require_user
-from .features import (
-    _audit,
-    _base_filter,
-    _check_geometry_in_extent,
-    _extent_condition,
-    _fetch_one,
-    _geom_sql,
-    _row_to_feature,
-    _table,
-)
+from .features import _audit, _fetch_one, _geom_sql, _row_to_feature, _scope_error, _table, in_scope
 
 log = logging.getLogger("sophia.photos")
 
@@ -58,6 +51,13 @@ def _resource_field(lyr: LayerDef, name: str, photo: bool) -> FieldDef:
     if not lyr.pg:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Załączniki tylko w warstwach PostGIS")
     return f
+
+
+def _require_right(ctx: ProjectContext, photo: bool) -> None:
+    if photo and not ctx.can_photos:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Brak prawa dodawania zdjęć w tym projekcie")
+    if not photo and not ctx.can_files:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Brak prawa dodawania dokumentów w tym projekcie")
 
 
 def _require_field_edit(ctx: ProjectContext, layer_id: str) -> None:
@@ -140,18 +140,16 @@ async def _insert_child(ctx: ProjectContext, user: CurrentUser, lyr: LayerDef, f
     if relation is None or not parent.pg or parent.pg.conninfo != lyr.pg.conninfo:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Brak relacji między warstwami w projekcie QGIS")
     srid = int(crs.split(":")[1]) if crs.upper().startswith("EPSG:") else 2180
-    view_extent = await user_extent_ewkb(user, "view")
-    edit_extent = await user_extent_ewkb(user, "edit")
 
     async with layer_conn(lyr.pg.conninfo) as conn, conn.transaction():
-        pg = sql.Identifier(parent.pg.geometry_column) if parent.pg.geometry_column else None
+        pg = col(T, parent.pg.geometry_column) if parent.pg.geometry_column else None
         prow = await (await conn.execute(sql.SQL(
-            "SELECT {cols}{g} FROM {t} WHERE {k}::text = {pk} AND {f} AND {e}").format(
-            cols=sql.SQL(", ").join(sql.Identifier(p) for p, _ in relation.pairs),
+            "SELECT {cols}{g} FROM {t} AS {a} WHERE {k}::text = {pk} AND {f}").format(
+            cols=sql.SQL(", ").join(col(T, p) for p, _ in relation.pairs),
             g=sql.SQL(", ST_AsGeoJSON(ST_PointOnSurface({}))::json AS __pos, ST_SRID({}) AS __srid").format(pg, pg)
             if pg else sql.SQL(""),
-            t=_table(parent), k=sql.Identifier(parent.pg.key), pk=sql.Literal(parent_pk),
-            f=_base_filter(parent), e=_extent_condition(parent, pg, view_extent) if pg else sql.SQL("true"),
+            t=_table(parent), a=sql.Identifier(*T), k=col(T, parent.pg.key), pk=sql.Literal(parent_pk),
+            f=row_filter(ctx, parent),
         ))).fetchone()
         if prow is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Brak obiektu nadrzędnego")
@@ -167,7 +165,6 @@ async def _insert_child(ctx: ProjectContext, user: CurrentUser, lyr: LayerDef, f
             elif pg and prow.get("__pos"):
                 geom = _geom_sql(lyr, prow["__pos"], prow["__srid"] or srid)
             if geom is not None:
-                await _check_geometry_in_extent(conn, lyr, geom, edit_extent)
                 cols.append(sql.Identifier(lyr.pg.geometry_column))
                 vals.append(geom)
         try:
@@ -177,7 +174,9 @@ async def _insert_child(ctx: ProjectContext, user: CurrentUser, lyr: LayerDef, f
         except psycopg.errors.IntegrityError as e:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
                                 f"Nie można dodać rekordu: {e.diag.message_primary}") from e
-        row = await _fetch_one(conn, lyr, pk, srid, None)
+        if not await in_scope(conn, ctx, lyr, pk, "edit"):
+            raise _scope_error(ctx, lyr)
+        row = await _fetch_one(conn, None, lyr, pk, srid, None)
     feature = _row_to_feature(row)
     await _audit(ctx, lyr.id, pk, "insert", None, feature)
     return feature
@@ -192,6 +191,7 @@ async def upload_photo(slug: str, layer_id: str, file: UploadFile = File(...), f
     ctx = await load_project_context(slug, user)
     lyr = ctx.layer(layer_id)
     _resource_field(lyr, field, photo=True)
+    _require_right(ctx, photo=True)
     if parent_layer is None:
         _require_field_edit(ctx, layer_id)
         rel, photo = await _store_photo(ctx, lyr, file)
@@ -216,6 +216,7 @@ async def upload_file(slug: str, layer_id: str, file: UploadFile = File(...), fi
     ctx = await load_project_context(slug, user)
     lyr = ctx.layer(layer_id)
     f = _resource_field(lyr, field, photo=False)
+    _require_right(ctx, photo=False)
     if parent_layer is None:
         _require_field_edit(ctx, layer_id)
         return await _store_file(ctx, lyr, f, file)
@@ -229,36 +230,9 @@ async def upload_file(slug: str, layer_id: str, file: UploadFile = File(...), fi
     return {**feature, "file": meta}
 
 
-T = "__t"          # alias tabeli w zapytaniach z warunkiem widoczności
-
-
-def visible_condition(ctx: ProjectContext, lyr: LayerDef, extent: bytes | None) -> sql.Composable:
-    """Czy rekord (FROM tabela AS __t) jest widoczny dla użytkownika: filtr warstwy z QGIS i zasięg.
-
-    Tabela bez geometrii będąca dzieckiem w relacji (np. tabela zdjęć): zasięg sprawdzany na obiekcie
-    nadrzędnym, który użytkownik może oglądać. Bez takiej relacji — tylko uprawnienie do warstwy."""
-    parts = [_base_filter(lyr)]
-    if extent is not None and lyr.pg.geometry_column:
-        parts.append(_extent_condition(lyr, sql.Identifier(T, lyr.pg.geometry_column), extent))
-    elif extent is not None:
-        spatial_parents, exists = 0, []
-        for rel in ctx.project.relations:
-            parent = ctx.project.layers.get(rel.parent_layer) if rel.child_layer == lyr.id else None
-            if not parent or not parent.pg or not parent.pg.geometry_column or parent.pg.conninfo != lyr.pg.conninfo:
-                continue
-            spatial_parents += 1
-            if not ctx.perms(parent.id).view:
-                continue
-            join = sql.SQL(" AND ").join(
-                sql.SQL("{} = {}").format(sql.Identifier("__p", p), sql.Identifier(T, c)) for p, c in rel.pairs)
-            exists.append(sql.SQL("EXISTS (SELECT 1 FROM {pt} AS __p WHERE {j} AND {f} AND {e})").format(
-                pt=_table(parent), j=join, f=_base_filter(parent),
-                e=_extent_condition(parent, sql.Identifier("__p", parent.pg.geometry_column), extent)))
-        if exists:
-            parts.append(sql.SQL("({})").format(sql.SQL(" OR ").join(exists)))
-        elif spatial_parents:
-            parts.append(sql.SQL("false"))
-    return sql.SQL(" AND ").join(parts)
+def visible_condition(ctx: ProjectContext, lyr: LayerDef, _extent=None) -> sql.Composable:
+    """Zgodność wsteczna: warunek widoczności rekordu (FROM tabela AS __t) — app/scope.py."""
+    return row_filter(ctx, lyr, T, "view")
 
 
 @router.get("/features/{pk}/files/{field}")
@@ -270,12 +244,11 @@ async def feature_file(slug: str, layer_id: str, pk: str, field: str, thumb: boo
     f = next((x for x in lyr.fields if x.name == field), None)
     if f is None or not photos.is_resource_field(f) or not lyr.pg:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Pole nie jest załącznikiem")
-    extent = await user_extent_ewkb(user, "view")
     async with layer_conn(lyr.pg.conninfo) as conn:
         row = await (await conn.execute(sql.SQL(
             "SELECT {c}::text AS v FROM {t} AS {a} WHERE {k}::text = {pk} AND {vis}").format(
-            c=sql.Identifier(T, field), t=_table(lyr), a=sql.Identifier(T), k=sql.Identifier(T, lyr.pg.key),
-            pk=sql.Literal(pk), vis=visible_condition(ctx, lyr, extent)))).fetchone()
+            c=col(T, field), t=_table(lyr), a=sql.Identifier(*T), k=col(T, lyr.pg.key),
+            pk=sql.Literal(pk), vis=visible_condition(ctx, lyr)))).fetchone()
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Brak obiektu")
     try:
@@ -308,19 +281,18 @@ async def photo_manifest(slug: str, user: CurrentUser | None = Depends(optional_
     """Lista plików z pól „Załącznik” widocznych dla użytkownika — do pobrania przez Fię do folderu
     projektu (QGIS Desktop pokazuje zdjęcia po ścieżce względnej). Pobieranie: features/{pk}/files/{field}."""
     ctx = await load_project_context(slug, user)
-    extent = await user_extent_ewkb(user, "view")
     files: dict[str, dict] = {}
     for lyr in ctx.project.layers.values():
         fields = [f for f in lyr.fields if photos.is_resource_field(f)]
         if not fields or not lyr.pg or not ctx.perms(lyr.id).view:
             continue
-        vis = visible_condition(ctx, lyr, extent)
+        vis = visible_condition(ctx, lyr)
         async with layer_conn(lyr.pg.conninfo) as conn:
             for f in fields:
                 rows = await (await conn.execute(sql.SQL(
                     "SELECT {k}::text AS pk, {c}::text AS v FROM {t} AS {a} WHERE {c} IS NOT NULL AND {vis}").format(
-                    k=sql.Identifier(T, lyr.pg.key), c=sql.Identifier(T, f.name), t=_table(lyr),
-                    a=sql.Identifier(T), vis=vis))).fetchall()
+                    k=col(T, lyr.pg.key), c=col(T, f.name), t=_table(lyr),
+                    a=sql.Identifier(*T), vis=vis))).fetchall()
                 for r in rows:
                     try:
                         rel = photos.normalize_value(r["v"])

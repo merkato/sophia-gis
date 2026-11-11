@@ -30,6 +30,17 @@ MIGRATIONS: list[tuple[str, str]] = [
                '{"url": "https://tile.openstreetmap.org/{z}/{x}/{y}.png", "max_zoom": 19}'::jsonb
         WHERE NOT EXISTS (SELECT 1 FROM portal.basemaps);
     """),
+    ("permissions_v2", """
+        -- Serwer: autor projektów (publikacja przez Fię bez pełnych praw administratora)
+        ALTER TABLE portal.users ADD COLUMN IF NOT EXISTS can_publish boolean NOT NULL DEFAULT false;
+        -- Projekt opublikowany przez autora: autor ma w nim rolę „manager”
+        ALTER TABLE portal.projects ADD COLUMN IF NOT EXISTS owner_id int REFERENCES portal.users(id) ON DELETE SET NULL;
+        -- Grupa w projekcie: prawa do zdjęć i plików (domyślnie tak) oraz zakres danych
+        ALTER TABLE portal.project_access ADD COLUMN IF NOT EXISTS can_photos boolean NOT NULL DEFAULT true;
+        ALTER TABLE portal.project_access ADD COLUMN IF NOT EXISTS can_files boolean NOT NULL DEFAULT true;
+        ALTER TABLE portal.project_access ADD COLUMN IF NOT EXISTS scope_all boolean NOT NULL DEFAULT true;
+        ALTER TABLE portal.project_access ADD COLUMN IF NOT EXISTS scope_codes text[] NOT NULL DEFAULT '{}';
+    """),
 ]
 
 

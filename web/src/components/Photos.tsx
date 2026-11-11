@@ -49,9 +49,9 @@ function PickButtons({ onFiles, multiple, busy }: { onFiles: (files: File[]) => 
 }
 
 /** Wariant A: jedno zdjęcie w polu obiektu. Wartość pola = ścieżka względna zwrócona przez serwer. */
-export function PhotoField({ field, value, saved, onChange, disabled, slug, layerId, pk, crs }: {
+export function PhotoField({ field, value, saved, onChange, disabled, slug, layerId, pk, crs, canUpload }: {
   field: FieldDef; value: unknown; saved: unknown; onChange: (v: unknown) => void; disabled: boolean;
-  slug: string; layerId: string; pk: string | null; crs: string;
+  slug: string; layerId: string; pk: string | null; crs: string; canUpload: boolean;
 }) {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -89,7 +89,7 @@ export function PhotoField({ field, value, saved, onChange, disabled, slug, laye
       )}
       {!disabled && (
         <div className="toolgroup">
-          <PickButtons onFiles={upload} busy={busy} />
+          {canUpload && <PickButtons onFiles={upload} busy={busy} />}
           {str && <button type="button" className="danger" disabled={busy} onClick={() => onChange(null)}>Usuń zdjęcie</button>}
           {busy && <span className="muted">Wysyłanie…</span>}
         </div>
@@ -184,7 +184,7 @@ export function PhotoGallery({ config, group, parentLayerId, parentPk, onChanged
   return (
     <section className="gallery">
       <h4>{group.name} <span className="muted">({items.length})</span></h4>
-      {layer.perms.insert && (
+      {layer.perms.insert && config.rights?.photos && (
         <div className="toolgroup">
           <PickButtons onFiles={upload} multiple busy={!!progress} />
           {progress && <span className="muted">{progress}</span>}

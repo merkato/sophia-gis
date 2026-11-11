@@ -65,24 +65,28 @@ Lista z 10.11.2026 (aktualizacja 11.11.2026). Kolejność jest kolejnością rea
 - Gdy żadna warstwa nie jest aktywna do edycji, narzędzia są **wyszarzone** (nie znikają).
 - Wybór aktywnej warstwy edycyjnej: z drzewa (ołówek) i z listy w pasku.
 
-### 8. Model uprawnień: serwer → projekt → zakres danych
-Potrzebny do przeniesienia projektu RDLP (wyłączenia z produkcji leśnej) z Lizmapa.
+### 8. ✅ Model uprawnień: serwer → projekt → zakres danych
+Potrzebny do projektów z podziałem danych na jednostki terenowe (centrala widzi wszystko, oddziały — swoje).
 - **Serwer:** administrator zawsze wszystko; flaga **Autor projektów** przy użytkowniku — publikacja
   przez Fię bez pełnych praw administratora.
 - **Projekt (grupa w projekcie):** rola podgląd / edycja, prawo do zdjęć i PDF (domyślnie włączone),
   wyjątki per warstwa (już są: `layer_access`).
-- **Zakres danych (grupa w projekcie):** „cały obszar” albo lista kodów (np. `n1703`, `n1705`).
+- **Zakres danych (grupa w projekcie):** „cały obszar” albo lista kodów (np. `od01`, `od02`).
   W Fii autor definiuje **wymiar zakresu** (warstwa granic + pole z kodem) i regułę dla każdej
   warstwy: *przestrzennie* (dokładna geometria, nie bbox), *atrybut* (pole = kod), *przez relację*
-  (dziedziczy po obiekcie nadrzędnym — lustracje, zdjęcia, PDF), *bez filtra* (słowniki).
-- Granica: widzi każde nadleśnictwo, którego obszar obiekt przecina; edytuje to, w którym leży punkt
+  (dziedziczy po obiekcie nadrzędnym — oględziny, zdjęcia, PDF), *bez filtra* (słowniki).
+- Granica: widzi każda jednostka, której obszar obiekt przecina; edytuje ta, w której obszarze leży punkt
   wewnętrzny obiektu (jeden właściciel). Kilka grup = suma zakresów.
 - **Jeden filtr wszędzie:** API (lista, odczyt, edycja, powiązane, zdjęcia, PDF), **QGIS Server**
   (mapa, identyfikacja, wydruk — wtyczka kontroli dostępu z filtrem SQL od API; dziś zasięgi
   działają tylko w API, obraz mapy pokazuje wszystkie obiekty!), pobieranie zdjęć przez Fię, raporty.
 - Kolejność: silnik filtra w API → filtr w QGIS Server → model danych i migracja obecnych zasięgów
-  (`extents`, `extent_assignments`) → Fia i panel administratora → dokumentacja na przykładzie RDLP.
+  (`extents`, `extent_assignments`) → Fia i panel administratora → dokumentacja na fikcyjnym przykładzie.
 - Wchłania zaległe: zasięg obiektu nadrzędnego dla tabel bez geometrii.
+- Zrobione: `api/app/scope.py` (jeden warunek SQL dla API i QGIS Server), wtyczka
+  `qgis-server-plugins/sophia_filter`, migracja `permissions_v2`, panel (autor projektów, grupy i zakres),
+  Fia (zakładka „Zakres danych”), `docs/user/uprawnienia.md`. Stare zasięgi (`extent_assignments`)
+  wycofane. Limit wielkości plików per warstwa — nie zrobiony (globalne limity w konfiguracji API).
 
 ### 9. Tabela atrybutów zamiast listy rekordów w panelu bocznym
 - Usunąć listę rekordów tabel bez geometrii z panelu bocznego (`RecordList`). Przy dużej tabeli
@@ -112,6 +116,5 @@ Potrzebny do przeniesienia projektu RDLP (wyłączenia z produkcji leśnej) z Li
 ## Na sam koniec
 
 - [ ] **Raporty po stronie Sophii** (zamiast raportów z menedżera wydruków QGIS) — np. raporty
-      z lustracji terenowych do PDF, z filtrem zakresu użytkownika (punkt 8). Dopiero przy powrocie
-      do projektu wyłączeń z produkcji leśnej: najpierw analiza kodu dotychczasowego widżetu
-      napisanego pod tę bazę i Lizmapa.
+      z oględzin terenowych do PDF, z filtrem zakresu użytkownika (punkt 8). Najpierw analiza
+      dotychczasowego rozwiązania raportów w projekcie, który będzie przenoszony.

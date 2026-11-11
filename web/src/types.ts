@@ -3,6 +3,7 @@ export interface User {
   login: string;
   full_name: string | null;
   is_admin: boolean;
+  can_publish?: boolean;
   groups: string[];
 }
 
@@ -83,6 +84,8 @@ export interface ProjectConfig {
   relations: RelationDef[];
   reports: ReportDef[];
   tools: ToolInfo[];
+  scope: { label: string; codes: string[] | null } | null;   // codes null = cały obszar
+  rights: { photos: boolean; files: boolean };
 }
 
 /** Narzędzie pobierania z Fii (np. działka z ULDK -> warstwa projektu). */
@@ -184,7 +187,7 @@ export interface WmtsCapabilities {
 // --- panel administratora
 export interface AdminUser {
   id: number; login: string; full_name: string | null; email: string | null;
-  is_admin: boolean; is_active: boolean; last_login_at: string | null; group_ids: number[];
+  is_admin: boolean; is_active: boolean; can_publish: boolean; last_login_at: string | null; group_ids: number[];
 }
 export interface Group { id: number; name: string; description: string | null }
 export interface AdminProject {
@@ -192,7 +195,23 @@ export interface AdminProject {
   sort_order: number; is_public: boolean;
 }
 export type ProjectRole = "viewer" | "editor" | "manager";
+/** Grupa w projekcie: rola, prawa do zdjęć/dokumentów i zakres danych. */
+export interface GroupAccess {
+  group_id: number;
+  role: ProjectRole;
+  can_photos: boolean;
+  can_files: boolean;
+  scope_all: boolean;               // cały obszar; inaczej tylko scope_codes
+  scope_codes: string[];
+}
 export interface ProjectAccess {
-  groups: { group_id: number; role: ProjectRole }[];
+  groups: GroupAccess[];
   layers: Record<string, unknown>[];
+}
+/** Wymiar zakresu projektu (z Fii) i kody obszarów z warstwy granic. */
+export interface ProjectScopeInfo {
+  scope: null | {
+    label: string; layer: string; field: string; codes: string[];
+    layers: Record<string, { name: string; mode: string; field: string | null }>;
+  };
 }

@@ -112,11 +112,11 @@ scp -r D:\mapy\mapa_1900 sophia:/opt/sophia/data/rasters/
 
 W projekcie QGIS ścieżki muszą być **względne**. Fia publikuje projekt do
 `data/projects/<slug>/<slug>.qgz`, więc najprościej trzymać rastry w podkatalogu obok projektu
-(lokalnie `sokolec\rastry\`, na serwerze `data/projects/sokolec/rastry/`). Ścieżki `./rastry/…`
+(lokalnie `moj-projekt\rastry\`, na serwerze `data/projects/moj-projekt/rastry/`). Ścieżki `./rastry/…`
 działają wtedy po obu stronach bez zmian. Kopia zapasowa pomija pliki rastrowe także w tym miejscu.
 
 ```powershell
-scp -r E:\gis\archiwalne\sokolec\rastry sophia:/opt/sophia/data/projects/sokolec/
+scp -r E:\gis\projekty\moj-projekt\rastry sophia:/opt/sophia/data/projects/moj-projekt/
 ```
 
 ### Biblioteka rastrów dla wielu projektów

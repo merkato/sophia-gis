@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { adminApi, type UserInput } from "../api";
-import type { AdminProject, AdminUser, Basemap, Group, ProjectAccess, ProjectRole } from "../types";
+import type { AdminProject, AdminUser, Basemap, Group, ProjectAccess } from "../types";
+import { AccessEditor } from "./AccessEditor";
 import { BasemapEditor } from "./BasemapEditor";
 
 type Tab = "users" | "groups" | "projects" | "basemaps";
@@ -48,7 +49,7 @@ function randomPassword(): string {
 
 // ------------------------------------------------------------------------------ użytkownicy
 
-const emptyUser: UserInput = { login: "", full_name: "", email: "", is_admin: false, is_active: true, group_ids: [], password: "" };
+const emptyUser: UserInput = { login: "", full_name: "", email: "", is_admin: false, is_active: true, can_publish: false, group_ids: [], password: "" };
 
 function UsersTab({ run }: { run: Run }) {
   const [users, setUsers] = useState<AdminUser[]>([]);
@@ -93,10 +94,10 @@ function UsersTab({ run }: { run: Run }) {
                 <td>{u.login}</td>
                 <td>{u.full_name}</td>
                 <td>{u.group_ids.map(groupName).join(", ")}</td>
-                <td>{u.is_admin ? "administrator" : u.is_active ? "użytkownik" : "zablokowany"}</td>
+                <td>{u.is_admin ? "administrator" : !u.is_active ? "zablokowany" : u.can_publish ? "autor projektów" : "użytkownik"}</td>
                 <td className="muted">{u.last_login_at ? new Date(u.last_login_at).toLocaleString() : "—"}</td>
                 <td className="row-actions">
-                  <button onClick={() => { setShownPassword(null); setEdit({ id: u.id, data: { login: u.login, full_name: u.full_name ?? "", email: u.email ?? "", is_admin: u.is_admin, is_active: u.is_active, group_ids: u.group_ids, password: "" } }); }}>Edytuj</button>
+                  <button onClick={() => { setShownPassword(null); setEdit({ id: u.id, data: { login: u.login, full_name: u.full_name ?? "", email: u.email ?? "", is_admin: u.is_admin, is_active: u.is_active, can_publish: u.can_publish, group_ids: u.group_ids, password: "" } }); }}>Edytuj</button>
                   <button className="danger" onClick={() => confirm(`Usunąć konto ${u.login}?`) && run(adminApi.deleteUser.bind(null, u.id)).then(load)}>Usuń</button>
                 </td>
               </tr>
@@ -132,6 +133,9 @@ function UsersTab({ run }: { run: Run }) {
           </fieldset>
           <label className="check"><input type="checkbox" checked={edit.data.is_active} onChange={(e) => set({ is_active: e.target.checked })} /> Konto aktywne</label>
           <label className="check"><input type="checkbox" checked={edit.data.is_admin} onChange={(e) => set({ is_admin: e.target.checked })} /> Administrator (pełny dostęp)</label>
+          <label className="check" title="Publikacja projektów z QGIS (Fia) bez pełnych praw administratora; autor zarządza swoimi projektami">
+            <input type="checkbox" checked={edit.data.can_publish || edit.data.is_admin} disabled={edit.data.is_admin}
+              onChange={(e) => set({ can_publish: e.target.checked })} /> Autor projektów (publikacja z QGIS)</label>
           <div className="actions">
             <button className="primary" onClick={save} disabled={!edit.data.login || (edit.id === null && !edit.data.password)}>Zapisz</button>
             <button onClick={() => setEdit(null)}>Anuluj</button>
@@ -176,7 +180,6 @@ function GroupsTab({ run }: { run: Run }) {
 
 // ------------------------------------------------------------------------------ projekty
 
-const ROLES: [ProjectRole | "", string][] = [["", "brak dostępu"], ["viewer", "podgląd"], ["editor", "edycja"], ["manager", "zarządzanie"]];
 
 function ProjectsTab({ run, onChanged }: { run: Run; onChanged: () => void }) {
   const [projects, setProjects] = useState<AdminProject[]>([]);
@@ -202,10 +205,6 @@ function ProjectsTab({ run, onChanged }: { run: Run; onChanged: () => void }) {
       .then((ok) => { if (ok) { load(); onChanged(); } });
   };
 
-  const roleOf = (gid: number) => access?.data.groups.find((g) => g.group_id === gid)?.role ?? "";
-  const setRole = (gid: number, role: ProjectRole | "") => setAccess((a) => a && ({
-    ...a, data: { ...a.data, groups: [...a.data.groups.filter((g) => g.group_id !== gid), ...(role ? [{ group_id: gid, role }] : [])] },
-  }));
 
   return (
     <div className="admin-split">
@@ -213,6 +212,7 @@ function ProjectsTab({ run, onChanged }: { run: Run; onChanged: () => void }) {
         <p className="muted">
           <b>Publiczny</b> — widoczny bez logowania (tylko podgląd). <b>Z uprawnieniami</b> — tylko dla
           zalogowanych z grup, którym nadano dostęp. Edycja zawsze wymaga roli „edycja” lub wyższej.
+          W „Grupy…” ustawiasz też prawo do zdjęć i dokumentów oraz zakres danych (obszary).
         </p>
         <table className="grid">
           <thead><tr><th>Tytuł (menu)</th><th>Dostęp</th><th>Kolejność</th><th>Plik</th><th /></tr></thead>
@@ -229,7 +229,7 @@ function ProjectsTab({ run, onChanged }: { run: Run; onChanged: () => void }) {
                 <td><input type="number" className="num" defaultValue={p.sort_order} onBlur={(e) => Number(e.target.value) !== p.sort_order && update(p, { sort_order: Number(e.target.value) })} /></td>
                 <td className="muted">{p.file_name}</td>
                 <td className="row-actions">
-                  <button onClick={() => run(async () => setAccess({ project: p, data: await adminApi.projectAccess(p.id) }))}>Grupy…</button>
+                  <button onClick={() => run(async () => setAccess({ project: p, data: await adminApi.projectAccess(p.id) }))}>Grupy i zakres…</button>
                   <button className="danger" title="Usuwa projekt z menu; plik zostaje na serwerze"
                     onClick={() => confirm(`Usunąć „${p.title}” z portalu? Plik projektu zostanie na serwerze.`) && run(() => adminApi.deleteProject(p.id)).then(() => { load(); onChanged(); })}>Usuń</button>
                 </td>
@@ -250,22 +250,10 @@ function ProjectsTab({ run, onChanged }: { run: Run; onChanged: () => void }) {
       </section>
 
       {access && (
-        <section className="admin-form form">
-          <h3>Dostęp grup: {access.project.title}</h3>
-          {access.project.is_public && <p className="muted">Projekt jest publiczny — każdy może go oglądać. Role poniżej nadają edycję.</p>}
-          {groups.length === 0 && <p className="muted">Brak grup — utwórz je w zakładce Grupy.</p>}
-          {groups.map((g) => (
-            <label key={g.id} className="field"><span>{g.name}</span>
-              <select value={roleOf(g.id)} onChange={(e) => setRole(g.id, e.target.value as ProjectRole | "")}>
-                {ROLES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-              </select>
-            </label>
-          ))}
-          <div className="actions">
-            <button className="primary" onClick={() => run(() => adminApi.setProjectAccess(access.project.id, access.data)).then((ok) => { if (ok) { setAccess(null); onChanged(); } })}>Zapisz</button>
-            <button onClick={() => setAccess(null)}>Anuluj</button>
-          </div>
-        </section>
+        <AccessEditor project={access.project} groups={groups} access={access.data}
+          onChange={(data) => setAccess((a) => a && { ...a, data })}
+          onSave={() => run(() => adminApi.setProjectAccess(access.project.id, access.data)).then((ok) => { if (ok) { setAccess(null); onChanged(); } })}
+          onCancel={() => setAccess(null)} />
       )}
     </div>
   );

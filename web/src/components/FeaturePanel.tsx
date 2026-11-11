@@ -228,7 +228,8 @@ export const FeaturePanel = forwardRef<FeaturePanelHandle, Props>(function Featu
             <label key={f.name} className="field">
               <span>{f.alias ?? f.name}{f.not_null && f.editable ? " *" : ""}</span>
               <FieldInput field={f} value={values[f.name]} readOnly={!canEdit}
-                source={{ slug: config.slug, layerId, version: config.version, pk: pk === null ? null : String(pk), crs: config.crs }}
+                source={{ slug: config.slug, layerId, version: config.version, pk: pk === null ? null : String(pk), crs: config.crs,
+                  canPhotos: config.rights?.photos ?? false, canFiles: config.rights?.files ?? false }}
                 saved={isNew ? undefined : feature?.properties[f.name]}
                 onChange={(v) => setValues((s) => ({ ...s, [f.name]: v }))} />
             </label>
