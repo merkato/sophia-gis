@@ -20,6 +20,10 @@ Zasady ogólne, wspólne dla wszystkich tematów:
   widżety (lista wartości, odwołanie do relacji, data, pole wyboru, załącznik…), pola ukryte
   i tylko do odczytu, pola wymagane,
 - relacje (*Projekt → Właściwości → Relacje*) dają w formularzu zakładki **Powiązane**, **Zdjęcia** i **Dokumenty**,
+- **atrybucja** (źródło danych, np. „Biblioteka Przykładowa, domena publiczna”): *Właściwości warstwy
+  → QGIS Server → Atrybucja* (tytuł i opcjonalny URL), a bez niej — *Metadane → Prawa*. Pokazuje się
+  w prawym dolnym rogu mapy (ⓘ), gdy warstwa jest włączona, i w „Źródła” na wydruku w układzie Sophii.
+  W szablonie QGIS dodaj ją sam jako etykietę. Po zmianie zapisz projekt i opublikuj go ponownie w Fii,
 - przed publikacją sprawdź zakładkę **Diagnostyka** w Fii,
 - hasło do Sophii Fia trzyma w **menedżerze uwierzytelniania QGIS** (zakładka **Serwer**,
   „Zapamiętaj…”). Służy do publikacji i do pobierania zdjęć.

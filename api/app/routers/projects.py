@@ -62,6 +62,8 @@ async def project_config(slug: str, user: CurrentUser | None = Depends(optional_
             "wms_name": lyr.wms_name,
             "type": lyr.type,
             "tile_format": lyr.tile_format,
+            "attribution": lyr.attribution,
+            "attribution_url": lyr.attribution_url,
             "geometry_type": lyr.geometry_type,
             "crs": lyr.crs,
             "popup": lyr.popup,

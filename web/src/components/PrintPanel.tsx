@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { api, type ReportInfo } from "../api";
 import type { Basemap, ProjectConfig } from "../types";
+import { projectAttributions } from "../attribution";
 import { mapAreaMm, printPageHtml, renderPrintMap, type Orientation, type Paper, type PrintOptions } from "../print";
 
 export const SCALES = [500, 1000, 2000, 2500, 5000, 10000, 25000, 50000, 100000, 250000, 500000];
@@ -90,7 +91,10 @@ export function PrintPanel({ config, basemaps, wmsLayers, layerNames, opacity, g
       const r = await renderPrintMap({ config, basemaps, wmsLayers, extent: v.extent, center: v.center, opacity }, opts);
       const html = printPageHtml(r, opts, {
         project: config.slug ? config.title : null, layers: layerNames,
-        attributions: basemaps.map((b) => b.attribution ?? b.name),
+        attributions: [
+          ...basemaps.map((b) => b.attribution ?? b.name),
+          ...(config.slug ? projectAttributions(config, wmsLayers).map((a) => a.text) : []),
+        ],
       });
       if (win) { win.document.open(); win.document.write(html); win.document.close(); }
       else if (!window.open(URL.createObjectURL(new Blob([html], { type: "text/html" })), "_blank")) {

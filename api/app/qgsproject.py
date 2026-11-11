@@ -62,6 +62,8 @@ class LayerDef:
     hidden: bool = False
     tile_format: str | None = None      # rastry: format kafli w WebUI (None = wektor, bez kafli)
     source: str | None = None           # źródło warstw WMS/WMTS/XYZ — dopasowanie podkładu z katalogu do wydruku
+    attribution: str | None = None      # QGIS Server → Atrybucja (albo Metadane → Prawa): na mapie i wydruku
+    attribution_url: str | None = None
     # zakres danych (app/scope.py): spatial | attribute | relation | none; "auto" rozstrzygane po wczytaniu
     scope_mode: str = "none"
     scope_field: str | None = None
@@ -396,6 +398,19 @@ def start_extent(root: etree._Element, crs: str) -> list[float] | None:
     return None
 
 
+def layer_attribution(ml: etree._Element) -> tuple[str | None, str | None]:
+    """Atrybucja warstwy: QGIS Server → Atrybucja (tytuł + URL); bez niej — Metadane → Prawa."""
+    el = ml.find("attribution")
+    text = (el.text or "").strip() if el is not None else ""
+    url = (el.get("href") or "").strip() if el is not None else ""
+    if not text:
+        rights = [(r.text or "").strip() for r in ml.findall("./resourceMetadata/rights")]
+        text = "; ".join(r for r in rights if r)
+    if not url.lower().startswith(("http://", "https://")):
+        url = ""
+    return text or None, url or None
+
+
 def load_project(path: Path) -> Project:
     root = _load_xml(path)
     sidecar_path = path.with_suffix(".portal.json")
@@ -418,6 +433,7 @@ def load_project(path: Path) -> Project:
             geometry_type=_geometry_kind(ml) if ml.get("type") == "vector" else None,
             display_expression=ml.findtext("previewExpression") or None,
         )
+        lyr.attribution, lyr.attribution_url = layer_attribution(ml)
         if lyr.type == "raster":
             lyr.tile_format = raster_tile_format(provider, ml.findtext("datasource") or "")
             if provider == "wms":

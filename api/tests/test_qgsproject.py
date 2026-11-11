@@ -3,8 +3,9 @@ import zipfile
 from pathlib import Path
 
 import pytest
+from lxml import etree
 
-from app.qgsproject import get_project, parse_pg_datasource
+from app.qgsproject import get_project, layer_attribution, parse_pg_datasource
 
 QGS = """<!DOCTYPE qgis>
 <qgis projectname="Ewidencja testowa" version="4.2.3">
@@ -140,3 +141,15 @@ def test_start_extent_priority():
     assert start_extent(etree.fromstring(f"<qgis>{wms}{canvas}</qgis>"), "EPSG:2180") == [10, 20, 30, 40]
     assert start_extent(etree.fromstring(f"<qgis>{canvas}</qgis>"), "EPSG:2180") == [5, 6, 7, 8]
     assert start_extent(etree.fromstring("<qgis/>"), "EPSG:2180") is None
+
+
+def test_layer_attribution():
+    ml = etree.fromstring(
+        '<maplayer><resourceMetadata><rights>Domena publiczna</rights></resourceMetadata>'
+        '<attribution href="https://example.org/zbiory">Biblioteka Przykładowa</attribution></maplayer>')
+    assert layer_attribution(ml) == ("Biblioteka Przykładowa", "https://example.org/zbiory")
+    ml = etree.fromstring(
+        '<maplayer><resourceMetadata><rights>Domena publiczna</rights></resourceMetadata>'
+        '<attribution href="javascript:alert(1)"></attribution></maplayer>')
+    assert layer_attribution(ml) == ("Domena publiczna", None)
+    assert layer_attribution(etree.fromstring("<maplayer/>")) == (None, None)

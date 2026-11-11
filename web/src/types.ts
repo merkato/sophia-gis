@@ -37,6 +37,8 @@ export interface LayerInfo {
   wms_name: string;
   type: "vector" | "raster";
   tile_format: string | null;        // rastry: kafle WMS w tym formacie; wektory: null (bez kafli)
+  attribution: string | null;        // QGIS Server → Atrybucja (albo Metadane → Prawa)
+  attribution_url: string | null;
   geometry_type: "Point" | "Line" | "Polygon" | null;
   crs: string | null;
   popup: boolean;

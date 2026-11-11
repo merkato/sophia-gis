@@ -23,6 +23,7 @@ import type { Geometry } from "ol/geom";
 import { api } from "../api";
 import type { Basemap, GeoJSONFeature, ProjectConfig, TreeNode } from "../types";
 import { PNG8, basemapLayer, ensureBasemapProjections, tileGridFor } from "../tiles";
+import { attributionHtml, projectAttributions } from "../attribution";
 
 // --- Kafle rastrów
 // Rastry projektu (skany, mozaiki) idą jako kafle WMS na stałej siatce: te same adresy
@@ -200,9 +201,11 @@ export function MapView(props: Props) {
         tileLayersRef.current.set(key, layer);
       }
       layer.setOpacity((props.opacity[`${config.slug}/${name}`] ?? 100) / 100);
+      layer.getSource()?.setAttributions(attributionHtml(projectAttributions(config, [name])));
       tiled.push(layer);
     }
     group.setLayers(new Collection(tiled));
+    wms.setAttributions(attributionHtml(projectAttributions(config, vectors)));
     wmsLayerRef.current?.setVisible(vectors.length > 0);
     wms.updateParams({ LAYERS: vectors.join(","), _t: reloadToken });
     // eslint-disable-next-line react-hooks/exhaustive-deps
