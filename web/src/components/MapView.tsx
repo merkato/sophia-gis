@@ -60,6 +60,7 @@ interface Props {
   onFetchClick?: (coordinate: number[]) => void;         // narzędzie pobierania (ULDK…)
   preview?: GeoJSONFeature["geometry"] | null;           // obrys pobranego obiektu przed dodaniem
   printFrame?: [number, number] | null;                  // obszar wydruku [szer., wys.] w metrach, wokół środka widoku
+  opacity: Record<string, number>;                       // krycie 0–100: "<slug>/<warstwa WMS>", "bm:<id>"
   mapRef: MutableRefObject<OlMap | null>;
 }
 
@@ -162,11 +163,12 @@ export function MapView(props: Props) {
           }
           return layer;
         });
+      active.forEach((b, i) => layers[i]?.setOpacity((props.opacity[`bm:${b.id}`] ?? b.opacity * 100) / 100));
       group.setLayers(new Collection(layers));
     })().catch(console.error);
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [basemaps, baseId, overlayIds, config.slug]);
+  }, [basemaps, baseId, overlayIds, config.slug, props.opacity]);
 
   // --- widoczne warstwy: rastry jako kafle (każdy osobno), wektory jednym obrazem WMS na wierzchu
   useEffect(() => {
@@ -197,13 +199,14 @@ export function MapView(props: Props) {
         });
         tileLayersRef.current.set(key, layer);
       }
+      layer.setOpacity((props.opacity[`${config.slug}/${name}`] ?? 100) / 100);
       tiled.push(layer);
     }
     group.setLayers(new Collection(tiled));
     wmsLayerRef.current?.setVisible(vectors.length > 0);
     wms.updateParams({ LAYERS: vectors.join(","), _t: reloadToken });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [wmsLayers, reloadToken, config.slug, config.version]);
+  }, [wmsLayers, reloadToken, config.slug, config.version, props.opacity]);
 
   // --- obiekty warstwy edycyjnej (ładowane z API dla bieżącego widoku)
   useEffect(() => {

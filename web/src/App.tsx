@@ -13,6 +13,7 @@ import { Toolbar } from "./components/Toolbar";
 import { FetchCard } from "./components/FetchCard";
 import { AdminPanel } from "./components/AdminPanel";
 import { BasemapSwitcher, initialBasemapChoice, saveBasemapChoice } from "./components/BasemapSwitcher";
+import { loadOpacity, saveOpacity, useOpenSliders } from "./components/OpacitySlider";
 
 /**
  * Mapa bez projektu (brak dostępnych projektów, niezalogowany gość): same podkłady z katalogu
@@ -76,6 +77,15 @@ export default function App() {
   const [baseReady, setBaseReady] = useState(false);
   useEffect(() => { ensureProjection("EPSG:2180").then(() => setBaseReady(true)).catch(() => setBaseReady(true)); }, []);
   const [showPrint, setShowPrint] = useState(false);
+  // krycie rastrów projektu i podkładów (0–100), zapamiętane w przeglądarce
+  const [opacity, setOpacity] = useState<Record<string, number>>(loadOpacity);
+  const setOpacityKey = (key: string, v: number) => setOpacity((o) => {
+    const next = { ...o };
+    if (v === 100 && !key.startsWith("bm:")) delete next[key]; else next[key] = v;
+    saveOpacity(next);
+    return next;
+  });
+  const treeSliders = useOpenSliders();
   const [printFrame, setPrintFrame] = useState<[number, number] | null>(null);
   const [editLayerId, setEditLayerId] = useState<string | null>(null);
   const [tool, setTool] = useState<Tool>("identify");
@@ -324,20 +334,28 @@ export default function App() {
 
       <div className="body">
         {sidebarOpen && <aside className="sidebar">
-          <BasemapSwitcher basemaps={basemaps} baseId={baseId} overlayIds={overlayIds}
-            onBase={chooseBase} onToggleOverlay={toggleOverlay} />
           {config ? (
             <>
               <h3>Warstwy</h3>
               <LayerTree tree={config.tree} visible={visible} onToggle={toggle}
                 editableIds={editableIds} editLayerId={editLayerId}
-                onEditLayer={chooseEditLayer} tableIds={tableIds} onOpenTable={setTableLayerId} />
+                onEditLayer={chooseEditLayer} tableIds={tableIds} onOpenTable={setTableLayerId}
+                rasterKey={(n) => {
+                  const wms = n.kind === "raster_group" ? n.name
+                    : n.kind === "layer" && n.layer_id && config.layers[n.layer_id]?.type === "raster" ? config.layers[n.layer_id].wms_name : null;
+                  return wms ? `${config.slug}/${wms}` : null;
+                }}
+                opacityOf={(k) => opacity[k] ?? 100} onOpacity={setOpacityKey} sliders={treeSliders} />
 
 
             </>
           ) : <p className="muted">{projects.length ? "Wybierz projekt z menu." : user
             ? "Nie masz dostępu do żadnego projektu — poproś administratora o nadanie uprawnień."
             : "Mapa podkładów. Zaloguj się, aby zobaczyć projekty."}</p>}
+          <BasemapSwitcher basemaps={basemaps} baseId={baseId} overlayIds={overlayIds}
+            onBase={chooseBase} onToggleOverlay={toggleOverlay}
+            opacityOf={(b) => opacity[`bm:${b.id}`] ?? Math.round(b.opacity * 100)}
+            onOpacity={(b, v) => setOpacityKey(`bm:${b.id}`, v)} />
         </aside>}
 
         <main className="mapwrap">
@@ -350,6 +368,7 @@ export default function App() {
               onFetchClick={fetchAt}
               preview={fetchTool ? fetchState.result?.geometry ?? null : null}
               printFrame={showPrint ? printFrame : null}
+              opacity={opacity}
               onSelect={(layerId, feature) => guard(() => setSelection({ layerId, feature, isNew: false }))}
               onDrawn={(layerId, geometry) => guard(() =>
                 setSelection({ layerId, isNew: true, feature: { type: "Feature", id: "", geometry, properties: {} } }))}
@@ -381,7 +400,7 @@ export default function App() {
           )}
           {showPrint && mapConfig && (
             <PrintPanel config={mapConfig} basemaps={printBasemaps} wmsLayers={config ? wmsLayers : []}
-              layerNames={printLayerNames} onFrame={setPrintFrame} onClose={() => setShowPrint(false)}
+              layerNames={printLayerNames} opacity={opacity} onFrame={setPrintFrame} onClose={() => setShowPrint(false)}
               getView={() => {
                 const map = mapRef.current;
                 if (!map) return null;

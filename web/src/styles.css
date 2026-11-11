@@ -181,8 +181,16 @@ button.block, .reports .button { display: block; width: 100%; text-align: left; 
 .dialog h3 { margin: 0 0 6px; font-size: 16px; }
 .dialog p { margin: 0; color: var(--muted); }
 
-/* --- podkłady w panelu bocznym */
+/* --- podkłady w panelu bocznym (na dole, pod warstwami projektu) */
+.basemaps { margin-top: 14px; padding-top: 4px; border-top: 1px solid var(--line); }
+.basemaps .tree { list-style: none; margin: 0; padding: 0; }
 .basemaps .tree-row label { gap: 8px; }
+/* --- przezroczystość rastrów i podkładów */
+.opacity-btn { font-size: 14px; }
+.opacity-btn.changed { color: var(--accent); }
+.opacity-row { display: flex; align-items: center; gap: 8px; padding: 2px 4px 6px; }
+.opacity-row input[type="range"] { flex: 1; min-width: 0; padding: 0; border: none; background: none; }
+.opacity-row .muted { width: 34px; text-align: right; font-variant-numeric: tabular-nums; }
 
 /* --- panel administratora */
 .admin { position: fixed; inset: 0; z-index: 20; background: var(--bg); display: flex; flex-direction: column; }

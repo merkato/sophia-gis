@@ -26,6 +26,15 @@ Zasady ogólne, wspólne dla wszystkich tematów:
 
 ## Praca w przeglądarce
 
+### Panel warstw
+- Na górze **warstwy projektu** (drzewo jak w QGIS), na dole **podkład** (jeden) i **nakładki**
+  (np. cieniowanie terenu) z katalogu Sophii.
+- **◐ Przezroczystość** — przy włączonych warstwach rastrowych (skany, mozaiki VRT), przy wybranym
+  podkładzie i włączonych nakładkach. Kliknięcie rozwija suwak (0–100%), ↺ wraca do pełnego krycia.
+  Ustawienie pamięta ta przeglądarka; uwzględnia je też wydruk w układzie Sophii.
+- Warstwy wektorowe (punkty, linie, poligony) rysuje QGIS Server jednym obrazem — ich wygląd,
+  także przezroczystość, ustawiasz w stylu warstwy w QGIS.
+
 ### Formularz obiektu
 - Formularz otwiera się jako **okno nad mapą**. Przesuwasz je, ciągnąc za nagłówek, a dwuklik
   w nagłówek wraca na środek. Rozmiar zmieniasz w prawym dolnym rogu, przycisk **▁** zwija okno do

@@ -18,8 +18,9 @@ function loadSaved(): Saved {
  * z projektu QGIS (GetPrint: skala, warstwy, podkład z warstwy projektu, tytuł/opis do etykiet).
  * docs/user/wydruki.md
  */
-export function PrintPanel({ config, basemaps, wmsLayers, layerNames, getView, onFrame, onClose }: {
+export function PrintPanel({ config, basemaps, wmsLayers, layerNames, opacity, getView, onFrame, onClose }: {
   config: ProjectConfig;
+  opacity: Record<string, number>;     // krycie rastrów i podkładów jak na ekranie
   basemaps: Basemap[];                 // aktywne: podkład + nakładki
   wmsLayers: string[];                 // od spodu
   layerNames: string[];
@@ -86,7 +87,7 @@ export function PrintPanel({ config, basemaps, wmsLayers, layerNames, getView, o
     if (win) win.document.write("<p style='font-family:sans-serif;padding:20px'>Przygotowywanie wydruku…</p>");
     setBusy(true);
     try {
-      const r = await renderPrintMap({ config, basemaps, wmsLayers, extent: v.extent, center: v.center }, opts);
+      const r = await renderPrintMap({ config, basemaps, wmsLayers, extent: v.extent, center: v.center, opacity }, opts);
       const html = printPageHtml(r, opts, {
         project: config.slug ? config.title : null, layers: layerNames,
         attributions: basemaps.map((b) => b.attribution ?? b.name),

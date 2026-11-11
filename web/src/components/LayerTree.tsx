@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { IconTable } from "./Icons";
+import { OpacityButton, OpacityRow, useOpenSliders } from "./OpacitySlider";
 import type { TreeNode } from "../types";
 
 export const nodeKey = (n: TreeNode) => (n.kind === "layer" ? `l:${n.layer_id}` : `g:${n.name}`);
@@ -20,6 +21,10 @@ interface Props {
   onEditLayer: (id: string | null) => void;
   tableIds: Set<string>;               // warstwy PostGIS — mają tabelę atrybutów
   onOpenTable: (id: string) => void;
+  rasterKey: (node: TreeNode) => string | null;   // nazwa WMS warstwy rastrowej / mozaiki (null = wektor, grupa)
+  opacityOf: (key: string) => number;             // krycie 0–100
+  onOpacity: (key: string, v: number) => void;
+  sliders: ReturnType<typeof useOpenSliders>;
 }
 
 function Node({ node, parent, depth, ...p }: Props & { node: TreeNode; parent: TreeNode | null; depth: number }) {
@@ -28,6 +33,7 @@ function Node({ node, parent, depth, ...p }: Props & { node: TreeNode; parent: T
   const checked = p.visible.has(key);
   const isGroup = node.kind === "group";
   const radio = parent?.mutually_exclusive;
+  const rkey = p.rasterKey(node);
 
   return (
     <li>
@@ -41,6 +47,10 @@ function Node({ node, parent, depth, ...p }: Props & { node: TreeNode; parent: T
           <input type={radio ? "radio" : "checkbox"} checked={checked} onChange={() => p.onToggle(node, parent)} />
           <span className={node.kind === "raster_group" ? "raster" : ""}>{node.name}</span>
         </label>
+        {rkey && checked && (
+          <OpacityButton open={p.sliders.isOpen(rkey)} value={p.opacityOf(rkey)} label={node.name}
+            onToggle={() => p.sliders.toggle(rkey)} />
+        )}
         {node.kind === "layer" && node.layer_id && p.tableIds.has(node.layer_id) && (
           <button className="edit-btn table-btn" title="Otwórz tabelę atrybutów" aria-label={`Tabela atrybutów: ${node.name}`}
             onClick={() => p.onOpenTable(node.layer_id!)}><IconTable width={16} height={16} /></button>
@@ -53,6 +63,9 @@ function Node({ node, parent, depth, ...p }: Props & { node: TreeNode; parent: T
           >✎</button>
         )}
       </div>
+      {rkey && checked && p.sliders.isOpen(rkey) && (
+        <OpacityRow value={p.opacityOf(rkey)} onChange={(v) => p.onOpacity(rkey, v)} indent={depth * 14 + 40} />
+      )}
       {isGroup && open && (
         <ul>
           {node.children.map((c) => (

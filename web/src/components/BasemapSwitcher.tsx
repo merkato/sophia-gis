@@ -1,4 +1,5 @@
 import type { Basemap } from "../types";
+import { OpacityButton, OpacityRow, useOpenSliders } from "./OpacitySlider";
 
 interface Props {
   basemaps: Basemap[];
@@ -6,10 +7,13 @@ interface Props {
   overlayIds: Set<number>;
   onBase: (id: number | null) => void;
   onToggleOverlay: (id: number) => void;
+  opacityOf: (b: Basemap) => number;          // krycie 0–100
+  onOpacity: (b: Basemap, v: number) => void;
 }
 
 /** Podkłady z katalogu Sophii: jeden podkład (radio) + dowolne nakładki (np. cieniowanie). */
-export function BasemapSwitcher({ basemaps, baseId, overlayIds, onBase, onToggleOverlay }: Props) {
+export function BasemapSwitcher({ basemaps, baseId, overlayIds, onBase, onToggleOverlay, opacityOf, onOpacity }: Props) {
+  const sliders = useOpenSliders();
   const bases = basemaps.filter((b) => !b.is_overlay);
   const overlays = basemaps.filter((b) => b.is_overlay);
   if (!basemaps.length) return null;
@@ -18,11 +22,20 @@ export function BasemapSwitcher({ basemaps, baseId, overlayIds, onBase, onToggle
       <h3>Podkład</h3>
       <ul className="tree">
         {bases.map((b) => (
-          <li key={b.id} className="tree-row">
-            <label>
-              <input type="radio" name="basemap" checked={baseId === b.id} onChange={() => onBase(b.id)} />
-              {b.name}
-            </label>
+          <li key={b.id}>
+            <div className="tree-row">
+              <label>
+                <input type="radio" name="basemap" checked={baseId === b.id} onChange={() => onBase(b.id)} />
+                {b.name}
+              </label>
+              {baseId === b.id && (
+                <OpacityButton open={sliders.isOpen(`bm${b.id}`)} value={opacityOf(b)} label={b.name}
+                  onToggle={() => sliders.toggle(`bm${b.id}`)} />
+              )}
+            </div>
+            {baseId === b.id && sliders.isOpen(`bm${b.id}`) && (
+              <OpacityRow value={opacityOf(b)} onChange={(v) => onOpacity(b, v)} indent={22} />
+            )}
           </li>
         ))}
         <li className="tree-row">
@@ -37,11 +50,20 @@ export function BasemapSwitcher({ basemaps, baseId, overlayIds, onBase, onToggle
           <h3>Nakładki</h3>
           <ul className="tree">
             {overlays.map((b) => (
-              <li key={b.id} className="tree-row">
-                <label>
-                  <input type="checkbox" checked={overlayIds.has(b.id)} onChange={() => onToggleOverlay(b.id)} />
-                  {b.name}
-                </label>
+              <li key={b.id}>
+                <div className="tree-row">
+                  <label>
+                    <input type="checkbox" checked={overlayIds.has(b.id)} onChange={() => onToggleOverlay(b.id)} />
+                    {b.name}
+                  </label>
+                  {overlayIds.has(b.id) && (
+                    <OpacityButton open={sliders.isOpen(`bm${b.id}`)} value={opacityOf(b)} label={b.name}
+                      onToggle={() => sliders.toggle(`bm${b.id}`)} />
+                  )}
+                </div>
+                {overlayIds.has(b.id) && sliders.isOpen(`bm${b.id}`) && (
+                  <OpacityRow value={opacityOf(b)} onChange={(v) => onOpacity(b, v)} indent={22} />
+                )}
               </li>
             ))}
           </ul>

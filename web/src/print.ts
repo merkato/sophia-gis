@@ -31,6 +31,7 @@ export interface PrintSource {
   wmsLayers: string[];             // warstwy projektu od spodu do wierzchu
   extent: number[];                // widok na ekranie
   center: number[];
+  opacity: Record<string, number>; // krycie 0–100 jak na ekranie ("<slug>/<WMS>", "bm:<id>")
 }
 
 const PAPER_MM: Record<Paper, [number, number]> = { A4: [297, 210], A3: [420, 297] };
@@ -79,13 +80,18 @@ export async function renderPrintMap(src: PrintSource, o: PrintOptions): Promise
   document.body.appendChild(host);
 
   await ensureBasemapProjections(src.basemaps);
-  const layers: (TileLayer | ImageLayer<ImageWMS>)[] = src.basemaps.map((b) => basemapLayer(b, crs, true));
+  const layers: (TileLayer | ImageLayer<ImageWMS>)[] = src.basemaps.map((b) => {
+    const l = basemapLayer(b, crs, true);
+    l.setOpacity((src.opacity[`bm:${b.id}`] ?? b.opacity * 100) / 100);
+    return l;
+  });
   const formats = tileFormats(src.config);
   const vectors: string[] = [];
   for (const name of src.wmsLayers) {
     const fmt = formats.get(name);
     if (!fmt) { vectors.push(name); continue; }
     layers.push(new TileLayer({
+      opacity: (src.opacity[`${src.config.slug}/${name}`] ?? 100) / 100,
       source: new TileWMS({
         url: "/ows", crossOrigin: "anonymous", tileGrid: tileGridFor(crs), serverType: "qgis", hidpi: false, transition: 0,
         params: { PROJECT: src.config.slug, VERSION: "1.1.1", LAYERS: name, STYLES: "", FORMAT: fmt,
