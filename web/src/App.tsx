@@ -6,7 +6,8 @@ import type { Basemap, FetchResult, GeoJSONFeature, ProjectConfig, ProjectSummar
 import { MapView, type Tool } from "./components/MapView";
 import { LayerTree, initialVisibility, nodeKey, visibleWmsNames } from "./components/LayerTree";
 import { FeaturePanel, type FeaturePanelHandle } from "./components/FeaturePanel";
-import { RecordList } from "./components/RecordList";
+import { AttributeTable } from "./components/AttributeTable";
+import GeoJSON from "ol/format/GeoJSON";
 import { Toolbar } from "./components/Toolbar";
 import { FetchCard } from "./components/FetchCard";
 import { AdminPanel } from "./components/AdminPanel";
@@ -162,25 +163,46 @@ export default function App() {
     });
   };
 
-  const openFeature = (layerId: string, pk: string) => guard(async () => {
+  const openFeature = (layerId: string, pk: string, zoom = false) => guard(async () => {
     if (!config) return;
     try {
       const f = await api.feature(config.slug, layerId, pk, config.crs);
       setSelection({ layerId, feature: f, isNew: false });
+      if (zoom && f.geometry) zoomTo(f.geometry);
     } catch (e) {
       setMessage((e as Error).message);
     }
   });
+
+  /** Przybliżenie mapy do obiektu (wiersz tabeli atrybutów) — bez zmiany skali, gdy obiekt jest widoczny. */
+  const zoomTo = (geometry: GeoJSONFeature["geometry"]) => {
+    const map = mapRef.current;
+    if (!map || !geometry || !config) return;
+    const g = new GeoJSON().readGeometry(geometry, { dataProjection: config.crs, featureProjection: config.crs });
+    if (!g) return;
+    const ext = g.getExtent();
+    const view = map.getView();
+    const visible = view.calculateExtent(map.getSize());
+    const inside = ext[0] >= visible[0] && ext[1] >= visible[1] && ext[2] <= visible[2] && ext[3] <= visible[3];
+    if (!inside) view.fit(ext, { padding: [60, 60, 60, 60], maxZoom: Math.max(view.getZoom() ?? 0, 14), duration: 300 });
+  };
+
+  // tabela atrybutów (okno na środku ekranu) — jedna naraz
+  const [tableLayerId, setTableLayerId] = useState<string | null>(null);
+  useEffect(() => { setTableLayerId(null); }, [slug]);
+  const tableIds = useMemo(
+    () => new Set(Object.values(config?.layers ?? {}).filter((l) => l.primary_key && l.type === "vector").map((l) => l.id)),
+    [config]);
 
   const editLayer = editLayerId ? config?.layers[editLayerId] : null;
 
   /** Wybór warstwy edycyjnej — z drzewa (ołówek) albo z paska narzędzi. */
   const chooseEditLayer = (id: string | null) => guard(() => {
     setEditLayerId(id);
-    // tabela bez geometrii: nic do zaznaczania na mapie — lista rekordów w panelu bocznym
+    // tabela bez geometrii: nic do zaznaczania na mapie — otwieramy jej tabelę atrybutów
     const geom = id ? config?.layers[id]?.geometry_type : null;
     chooseTool(geom ? "select" : "identify");
-    if (id && !geom) setSidebarOpen(true);
+    if (id && !geom) setTableLayerId(id);
     setSelection(null);
   });
 
@@ -268,7 +290,8 @@ export default function App() {
       <Toolbar config={config} editLayerId={editLayerId} onEditLayer={chooseEditLayer} tool={tool} onTool={chooseTool}
         canDelete={canDelete} onDelete={deleteSelected} onNewRecord={newRecord}
         sidebarOpen={sidebarOpen} onToggleSidebar={() => setSidebarOpen((o) => !o)}
-        fetchToolId={fetchToolId} onFetchTool={startFetchTool} />
+        fetchToolId={fetchToolId} onFetchTool={startFetchTool}
+        onOpenTable={() => editLayerId && setTableLayerId(editLayerId)} />
 
       <div className="body">
         {sidebarOpen && <aside className="sidebar">
@@ -279,16 +302,8 @@ export default function App() {
               <h3>Warstwy</h3>
               <LayerTree tree={config.tree} visible={visible} onToggle={toggle}
                 editableIds={editableIds} editLayerId={editLayerId}
-                onEditLayer={chooseEditLayer} />
+                onEditLayer={chooseEditLayer} tableIds={tableIds} onOpenTable={setTableLayerId} />
 
-              {editLayer && !editLayer.geometry_type && (
-                <section className="edit-tools">
-                  <h3>Edycja: {editLayer.name}</h3>
-                  <RecordList config={config} layer={editLayer} reloadToken={reloadToken}
-                    selectedId={selection && selection.layerId === editLayer.id && !selection.isNew ? String(selection.feature.id) : null}
-                    onOpen={(pk) => openFeature(editLayer.id, pk)} onNew={newRecord} />
-                </section>
-              )}
 
               {config.reports.some((r) => !r.layer_id) && (
                 <section>
@@ -331,6 +346,15 @@ export default function App() {
                 }
               }}
             />
+          )}
+          {config && tableLayerId && config.layers[tableLayerId] && (
+            <AttributeTable config={config} layerId={tableLayerId} reloadToken={reloadToken}
+              selectedId={selection && selection.layerId === tableLayerId && !selection.isNew ? String(selection.feature.id) : null}
+              onOpen={(pk) => openFeature(tableLayerId, pk, !!config.layers[tableLayerId].geometry_type)}
+              onNew={!config.layers[tableLayerId].geometry_type && config.layers[tableLayerId].perms.insert
+                ? () => guard(() => setSelection({ layerId: tableLayerId, isNew: true, feature: { type: "Feature", id: "", geometry: null, properties: {} } }))
+                : null}
+              onClose={() => setTableLayerId(null)} />
           )}
           {config && fetchTool && (
             <FetchCard config={config} tool={fetchTool} state={fetchState} onAdd={addFetched}

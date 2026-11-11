@@ -42,10 +42,14 @@ def _srid(crs: str | None) -> int:
     raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Nieobsługiwany układ: {crs}")
 
 
-def _select_list(lyr: LayerDef, out_srid: int) -> sql.Composed:
-    names = [f.name for f in lyr.fields if f.widget != "Hidden" and f.name != lyr.pg.geometry_column]
+def _visible_names(lyr: LayerDef) -> list[str]:
+    return [f.name for f in lyr.fields if f.widget != "Hidden" and f.name != lyr.pg.geometry_column]
+
+
+def _select_list(lyr: LayerDef, out_srid: int, geometry: bool = True) -> sql.Composed:
+    names = _visible_names(lyr)
     parts = [sql.SQL("{}::text AS __pk").format(col(T, lyr.pg.key))]
-    if lyr.pg.geometry_column:
+    if lyr.pg.geometry_column and geometry:
         parts.append(sql.SQL("ST_AsGeoJSON(ST_Transform({g}, {s}), 9)::json AS __geom").format(
             g=col(T, lyr.pg.geometry_column), s=sql.Literal(out_srid)))
     if names:
@@ -138,6 +142,12 @@ async def list_features(
     bbox: str | None = Query(None, description="minx,miny,maxx,maxy w układzie crs"),
     crs: str = Query("EPSG:3857"),
     limit: int = Query(1000, le=MAX_FEATURES),
+    offset: int = Query(0, ge=0, description="Stronicowanie (tabela atrybutów)"),
+    sort: str | None = Query(None, description="Pole sortowania (widoczne pole warstwy)"),
+    desc: bool = False,
+    q: str | None = Query(None, max_length=200, description="Szukaj w polach (fragment tekstu)"),
+    geometry: bool = Query(True, description="false = bez geometrii (tabela atrybutów)"),
+    total: bool = Query(False, description="Zwróć łączną liczbę rekordów spełniających warunki"),
     user: CurrentUser | None = Depends(optional_user),
 ):
     ctx = await load_project_context(slug, user)
@@ -145,7 +155,13 @@ async def list_features(
     if not lyr.pg:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Warstwa nie jest warstwą PostGIS")
     srid = _srid(crs)
+    names = _visible_names(lyr)
     where = [row_filter(ctx, lyr)]
+    if q and q.strip():
+        pattern = "%" + q.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
+        where.append(sql.SQL("({})").format(sql.SQL(" OR ").join(
+            sql.SQL("{}::text ILIKE {}").format(col(T, n), sql.Literal(pattern))
+            for n in [lyr.pg.key, *names])))
     if bbox and lyr.pg.geometry_column:
         try:
             minx, miny, maxx, maxy = (float(v) for v in bbox.split(","))
@@ -155,13 +171,25 @@ async def list_features(
             g=col(T, lyr.pg.geometry_column), a=sql.Literal(minx), b=sql.Literal(miny), c=sql.Literal(maxx),
             d=sql.Literal(maxy), s=sql.Literal(srid), ls=sql.Literal(lyr.pg.srid or srid)))
 
-    q = sql.SQL("SELECT {cols} FROM {t} AS {a} WHERE {w} LIMIT {lim}").format(
-        cols=_select_list(lyr, srid), t=_table(lyr), a=sql.Identifier(*T), w=sql.SQL(" AND ").join(where),
-        lim=sql.Literal(limit))
+    if sort is not None and sort not in names and sort != lyr.pg.key:
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, f"Nie można sortować po polu {sort}")
+    order = [sql.SQL("{} {} NULLS LAST").format(col(T, sort), sql.SQL("DESC" if desc else "ASC"))] if sort else []
+    order.append(col(T, lyr.pg.key))                  # stała kolejność przy stronicowaniu
+    cond = sql.SQL(" AND ").join(where)
+    query = sql.SQL("SELECT {cols} FROM {t} AS {a} WHERE {w} ORDER BY {o} LIMIT {lim} OFFSET {off}").format(
+        cols=_select_list(lyr, srid, geometry), t=_table(lyr), a=sql.Identifier(*T), w=cond,
+        o=sql.SQL(", ").join(order), lim=sql.Literal(limit), off=sql.Literal(offset))
     async with layer_conn(lyr.pg.conninfo) as conn:
-        rows = await (await conn.execute(q)).fetchall()
-    return {"type": "FeatureCollection", "features": [_row_to_feature(r) for r in rows],
-            "truncated": len(rows) >= limit}
+        rows = await (await conn.execute(query)).fetchall()
+        count = None
+        if total:
+            count = (await (await conn.execute(sql.SQL("SELECT count(*) AS n FROM {t} AS {a} WHERE {w}").format(
+                t=_table(lyr), a=sql.Identifier(*T), w=cond))).fetchone())["n"]
+    out = {"type": "FeatureCollection", "features": [_row_to_feature(r) for r in rows],
+           "truncated": len(rows) >= limit}
+    if count is not None:
+        out["total"] = count
+    return out
 
 
 @router.get("/{pk}")

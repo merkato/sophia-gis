@@ -65,11 +65,6 @@ button.block, .reports .button { display: block; width: 100%; text-align: left; 
 .edit-btn.active { color: var(--edit); background: none; }
 
 .edit-tools { border-left: 3px solid var(--edit); padding-left: 10px; }
-.records input { width: 100%; margin: 8px 0 4px; }
-.records ul { list-style: none; padding: 0; margin: 6px 0 0; max-height: 50vh; overflow: auto; }
-.records .link-row { display: block; width: 100%; text-align: left; border: none; background: none; padding: 5px 6px; border-radius: 4px; }
-.records .link-row:hover { background: color-mix(in srgb, var(--accent) 10%, transparent); }
-.records .link-row.active { background: color-mix(in srgb, var(--edit) 18%, transparent); color: inherit; }
 .toolgroup { display: flex; flex-wrap: wrap; gap: 6px; }
 
 /* --- formularz obiektu: pływające okno nad mapą (mapa pod spodem zostaje klikalna) */
@@ -130,6 +125,31 @@ button.block, .reports .button { display: block; width: 100%; text-align: left; 
 .lightbox-bar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: center; padding: 10px; color: #fff; }
 .lightbox-bar button, .lightbox-bar .button { background: rgba(255,255,255,.12); color: #fff; border-color: rgba(255,255,255,.3); }
 .lightbox-bar button.danger { color: #ff8787; border-color: #ff8787; }
+
+/* --- tabela atrybutów (okno nad mapą, domyślnie przy dolnej krawędzi) */
+.feature-window.table-window { top: auto; bottom: 10px; transform: translateX(-50%); width: min(900px, calc(100% - 20px));
+  height: min(420px, calc(100% - 20px)); z-index: 5; }
+.table-window.collapsed .table-tools, .table-window.collapsed .table-scroll, .table-window.collapsed .table-pager,
+.table-window.collapsed > .error { display: none; }
+.table-tools { display: flex; gap: 8px; align-items: center; padding: 8px 10px; border-bottom: 1px solid var(--line); flex-wrap: wrap; }
+.table-tools input[type="search"] { flex: 1; min-width: 160px; }
+.col-menu-wrap { position: relative; }
+.col-menu { position: absolute; right: 0; top: calc(100% + 4px); z-index: 2; background: var(--surface); border: 1px solid var(--line);
+  border-radius: 8px; padding: 8px 10px; min-width: 220px; max-height: 300px; overflow: auto; box-shadow: 0 8px 24px rgba(0,0,0,.2); }
+.table-scroll { flex: 1; overflow: auto; min-height: 0; }
+.attr-table { border-collapse: collapse; width: max-content; min-width: 100%; font-size: 13px; }
+.attr-table th { position: sticky; top: 0; background: var(--surface); text-align: left; font-weight: 600; font-size: 12px;
+  color: var(--muted); padding: 6px 10px; border-bottom: 1px solid var(--line); cursor: pointer; white-space: nowrap; user-select: none; }
+.attr-table th:hover { color: var(--ink); }
+.attr-table td { padding: 5px 10px; border-bottom: 1px solid var(--line); max-width: 280px; overflow: hidden;
+  text-overflow: ellipsis; white-space: nowrap; }
+.attr-table tbody tr { cursor: pointer; }
+.attr-table tbody tr:hover { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.attr-table tbody tr.active { background: color-mix(in srgb, var(--edit) 18%, transparent); }
+.attr-table .pk { color: var(--muted); font-variant-numeric: tabular-nums; }
+.table-pager { display: flex; align-items: center; justify-content: center; gap: 10px; padding: 6px; border-top: 1px solid var(--line); }
+.edit-btn.table-btn { display: inline-grid; place-items: center; }
+.feature-window:not(.table-window) { z-index: 6; }
 
 /* --- karta narzędzia pobierania (ULDK…) */
 .fetch-card { position: absolute; z-index: 5; left: 12px; bottom: 32px; width: min(360px, calc(100% - 24px));
@@ -219,6 +239,7 @@ ul.plain li { padding: 4px 0; }
     resize: none; z-index: 15; }
   .fw-head { cursor: default; }
   .fw-collapse { display: none; }
+  .feature-window.table-window { z-index: 14; }   /* formularz otwarty z wiersza leży nad tabelą */
   .admin-split { flex-direction: column; }
   .admin-form, .basemap-form, .preview { width: 100%; position: static; }
   .preview { height: 360px; }

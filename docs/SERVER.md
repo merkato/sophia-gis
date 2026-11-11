@@ -73,6 +73,30 @@ Inne usługi postawione później na tym serwerze (dashboard, geokoder, …) dop
 wspólną sieć Dockera `edge` (szczegóły w [proxy/sites/README.md](../proxy/sites/README.md)).
 Nie uruchamiaj na hoście drugiego proxy (nginx/Apache) na portach 80/443.
 
+### Aktualizacja
+
+```bash
+cd /opt/sophia && git pull -q && docker compose up -d --build api web
+```
+
+Dwie usługi wymagają dodatkowego kroku, bo `up --build` ich nie restartuje, gdy nie zmienia się
+ich konfiguracja w `docker-compose.yml`:
+
+- **zmiana `proxy/Caddyfile`** — odtwórz kontener Caddy (kilka sekund przerwy). `git pull` podmienia
+  plik, a kontener z zamontowanym pojedynczym plikiem widzi dalej starą wersję; `caddy reload`
+  po cichu wczytałby stary plik:
+  ```bash
+  docker compose up -d --force-recreate proxy
+  docker compose exec proxy cat /etc/caddy/Caddyfile | head      # sprawdź, czy to nowa wersja
+  ```
+- **zmiana `qgis-server-plugins/`** (np. filtr zakresu danych `sophia_filter`) — zrestartuj QGIS Server:
+  ```bash
+  docker compose restart qgis
+  docker compose logs --tail 50 qgis | grep sophia_filter
+  ```
+
+Pliki zmienione w ostatniej aktualizacji pokazuje `git diff --stat HEAD@{1} HEAD`.
+
 ## 4. Rastry historyczne
 
 Przygotuj je **lokalnie** (QGIS → OSGeo4W Shell), zanim trafią na serwer:

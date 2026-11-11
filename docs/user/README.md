@@ -49,10 +49,27 @@ wyszarzone.
 | tabela z zielonym plusem | **Dodaj rekord** — dla tabel bez geometrii | Dodaj rekord |
 | poligon z czerwonym węzłem | **Narzędzie wierzchołków** — przeciąganie wierzchołków; zwykłe kliknięcie otwiera obiekt | Narzędzie wierzchołków |
 | czerwony kosz | **Usuń zaznaczony obiekt** (z potwierdzeniem) | Usuń zaznaczone |
+| tabela z niebieskim nagłówkiem | **Otwórz tabelę atrybutów** warstwy edycyjnej | Otwórz tabelę atrybutów |
 | obrys działki / domek z niebieską strzałką | **Pobierz z ULDK** — działka lub budynek z kliknięcia do warstwy ([uldk.md](uldk.md)) | — (wtyczki ULDK) |
+
+### Tabela atrybutów
+- Otwierasz ją ikoną tabeli przy warstwie w panelu warstw (każda warstwa z bazy) albo ikoną
+  **Otwórz tabelę atrybutów** na pasku (warstwa edycyjna).
+- Okno leży nad mapą przy dolnej krawędzi; przesuwasz je za nagłówek jak formularz, dwuklik
+  wraca na środek, **▁** zwija. Na telefonie zajmuje cały ekran.
+- **Sortowanie**: kliknięcie nagłówka kolumny — rosnąco, drugie kliknięcie — malejąco, trzecie — bez
+  sortowania. Sortuje serwer, więc dotyczy całej tabeli, nie tylko widocznej strony.
+- **Szukaj** przeszukuje wszystkie kolumny (fragment tekstu); wynik też liczy serwer.
+- **Kolumny ▾** — ukrywanie kolumn na czas pracy. Wybór zapamiętuje ta przeglądarka, projekt QGIS
+  się nie zmienia.
+- Wartości wyglądają jak w formularzu: etykiety list wartości i słowników, nazwy plików, ✓.
+- Kliknięcie wiersza otwiera rekord w formularzu (z pytaniem o niezapisane zmiany), a dla warstwy
+  z geometrią także przybliża mapę do obiektu.
+- Strony po 100 wierszy (‹ ›); tabela pokazuje tylko rekordy z Twojego zakresu danych.
 
 ### Edycja
 - Warstwę do edycji wybierasz na pasku narzędzi (lista obok ołówka) albo ołówkiem w drzewie warstw.
 - Po zapisie nowego obiektu narzędzie wraca do **Zaznacz obiekt**.
-- Tabele bez geometrii (słowniki, tabele nadrzędne) mają listę rekordów w panelu bocznym zamiast mapy.
+- Tabela bez geometrii (słownik, tabela nadrzędna) po wybraniu do edycji otwiera się od razu jako
+  tabela atrybutów; nowy rekord dodajesz przyciskiem **+ Dodaj rekord** w tabeli albo na pasku.
 - Na telefonie panel warstw jest domyślnie schowany i otwiera się ikoną warstw.

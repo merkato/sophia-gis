@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { IconTable } from "./Icons";
 import type { TreeNode } from "../types";
 
 export const nodeKey = (n: TreeNode) => (n.kind === "layer" ? `l:${n.layer_id}` : `g:${n.name}`);
@@ -17,6 +18,8 @@ interface Props {
   editableIds: Set<string>;
   editLayerId: string | null;
   onEditLayer: (id: string | null) => void;
+  tableIds: Set<string>;               // warstwy PostGIS — mają tabelę atrybutów
+  onOpenTable: (id: string) => void;
 }
 
 function Node({ node, parent, depth, ...p }: Props & { node: TreeNode; parent: TreeNode | null; depth: number }) {
@@ -38,6 +41,10 @@ function Node({ node, parent, depth, ...p }: Props & { node: TreeNode; parent: T
           <input type={radio ? "radio" : "checkbox"} checked={checked} onChange={() => p.onToggle(node, parent)} />
           <span className={node.kind === "raster_group" ? "raster" : ""}>{node.name}</span>
         </label>
+        {node.kind === "layer" && node.layer_id && p.tableIds.has(node.layer_id) && (
+          <button className="edit-btn table-btn" title="Otwórz tabelę atrybutów" aria-label={`Tabela atrybutów: ${node.name}`}
+            onClick={() => p.onOpenTable(node.layer_id!)}><IconTable width={16} height={16} /></button>
+        )}
         {node.kind === "layer" && node.layer_id && p.editableIds.has(node.layer_id) && (
           <button
             className={`edit-btn ${p.editLayerId === node.layer_id ? "active" : ""}`}

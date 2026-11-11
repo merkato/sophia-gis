@@ -3,7 +3,7 @@ import type { LayerInfo, ProjectConfig } from "../types";
 import type { Tool } from "./MapView";
 import {
   GEOMETRY_ICON, IconAddPolygon, IconAddRecord, IconDelete, IconEdit, IconFetchBuilding, IconFetchParcel, IconIdentify,
-  IconLayers, IconSelect, IconVertex,
+  IconLayers, IconSelect, IconTable, IconVertex,
 } from "./Icons";
 
 const DRAW_LABEL = { Point: "Dodaj obiekt punktowy", Line: "Dodaj obiekt liniowy", Polygon: "Dodaj obiekt poligonowy" };
@@ -24,7 +24,7 @@ function ToolButton({ icon: Icon, label, active, disabled, onClick }: {
  * Narzędzia edycji są zawsze widoczne; bez aktywnej warstwy edycyjnej są wyszarzone.
  */
 export function Toolbar({ config, editLayerId, onEditLayer, tool, onTool, canDelete, onDelete, onNewRecord,
-  sidebarOpen, onToggleSidebar, fetchToolId, onFetchTool }: {
+  sidebarOpen, onToggleSidebar, fetchToolId, onFetchTool, onOpenTable }: {
   config: ProjectConfig | null;
   editLayerId: string | null;
   onEditLayer: (id: string | null) => void;
@@ -37,6 +37,7 @@ export function Toolbar({ config, editLayerId, onEditLayer, tool, onTool, canDel
   onToggleSidebar: () => void;
   fetchToolId: string | null;      // aktywne narzędzie pobierania (ULDK…)
   onFetchTool: (id: string) => void;
+  onOpenTable: () => void;         // tabela atrybutów warstwy edycyjnej
 }) {
   const editable: LayerInfo[] = Object.values(config?.layers ?? {})
     .filter((l) => l.perms.insert || l.perms.update || l.perms.delete)
@@ -75,6 +76,8 @@ export function Toolbar({ config, editLayerId, onEditLayer, tool, onTool, canDel
           <ToolButton icon={IconVertex} label="Narzędzie wierzchołków (zmiana geometrii)" active={tool === "modify"}
             disabled={!geom || !layer?.perms.update} onClick={() => onTool("modify")} />
           <ToolButton icon={IconDelete} label="Usuń zaznaczony obiekt" disabled={!canDelete} onClick={onDelete} />
+          <ToolButton icon={IconTable} label={layer ? `Otwórz tabelę atrybutów: ${layer.name}` : "Otwórz tabelę atrybutów"}
+            disabled={!layer} onClick={onOpenTable} />
         </>
       )}
 

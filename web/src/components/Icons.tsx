@@ -112,6 +112,15 @@ export const IconAddRecord = (p: P) => (
   </Svg>
 );
 
+/** Tabela atrybutów. */
+export const IconTable = (p: P) => (
+  <Svg {...p}>
+    <rect x="2.5" y="4" width="19" height="16" rx="1.2" fill="#fff" stroke={C.line} strokeWidth="1.2" />
+    <rect x="2.5" y="4" width="19" height="4" fill={C.blue} fillOpacity=".25" stroke={C.line} strokeWidth="1.2" />
+    <path d="M2.5 12h19M2.5 16h19M9 8v12M15 8v12" stroke={C.gray} strokeWidth="1" />
+  </Svg>
+);
+
 /** Panel warstw (pokaż / ukryj). */
 export const IconLayers = (p: P) => (
   <Svg {...p}>

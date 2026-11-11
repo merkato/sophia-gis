@@ -88,7 +88,7 @@ Potrzebny do projektów z podziałem danych na jednostki terenowe (centrala widz
   Fia (zakładka „Zakres danych”), `docs/user/uprawnienia.md`. Stare zasięgi (`extent_assignments`)
   wycofane. Limit wielkości plików per warstwa — nie zrobiony (globalne limity w konfiguracji API).
 
-### 9. Tabela atrybutów zamiast listy rekordów w panelu bocznym
+### 9. ✅ Tabela atrybutów zamiast listy rekordów w panelu bocznym
 - Usunąć listę rekordów tabel bez geometrii z panelu bocznego (`RecordList`). Przy dużej tabeli
   z kilkunastoma atrybutami lista z jedną etykietą nie wystarcza.
 - Kliknięcie warstwy w panelu bocznym (lub ikona „Otwórz tabelę atrybutów” na pasku, jak w QGIS)
@@ -100,6 +100,8 @@ Potrzebny do projektów z podziałem danych na jednostki terenowe (centrala widz
 - Kliknięcie wiersza otwiera rekord w formularzu (z pytaniem o niezapisane zmiany), „Dodaj rekord”
   z paska działa jak dotąd. Także dla warstw z geometrią (wiersz → przybliżenie do obiektu).
 - Wyszukiwanie / filtr, stronicowanie po stronie API dla dużych tabel.
+- Zrobione: `AttributeTable.tsx`, wspólne okno `FloatingWindow.tsx`, API listy z `offset/sort/desc/q/
+  geometry/total`; `RecordList` usunięty; opis w `docs/user/README.md`.
 
 ## Zaległe z wcześniejszych dni
 
