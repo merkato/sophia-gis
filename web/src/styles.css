@@ -37,7 +37,18 @@ button.block, .reports .button { display: block; width: 100%; text-align: left; 
 .brand { font-size: 16px; }
 .spacer { flex: 1; }
 
-.body { flex: 1; display: flex; min-height: 0; }
+/* --- pasek narzędzi pod paskiem tytułu (jak paski Digitalizacja/Atrybuty w QGIS) */
+.toolbar { display: flex; align-items: center; gap: 2px; padding: 3px 8px; background: var(--surface);
+  border-bottom: 1px solid var(--line); overflow-x: auto; scrollbar-width: thin; flex: none; }
+.toolbar .tool { width: 34px; height: 34px; padding: 0; display: inline-grid; place-items: center; flex: none;
+  border: 1px solid transparent; background: none; border-radius: 6px; }
+.toolbar .tool:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 10%, transparent); border-color: var(--line); }
+.toolbar .tool.active { background: color-mix(in srgb, var(--accent) 20%, transparent); border-color: var(--accent); }
+.toolbar .tool:disabled { opacity: .35; filter: grayscale(1); cursor: default; }
+.toolbar .sep { width: 1px; height: 24px; background: var(--line); margin: 0 6px; flex: none; }
+.toolbar .edit-layer { max-width: 240px; min-width: 120px; height: 30px; padding: 2px 6px; flex: 0 1 auto; }
+
+.body { flex: 1; display: flex; min-height: 0; position: relative; }
 .sidebar { width: 290px; overflow: auto; padding: 10px 14px; background: var(--surface); border-right: 1px solid var(--line); }
 .sidebar h3 { font-size: 12px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); margin: 14px 0 6px; }
 .mapwrap { flex: 1; position: relative; min-width: 0; }
@@ -162,7 +173,11 @@ ul.plain li { padding: 4px 0; }
 .preview-map { flex: 1; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: #f2f2ee; }
 
 @media (max-width: 800px) {
-  .sidebar { position: absolute; z-index: 5; height: calc(100% - 49px); width: 260px; }
+  .sidebar { position: absolute; z-index: 5; top: 0; bottom: 0; width: min(300px, 85vw);
+    box-shadow: 4px 0 16px rgba(0,0,0,.2); }
+  .toolbar .tool { width: 40px; height: 40px; }
+  .toolbar .edit-layer { max-width: 150px; }
+  .topbar select { min-width: 0; flex: 1; max-width: 220px; }
   .feature-window { position: fixed; inset: 0 !important; transform: none !important; width: auto !important;
     height: auto !important; max-width: none; max-height: none; min-width: 0; border: none; border-radius: 0;
     resize: none; z-index: 15; }

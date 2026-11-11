@@ -31,9 +31,24 @@ Zasady ogólne, wspólne dla wszystkich tematów:
 - Jeśli w formularzu są **niezapisane zmiany**, Sophia pyta: **Zapisz** / **Odrzuć** / **Anuluj**.
   To samo pytanie pojawia się przy zamykaniu formularza.
 
+### Pasek narzędzi
+Pod paskiem tytułu jest pasek narzędzi z ikonami w stylu QGIS. Nazwa każdego narzędzia pokazuje się
+po najechaniu kursorem. Narzędzia edycji są zawsze na miejscu. Bez aktywnej warstwy edycyjnej są
+wyszarzone.
+
+| Ikona | Narzędzie | Odpowiednik w QGIS |
+|---|---|---|
+| warstwy (trzy arkusze) | pokaż / ukryj panel warstw i podkładów | panel Warstwy |
+| niebieskie „i” | **Identyfikuj obiekty** — kliknięcie otwiera obiekt w formularzu | Identyfikuj obiekty |
+| żółty ołówek + lista | **Włącz / zakończ edycję** i wybór warstwy edycyjnej | Przełącz edycję |
+| przerywany prostokąt ze strzałką | **Zaznacz obiekt** warstwy edycyjnej | Zaznacz obiekty |
+| zielony punkt / linia / poligon z gwiazdką | **Dodaj obiekt** — ikona zależy od typu geometrii warstwy | Dodaj obiekt punktowy / liniowy / poligonowy |
+| tabela z zielonym plusem | **Dodaj rekord** — dla tabel bez geometrii | Dodaj rekord |
+| poligon z czerwonym węzłem | **Narzędzie wierzchołków** — przeciąganie wierzchołków; zwykłe kliknięcie otwiera obiekt | Narzędzie wierzchołków |
+| czerwony kosz | **Usuń zaznaczony obiekt** (z potwierdzeniem) | Usuń zaznaczone |
+
 ### Edycja
-- Warstwę do edycji wybierasz ołówkiem w drzewie warstw.
-- **Wybierz** — kliknięcie obiektu otwiera go w formularzu.
-- **Rysuj** — nowy obiekt. Po zapisie narzędzie wraca do **Wybierz**.
-- **Zmień geometrię** — przeciąganie wierzchołków. Zwykłe kliknięcie otwiera obiekt w formularzu.
-- Tabele bez geometrii (słowniki, tabele nadrzędne) mają listę rekordów zamiast mapy.
+- Warstwę do edycji wybierasz na pasku narzędzi (lista obok ołówka) albo ołówkiem w drzewie warstw.
+- Po zapisie nowego obiektu narzędzie wraca do **Zaznacz obiekt**.
+- Tabele bez geometrii (słowniki, tabele nadrzędne) mają listę rekordów w panelu bocznym zamiast mapy.
+- Na telefonie panel warstw jest domyślnie schowany i otwiera się ikoną warstw.

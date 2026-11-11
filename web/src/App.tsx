@@ -7,6 +7,7 @@ import { MapView, type Tool } from "./components/MapView";
 import { LayerTree, initialVisibility, nodeKey, visibleWmsNames } from "./components/LayerTree";
 import { FeaturePanel, type FeaturePanelHandle } from "./components/FeaturePanel";
 import { RecordList } from "./components/RecordList";
+import { Toolbar } from "./components/Toolbar";
 import { AdminPanel } from "./components/AdminPanel";
 import { BasemapSwitcher, initialBasemapChoice, saveBasemapChoice } from "./components/BasemapSwitcher";
 
@@ -70,6 +71,7 @@ export default function App() {
   const [overlayIds, setOverlayIds] = useState<Set<number>>(new Set());
   const mapRef = useRef<OlMap | null>(null);
   const panelRef = useRef<FeaturePanelHandle>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(() => !matchMedia("(max-width: 800px)").matches);
   const [pending, setPending] = useState<(() => void) | null>(null);
 
   /**
@@ -166,6 +168,32 @@ export default function App() {
 
   const editLayer = editLayerId ? config?.layers[editLayerId] : null;
 
+  /** Wybór warstwy edycyjnej — z drzewa (ołówek) albo z paska narzędzi. */
+  const chooseEditLayer = (id: string | null) => guard(() => {
+    setEditLayerId(id);
+    // tabela bez geometrii: nic do zaznaczania na mapie — lista rekordów w panelu bocznym
+    const geom = id ? config?.layers[id]?.geometry_type : null;
+    setTool(geom ? "select" : "identify");
+    if (id && !geom) setSidebarOpen(true);
+    setSelection(null);
+  });
+
+  const newRecord = () => editLayer && guard(() =>
+    setSelection({ layerId: editLayer.id, isNew: true, feature: { type: "Feature", id: "", geometry: null, properties: {} } }));
+
+  const canDelete = !!(selection && editLayer && selection.layerId === editLayer.id && !selection.isNew && editLayer.perms.delete);
+  const deleteSelected = async () => {
+    if (!config || !selection || !canDelete) return;
+    if (!confirm(`Usunąć obiekt #${selection.feature.id} z warstwy „${editLayer!.name}”? Tej operacji nie można cofnąć.`)) return;
+    try {
+      await api.deleteFeature(config.slug, selection.layerId, String(selection.feature.id));
+      setSelection(null);
+      setReloadToken((t) => t + 1);
+    } catch (e) {
+      setMessage((e as Error).message);
+    }
+  };
+
   return (
     <div className="app">
       <header className="topbar">
@@ -186,8 +214,12 @@ export default function App() {
         )}
       </header>
 
+      <Toolbar config={config} editLayerId={editLayerId} onEditLayer={chooseEditLayer} tool={tool} onTool={setTool}
+        canDelete={canDelete} onDelete={deleteSelected} onNewRecord={newRecord}
+        sidebarOpen={sidebarOpen} onToggleSidebar={() => setSidebarOpen((o) => !o)} />
+
       <div className="body">
-        <aside className="sidebar">
+        {sidebarOpen && <aside className="sidebar">
           <BasemapSwitcher basemaps={basemaps} baseId={baseId} overlayIds={overlayIds}
             onBase={chooseBase} onToggleOverlay={toggleOverlay} />
           {config ? (
@@ -195,34 +227,14 @@ export default function App() {
               <h3>Warstwy</h3>
               <LayerTree tree={config.tree} visible={visible} onToggle={toggle}
                 editableIds={editableIds} editLayerId={editLayerId}
-                onEditLayer={(id) => guard(() => {
-                  setEditLayerId(id);
-                  // tabela bez geometrii: nic do zaznaczania na mapie — lista rekordów w panelu
-                  setTool(id && config.layers[id]?.geometry_type ? "select" : "identify");
-                  setSelection(null);
-                })} />
+                onEditLayer={chooseEditLayer} />
 
-              {editLayer && (
+              {editLayer && !editLayer.geometry_type && (
                 <section className="edit-tools">
                   <h3>Edycja: {editLayer.name}</h3>
-                  {!editLayer.geometry_type ? (
-                    <RecordList config={config} layer={editLayer} reloadToken={reloadToken}
-                      selectedId={selection && selection.layerId === editLayer.id && !selection.isNew ? String(selection.feature.id) : null}
-                      onOpen={(pk) => openFeature(editLayer.id, pk)}
-                      onNew={() => guard(() => setSelection({ layerId: editLayer.id, isNew: true, feature: { type: "Feature", id: "", geometry: null, properties: {} } }))} />
-                  ) : (
-                  <div className="toolgroup">
-                    <button className={tool === "select" ? "active" : ""} onClick={() => setTool("select")}>Wybierz</button>
-                    {editLayer.perms.insert && editLayer.geometry_type && (
-                      <button className={tool === "draw" ? "active" : ""} onClick={() => setTool("draw")}>
-                        Rysuj {({ Point: "punkt", Line: "linię", Polygon: "poligon" })[editLayer.geometry_type]}
-                      </button>
-                    )}
-                    {editLayer.perms.update && editLayer.geometry_type && (
-                      <button className={tool === "modify" ? "active" : ""} onClick={() => setTool("modify")}>Zmień geometrię</button>
-                    )}
-                  </div>
-                  )}
+                  <RecordList config={config} layer={editLayer} reloadToken={reloadToken}
+                    selectedId={selection && selection.layerId === editLayer.id && !selection.isNew ? String(selection.feature.id) : null}
+                    onOpen={(pk) => openFeature(editLayer.id, pk)} onNew={newRecord} />
                 </section>
               )}
 
@@ -243,7 +255,7 @@ export default function App() {
               )}
             </>
           ) : <p className="muted">Wybierz projekt z menu.</p>}
-        </aside>
+        </aside>}
 
         <main className="mapwrap">
           {config && (

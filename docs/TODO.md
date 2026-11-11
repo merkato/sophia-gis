@@ -1,34 +1,38 @@
 # TO DO — WebUI i Fia
 
-Lista z 10.11.2026. Kolejność jest kolejnością realizacji (od 11.11.2026).
+Lista z 10.11.2026 (aktualizacja 11.11.2026). Kolejność jest kolejnością realizacji.
 
 ## Główne zadania
 
-### 1. Edytor atrybutów jako okno na środku ekranu
+### 1. ✅ Edytor atrybutów jako okno na środku ekranu (a048d5b)
 - Formularz obiektu (atrybuty, powiązane, dokumenty) jako okno modalne / pływające na środku,
   zamiast panelu przy prawej krawędzi. Mapa pod spodem nadal widoczna (półprzezroczyste tło
   albo okno przesuwalne).
 - Na telefonie: pełny ekran.
 - Dotyczy: `web/src/components/FeaturePanel.tsx`, `App.tsx`, `styles.css`.
 
-### 2. Po zapisie kliknięcie w inny obiekt wczytuje go do formularza
+### 2. ✅ Po zapisie kliknięcie w inny obiekt wczytuje go do formularza (1a90dd1)
 - Teraz po zapisie formularz zostaje otwarty na zapisanym obiekcie, a kolejne kliknięcie
   na mapie go nie podmienia.
 - Oczekiwane: jeśli w formularzu nie ma niezapisanych zmian, kliknięcie (identyfikacja albo
   „Wybierz”) wczytuje nowy obiekt. Przy niezapisanych zmianach pytamy: zapisz / odrzuć / anuluj.
 
-### 3. Fotografie, także z aparatu telefonu/tabletu
+### 3. ✅ Fotografie, także z aparatu telefonu/tabletu (08a7116)
 - Załącznik typu zdjęcie: `<input type="file" accept="image/*" capture="environment">`
   otwiera aparat w przeglądarce mobilnej.
 - Po stronie serwera: JPEG/PNG/HEIC (konwersja HEIC → JPEG), zmniejszenie do rozsądnego
   rozmiaru, miniatury, EXIF (data, GPS, orientacja). Galeria w formularzu.
-- Konfiguracja w Fii: warstwa „przyjmuje zdjęcia”.
+- Zrobione inaczej niż w planie: bez ustawienia w Fii — pole z widżetem QGIS „Załącznik” (wariant A)
+  albo tabela zdjęć w relacji (wariant B), galeria z wizytacjami, pobieranie do QGIS przez Fię.
+  Opis: `docs/user/zdjecia.md`.
 
-### 4. Ikony zamiast napisów na przyciskach
+### 4. ✅ Ikony zamiast napisów na przyciskach (razem z punktem 7)
 - Uniwersalne, w stylu QGIS (zestaw ikon SVG w repo, np. na licencji zgodnej z QGIS):
   wybierz, rysuj punkt / linię / poligon, zmień geometrię, usuń, zapisz, identyfikacja,
   pomiar, wydruk, warstwy, podkłady.
 - Podpowiedź (`title` / tooltip) z pełną nazwą przy każdej ikonie.
+- Zrobione: własne SVG w stylu QGIS (`web/src/components/Icons.tsx`) — bez kopiowania grafik QGIS (GPL).
+  Pomiar i wydruk dojdą do paska razem z tymi narzędziami.
 
 ### 5. Załączniki (PDF i inne) z WebUI — osobny katalog na projekt
 - **Stan obecny:** WebUI już dodaje PDF (zakładka „Dokumenty” w formularzu), jeśli warstwa ma
@@ -49,11 +53,30 @@ Lista z 10.11.2026. Kolejność jest kolejnością realizacji (od 11.11.2026).
   Każde źródło: zapytanie po punkcie/identyfikatorze, normalizacja wyniku, mapowanie pól z Fii.
   Zapytania przez API Sophii (bez CORS, z logiem i limitem).
 
-### 7. Górny pasek narzędzi edycji
+### 7. ✅ Górny pasek narzędzi edycji
 - Wszystkie narzędzia edycyjne (wybierz, rysuj, zmień geometrię, usuń, ULDK…) w pasku
   u góry ekranu zamiast w panelu bocznym.
 - Gdy żadna warstwa nie jest aktywna do edycji, narzędzia są **wyszarzone** (nie znikają).
 - Wybór aktywnej warstwy edycyjnej: z drzewa (ołówek) i z listy w pasku.
+
+### 8. Model uprawnień: serwer → projekt → zakres danych
+Potrzebny do przeniesienia projektu RDLP (wyłączenia z produkcji leśnej) z Lizmapa.
+- **Serwer:** administrator zawsze wszystko; flaga **Autor projektów** przy użytkowniku — publikacja
+  przez Fię bez pełnych praw administratora.
+- **Projekt (grupa w projekcie):** rola podgląd / edycja, prawo do zdjęć i PDF (domyślnie włączone),
+  wyjątki per warstwa (już są: `layer_access`).
+- **Zakres danych (grupa w projekcie):** „cały obszar” albo lista kodów (np. `n1703`, `n1705`).
+  W Fii autor definiuje **wymiar zakresu** (warstwa granic + pole z kodem) i regułę dla każdej
+  warstwy: *przestrzennie* (dokładna geometria, nie bbox), *atrybut* (pole = kod), *przez relację*
+  (dziedziczy po obiekcie nadrzędnym — lustracje, zdjęcia, PDF), *bez filtra* (słowniki).
+- Granica: widzi każde nadleśnictwo, którego obszar obiekt przecina; edytuje to, w którym leży punkt
+  wewnętrzny obiektu (jeden właściciel). Kilka grup = suma zakresów.
+- **Jeden filtr wszędzie:** API (lista, odczyt, edycja, powiązane, zdjęcia, PDF), **QGIS Server**
+  (mapa, identyfikacja, wydruk — wtyczka kontroli dostępu z filtrem SQL od API; dziś zasięgi
+  działają tylko w API, obraz mapy pokazuje wszystkie obiekty!), pobieranie zdjęć przez Fię, raporty.
+- Kolejność: silnik filtra w API → filtr w QGIS Server → model danych i migracja obecnych zasięgów
+  (`extents`, `extent_assignments`) → Fia i panel administratora → dokumentacja na przykładzie RDLP.
+- Wchłania zaległe: zasięg obiektu nadrzędnego dla tabel bez geometrii.
 
 ## Zaległe z wcześniejszych dni
 
@@ -62,9 +85,14 @@ Lista z 10.11.2026. Kolejność jest kolejnością realizacji (od 11.11.2026).
       restartuje QGIS Server i czyści cache kafli.
 - [ ] Podkład z katalogu w wydruku widoku mapy (GetPrint).
 - [ ] Sprzątanie plików osieroconych w `data/uploads` (zdjęcie usunięte z pola/rekordu zostaje na dysku).
-- [ ] Zasięg obiektu nadrzędnego także dla list/odczytu rekordów tabel bez geometrii (teraz: zdjęcia
-      i ich pliki; zwykłe rekordy dzieci bez geometrii — tylko uprawnienie do warstwy).
 - [ ] `config/pg_service.conf` poza gitem (w repo tylko `pg_service.conf.example`), żeby
       hasło na serwerze nie blokowało `git pull`.
 - [ ] Mapa (z podkładami) także bez wybranego projektu / dla niezalogowanych.
 - [ ] Szew 5076 | 5077 (~30–50 m): dodatkowe punkty georeferencji po lewej stronie 5077.
+
+## Na sam koniec
+
+- [ ] **Raporty po stronie Sophii** (zamiast raportów z menedżera wydruków QGIS) — np. raporty
+      z lustracji terenowych do PDF, z filtrem zakresu użytkownika (punkt 8). Dopiero przy powrocie
+      do projektu wyłączeń z produkcji leśnej: najpierw analiza kodu dotychczasowego widżetu
+      napisanego pod tę bazę i Lizmapa.
