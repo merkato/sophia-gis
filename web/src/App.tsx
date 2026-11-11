@@ -7,11 +7,23 @@ import { MapView, type Tool } from "./components/MapView";
 import { LayerTree, initialVisibility, nodeKey, visibleWmsNames } from "./components/LayerTree";
 import { FeaturePanel, type FeaturePanelHandle } from "./components/FeaturePanel";
 import { AttributeTable } from "./components/AttributeTable";
+import { PrintDialog } from "./components/PrintDialog";
 import GeoJSON from "ol/format/GeoJSON";
 import { Toolbar } from "./components/Toolbar";
 import { FetchCard } from "./components/FetchCard";
 import { AdminPanel } from "./components/AdminPanel";
 import { BasemapSwitcher, initialBasemapChoice, saveBasemapChoice } from "./components/BasemapSwitcher";
+
+/**
+ * Mapa bez projektu (brak dostępnych projektów, niezalogowany gość): same podkłady z katalogu
+ * w EPSG:2180, widok na całą Polskę.
+ */
+const BASE_CONFIG: ProjectConfig = {
+  slug: "", title: "Sophia", role: null, crs: "EPSG:2180", version: 0,
+  extent: [170000, 130000, 870000, 780000], options: {},
+  tree: { kind: "group", name: "", layer_id: null, visible: true, expanded: true, mutually_exclusive: false, children: [] },
+  layers: {}, relations: [], reports: [], tools: [], scope: null, rights: { photos: false, files: false },
+};
 
 interface Selection {
   layerId: string;
@@ -61,6 +73,9 @@ export default function App() {
   const [slug, setSlug] = useState<string | null>(() => new URLSearchParams(location.search).get("p"));
   const [config, setConfig] = useState<ProjectConfig | null>(null);
   const [visible, setVisible] = useState<Set<string>>(new Set());
+  const [baseReady, setBaseReady] = useState(false);
+  useEffect(() => { ensureProjection("EPSG:2180").then(() => setBaseReady(true)).catch(() => setBaseReady(true)); }, []);
+  const [showPrint, setShowPrint] = useState(false);
   const [editLayerId, setEditLayerId] = useState<string | null>(null);
   const [tool, setTool] = useState<Tool>("identify");
   const [selection, setSelection] = useState<Selection | null>(null);
@@ -148,6 +163,18 @@ export default function App() {
   const wmsLayers = useMemo(
     () => (config ? visibleWmsNames(config.tree, visible, (id) => config.layers[id]?.wms_name) : []),
     [config, visible]);
+
+  // mapa bez projektu: same podkłady (projekt jeszcze się wczytuje albo żaden nie jest dostępny)
+  const mapConfig = config ?? (baseReady && (!slug || projects.length === 0) ? BASE_CONFIG : null);
+
+  /** Wydruk: aktywne podkłady w kolejności rysowania i nazwy widocznych warstw projektu. */
+  const printBasemaps = useMemo(() => basemaps
+    .filter((b) => (b.is_overlay ? overlayIds.has(b.id) : b.id === baseId))
+    .sort((a, b) => Number(a.is_overlay) - Number(b.is_overlay)), [basemaps, baseId, overlayIds]);
+  const printLayerNames = useMemo(() => {
+    if (!config) return [];
+    return [...wmsLayers].reverse().map((n) => Object.values(config.layers).find((l) => l.wms_name === n)?.name ?? n);
+  }, [config, wmsLayers]);
 
   const editableIds = useMemo(
     () => new Set(Object.values(config?.layers ?? {}).filter((l) => l.perms.insert || l.perms.update || l.perms.delete).map((l) => l.id)),
@@ -291,7 +318,8 @@ export default function App() {
         canDelete={canDelete} onDelete={deleteSelected} onNewRecord={newRecord}
         sidebarOpen={sidebarOpen} onToggleSidebar={() => setSidebarOpen((o) => !o)}
         fetchToolId={fetchToolId} onFetchTool={startFetchTool}
-        onOpenTable={() => editLayerId && setTableLayerId(editLayerId)} />
+        onOpenTable={() => editLayerId && setTableLayerId(editLayerId)}
+        onPrint={mapConfig ? () => setShowPrint(true) : null} />
 
       <div className="body">
         {sidebarOpen && <aside className="sidebar">
@@ -321,13 +349,15 @@ export default function App() {
                 </section>
               )}
             </>
-          ) : <p className="muted">Wybierz projekt z menu.</p>}
+          ) : <p className="muted">{projects.length ? "Wybierz projekt z menu." : user
+            ? "Nie masz dostępu do żadnego projektu — poproś administratora o nadanie uprawnień."
+            : "Mapa podkładów. Zaloguj się, aby zobaczyć projekty."}</p>}
         </aside>}
 
         <main className="mapwrap">
-          {config && (
+          {mapConfig && (
             <MapView
-              config={config} wmsLayers={wmsLayers} editLayerId={editLayerId} tool={tool}
+              config={mapConfig} wmsLayers={config ? wmsLayers : []} editLayerId={config ? editLayerId : null} tool={tool}
               reloadToken={reloadToken} mapRef={mapRef}
               basemaps={basemaps} baseId={baseId} overlayIds={overlayIds}
               onIdentify={openFeature}
@@ -337,6 +367,7 @@ export default function App() {
               onDrawn={(layerId, geometry) => guard(() =>
                 setSelection({ layerId, isNew: true, feature: { type: "Feature", id: "", geometry, properties: {} } }))}
               onGeometryModified={async (layerId, pk, geometry) => {
+                if (!config) return;
                 try {
                   await api.updateFeature(config.slug, layerId, pk, { geometry }, config.crs);
                   setReloadToken((t) => t + 1);
@@ -384,6 +415,16 @@ export default function App() {
         <UnsavedDialog onSave={() => resolvePending("save")} onDiscard={() => resolvePending("discard")}
           onCancel={() => resolvePending("cancel")} />
       )}
+
+      {showPrint && mapConfig && mapRef.current && (() => {
+        const map = mapRef.current;
+        const view = map.getView();
+        return (
+          <PrintDialog config={mapConfig} basemaps={printBasemaps} wmsLayers={config ? wmsLayers : []}
+            layerNames={printLayerNames} extent={view.calculateExtent(map.getSize())} center={view.getCenter() ?? [0, 0]}
+            onClose={() => setShowPrint(false)} />
+        );
+      })()}
 
       {showAdmin && user?.is_admin && (
         <AdminPanel onClose={() => setShowAdmin(false)} onChanged={refreshSession} />

@@ -51,7 +51,9 @@ const wmtsProjection = (crs: string) => (crs === "OGC:CRS84" ? "EPSG:4326" : crs
  * wmts/xyz: kafle prosto z serwisu (inny układ niż mapa = przeliczenie w przeglądarce).
  * sophia: kafle WMS z projektu Sophii przez /ows (autoryzacja + wspólny cache nginx).
  */
-export function basemapLayer(b: Basemap, mapCrs: string): TileLayer {
+/** crossOrigin: wydruk w przeglądarce składa obraz z kafli — wymaga CORS (ekranowa mapa go nie wymaga). */
+export function basemapLayer(b: Basemap, mapCrs: string, crossOrigin = false): TileLayer {
+  const co = crossOrigin ? "anonymous" : undefined;
   const c = b.config;
   const attributions = b.attribution ?? undefined;
   let source;
@@ -66,10 +68,10 @@ export function basemapLayer(b: Basemap, mapCrs: string): TileLayer {
     source = new WMTS({
       url: c.url, layer: c.layer, matrixSet: c.matrix_set, format: c.format, style: c.style ?? "default",
       requestEncoding: c.request_encoding === "REST" ? "REST" : "KVP",
-      projection: wmtsProjection(g.crs), tileGrid, wrapX: false, attributions, transition: 0,
+      projection: wmtsProjection(g.crs), tileGrid, wrapX: false, attributions, transition: 0, crossOrigin: co,
     });
   } else if (b.kind === "xyz") {
-    source = new XYZ({ url: c.url, maxZoom: c.max_zoom ?? 19, attributions, transition: 0 });
+    source = new XYZ({ url: c.url, maxZoom: c.max_zoom ?? 19, attributions, transition: 0, crossOrigin: co });
   } else {
     const format: string = c.format ?? PNG8;
     source = new TileWMS({
@@ -79,7 +81,7 @@ export function basemapLayer(b: Basemap, mapCrs: string): TileLayer {
         TRANSPARENT: format === "image/jpeg" ? "false" : "true", TILED: "true", V: b.version,
       },
       tileGrid: tileGridFor(mapCrs), projection: mapCrs, serverType: "qgis", hidpi: false, transition: 0,
-      attributions,
+      attributions, crossOrigin: co,
     });
   }
   return new TileLayer({ source, opacity: b.opacity, preload: 1, properties: { basemapId: b.id } });

@@ -112,6 +112,17 @@ export const IconAddRecord = (p: P) => (
   </Svg>
 );
 
+/** Wydruk widoku mapy. */
+export const IconPrint = (p: P) => (
+  <Svg {...p}>
+    <rect x="6" y="2.5" width="12" height="6" fill="#fff" stroke={C.line} strokeWidth="1.2" />
+    <rect x="2.5" y="8" width="19" height="9" rx="1.5" fill="#dfe6ee" stroke={C.line} strokeWidth="1.2" />
+    <rect x="6" y="13.5" width="12" height="8" fill="#fff" stroke={C.line} strokeWidth="1.2" />
+    <path d="M8 16.5h8M8 19h6" stroke={C.blue} strokeWidth="1.1" />
+    <circle cx="18.5" cy="11" r="1" fill={C.green} />
+  </Svg>
+);
+
 /** Tabela atrybutów. */
 export const IconTable = (p: P) => (
   <Svg {...p}>

@@ -3,7 +3,7 @@ import type { LayerInfo, ProjectConfig } from "../types";
 import type { Tool } from "./MapView";
 import {
   GEOMETRY_ICON, IconAddPolygon, IconAddRecord, IconDelete, IconEdit, IconFetchBuilding, IconFetchParcel, IconIdentify,
-  IconLayers, IconSelect, IconTable, IconVertex,
+  IconLayers, IconPrint, IconSelect, IconTable, IconVertex,
 } from "./Icons";
 
 const DRAW_LABEL = { Point: "Dodaj obiekt punktowy", Line: "Dodaj obiekt liniowy", Polygon: "Dodaj obiekt poligonowy" };
@@ -24,7 +24,7 @@ function ToolButton({ icon: Icon, label, active, disabled, onClick }: {
  * Narzędzia edycji są zawsze widoczne; bez aktywnej warstwy edycyjnej są wyszarzone.
  */
 export function Toolbar({ config, editLayerId, onEditLayer, tool, onTool, canDelete, onDelete, onNewRecord,
-  sidebarOpen, onToggleSidebar, fetchToolId, onFetchTool, onOpenTable }: {
+  sidebarOpen, onToggleSidebar, fetchToolId, onFetchTool, onOpenTable, onPrint }: {
   config: ProjectConfig | null;
   editLayerId: string | null;
   onEditLayer: (id: string | null) => void;
@@ -38,6 +38,7 @@ export function Toolbar({ config, editLayerId, onEditLayer, tool, onTool, canDel
   fetchToolId: string | null;      // aktywne narzędzie pobierania (ULDK…)
   onFetchTool: (id: string) => void;
   onOpenTable: () => void;         // tabela atrybutów warstwy edycyjnej
+  onPrint: (() => void) | null;    // wydruk widoku mapy (null = mapa jeszcze niegotowa)
 }) {
   const editable: LayerInfo[] = Object.values(config?.layers ?? {})
     .filter((l) => l.perms.insert || l.perms.update || l.perms.delete)
@@ -53,6 +54,7 @@ export function Toolbar({ config, editLayerId, onEditLayer, tool, onTool, canDel
       <span className="sep" />
       <ToolButton icon={IconIdentify} label="Identyfikuj obiekty" active={tool === "identify"}
         disabled={!config} onClick={() => onTool("identify")} />
+      <ToolButton icon={IconPrint} label="Wydruk widoku mapy (PDF)" disabled={!onPrint} onClick={() => onPrint?.()} />
 
       {config && editable.length > 0 && (
         <>

@@ -108,12 +108,13 @@ Potrzebny do projektów z podziałem danych na jednostki terenowe (centrala widz
 - [ ] Edytor schematu bazy w WebUI (tabele, kolumny, relacje, słowniki) — patrz ARCHITECTURE.md.
 - [ ] `sync-rasters.ps1`: wysyła nowe arkusze biblioteki, przebudowuje VRT i piramidy,
       restartuje QGIS Server i czyści cache kafli.
-- [ ] Podkład z katalogu w wydruku widoku mapy (GetPrint).
+- [x] Podkład z katalogu w wydruku widoku mapy — wydruk w przeglądarce (`web/src/print.ts`): bieżący widok
+      z podkładami i warstwami na A4/A3, tytuł, skala, podziałka, data, źródła. QGIS Server 4.2 nie tworzy
+      warstw zewnętrznych (`EXTERNAL_WMS:`), a żaden projekt nie ma szablonu wydruku.
 - [ ] Sprzątanie plików osieroconych w `data/uploads` (zdjęcie usunięte z pola/rekordu zostaje na dysku).
 - [ ] `config/pg_service.conf` poza gitem (w repo tylko `pg_service.conf.example`), żeby
       hasło na serwerze nie blokowało `git pull`.
-- [ ] Mapa (z podkładami) także bez wybranego projektu / dla niezalogowanych.
-- [ ] Szew 5076 | 5077 (~30–50 m): dodatkowe punkty georeferencji po lewej stronie 5077.
+- [x] Mapa (z podkładami) także bez wybranego projektu / dla niezalogowanych (razem z wydrukiem).
 
 ## Na sam koniec
 

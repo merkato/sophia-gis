@@ -43,6 +43,7 @@ wyszarzone.
 |---|---|---|
 | warstwy (trzy arkusze) | pokaż / ukryj panel warstw i podkładów | panel Warstwy |
 | niebieskie „i” | **Identyfikuj obiekty** — kliknięcie otwiera obiekt w formularzu | Identyfikuj obiekty |
+| drukarka | **Wydruk widoku mapy** — strona A4/A3 do druku lub zapisu jako PDF | Nowy układ wydruku |
 | żółty ołówek + lista | **Włącz / zakończ edycję** i wybór warstwy edycyjnej | Przełącz edycję |
 | przerywany prostokąt ze strzałką | **Zaznacz obiekt** warstwy edycyjnej | Zaznacz obiekty |
 | zielony punkt / linia / poligon z gwiazdką | **Dodaj obiekt** — ikona zależy od typu geometrii warstwy | Dodaj obiekt punktowy / liniowy / poligonowy |
@@ -51,6 +52,21 @@ wyszarzone.
 | czerwony kosz | **Usuń zaznaczony obiekt** (z potwierdzeniem) | Usuń zaznaczone |
 | tabela z niebieskim nagłówkiem | **Otwórz tabelę atrybutów** warstwy edycyjnej | Otwórz tabelę atrybutów |
 | obrys działki / domek z niebieską strzałką | **Pobierz z ULDK** — działka lub budynek z kliknięcia do warstwy ([uldk.md](uldk.md)) | — (wtyczki ULDK) |
+
+### Wydruk widoku mapy
+- Ikona drukarki na pasku otwiera okno wydruku: **tytuł**, opcjonalny **opis** (np. sygnatura
+  sprawy), **papier** A4/A3, **orientacja**, **jakość** (96 / 150 / 200 dpi) i **skala** — cały
+  widoczny obszar albo stała skala (1:500 … 1:500 000) wokół środka widoku.
+- Wydruk zawiera to, co widać na mapie: wybrany **podkład** i nakładki z katalogu (ortofotomapa,
+  mapa topograficzna, cieniowanie…) oraz włączone warstwy projektu, a do tego tytuł, strzałkę
+  północy, skalę z podziałką, datę, listę warstw i źródła podkładów.
+- Strona otwiera się w nowej karcie; **Drukuj / zapisz jako PDF** wysyła ją do drukarki albo do pliku.
+  Jeśli nic się nie otwiera, zezwól przeglądarce na wyskakujące okna dla Sophii.
+- Wydruki z szablonów QGIS (raporty, atlas) działają jak dotąd — panel boczny, sekcja „Wydruki”.
+
+### Mapa bez projektu
+Bez zalogowania (albo bez dostępu do żadnego projektu) Sophia pokazuje mapę z podkładami
+z katalogu — na całą Polskę, z możliwością przełączania podkładów i wydruku.
 
 ### Tabela atrybutów
 - Otwierasz ją ikoną tabeli przy warstwie w panelu warstw (każda warstwa z bazy) albo ikoną

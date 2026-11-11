@@ -29,7 +29,7 @@ import { PNG8, basemapLayer, ensureBasemapProjections, tileGridFor } from "../ti
 // Podkłady (ortofoto, topo, OSM...) pochodzą z katalogu Sophii, nie z projektu.
 
 /** Nazwa WMS -> format kafli dla warstw rastrowych i mozaik (pozostałe = wektory). */
-function tileFormats(config: ProjectConfig): Map<string, string> {
+export function tileFormats(config: ProjectConfig): Map<string, string> {
   const out = new Map<string, string>();
   for (const l of Object.values(config.layers)) if (l.tile_format) out.set(l.wms_name, l.tile_format);
   const walk = (n: TreeNode) => {
