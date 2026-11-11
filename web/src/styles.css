@@ -218,6 +218,11 @@ ul.plain li { padding: 4px 0; }
 .preview-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
 .preview-map { flex: 1; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; background: #f2f2ee; }
 
+/* --- pliki (uploady) w panelu */
+.uploads-tab .inline { gap: 12px; margin: 6px 0; }
+.uploads-tab ul.small { font-size: 12px; max-height: 160px; overflow: auto; margin: 4px 0 0; }
+.uploads-tab td { vertical-align: top; }
+
 /* --- dostęp grup do projektu */
 .access-editor { width: 440px; }
 .access-editor fieldset.grant.off { opacity: .75; }

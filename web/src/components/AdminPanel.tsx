@@ -2,10 +2,11 @@ import { useCallback, useEffect, useState } from "react";
 import { adminApi, type UserInput } from "../api";
 import type { AdminProject, AdminUser, Basemap, Group, ProjectAccess } from "../types";
 import { AccessEditor } from "./AccessEditor";
+import { UploadsTab } from "./UploadsTab";
 import { BasemapEditor } from "./BasemapEditor";
 
-type Tab = "users" | "groups" | "projects" | "basemaps";
-const TABS: [Tab, string][] = [["users", "Użytkownicy"], ["groups", "Grupy"], ["projects", "Projekty"], ["basemaps", "Podkłady"]];
+type Tab = "users" | "groups" | "projects" | "basemaps" | "uploads";
+const TABS: [Tab, string][] = [["users", "Użytkownicy"], ["groups", "Grupy"], ["projects", "Projekty"], ["basemaps", "Podkłady"], ["uploads", "Pliki"]];
 
 /** Panel administratora: pełnoekranowa nakładka nad mapą. onChanged = odśwież menu projektów/podkłady. */
 export function AdminPanel({ onClose, onChanged }: { onClose: () => void; onChanged: () => void }) {
@@ -34,6 +35,7 @@ export function AdminPanel({ onClose, onChanged }: { onClose: () => void; onChan
         {tab === "groups" && <GroupsTab run={run} />}
         {tab === "projects" && <ProjectsTab run={run} onChanged={onChanged} />}
         {tab === "basemaps" && <BasemapsTab run={run} onChanged={onChanged} />}
+        {tab === "uploads" && <UploadsTab run={run} />}
       </div>
     </div>
   );

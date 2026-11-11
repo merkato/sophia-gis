@@ -126,6 +126,11 @@ export const adminApi = {
   projectAccess: (id: number) => request<ProjectAccess>(`/api/admin/projects/${id}/access`),
   setProjectAccess: (id: number, a: ProjectAccess) => request(`/api/admin/projects/${id}/access`, json("PUT", a)),
   projectScope: (id: number) => request<ProjectScopeInfo>(`/api/admin/projects/${id}/scope`),
+  uploads: (minAgeDays: number) => request<UploadsOverview>(`/api/admin/uploads?min_age_days=${minAgeDays}`),
+  cleanupUploads: (id: number, minAgeDays: number) =>
+    request<{ moved: number; size: number }>(`/api/admin/uploads/${id}/cleanup?min_age_days=${minAgeDays}`, { method: "POST" }),
+  purgeTrash: (id: number, olderThanDays: number) =>
+    request<{ deleted: number; size: number }>(`/api/admin/uploads/${id}/purge-trash?older_than_days=${olderThanDays}`, { method: "POST" }),
 
   basemaps: () => request<Basemap[]>("/api/admin/basemaps"),
   createBasemap: (b: BasemapInput) => request<Basemap>("/api/admin/basemaps", json("POST", b)),
@@ -134,6 +139,17 @@ export const adminApi = {
   capabilities: (src: { url?: string; xml?: string }) =>
     request<WmtsCapabilities>("/api/admin/basemaps/capabilities", json("POST", src)),
 };
+
+/** Pliki zdjęć i dokumentów w projektach (zakładka „Pliki” panelu). */
+export interface UploadsOverview {
+  min_age_days: number;
+  projects: {
+    project_id: number; title: string; slug: string; files: number; size: number;
+    orphans: number; orphans_size: number; orphan_paths: string[]; recent: number; missing: number;
+    trash_files: number; trash_size: number; error: string | null;
+  }[];
+  unregistered: { slug: string; files: number; size: number }[];
+}
 
 export type UserInput = Omit<AdminUser, "id" | "last_login_at"> & { password?: string };
 export type BasemapInput = Omit<Basemap, "id" | "version">;

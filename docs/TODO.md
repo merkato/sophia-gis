@@ -111,7 +111,8 @@ Potrzebny do projektów z podziałem danych na jednostki terenowe (centrala widz
 - [x] Podkład z katalogu w wydruku widoku mapy — wydruk w przeglądarce (`web/src/print.ts`): bieżący widok
       z podkładami i warstwami na A4/A3, tytuł, skala, podziałka, data, źródła. QGIS Server 4.2 nie tworzy
       warstw zewnętrznych (`EXTERNAL_WMS:`), a żaden projekt nie ma szablonu wydruku.
-- [ ] Sprzątanie plików osieroconych w `data/uploads` (zdjęcie usunięte z pola/rekordu zostaje na dysku).
+- [x] Sprzątanie plików osieroconych w `data/uploads` — `api/app/uploads.py` (kosz projektu, próg 7 dni),
+      panel → Pliki, `python -m app.uploads`; opis w `docs/SERVER.md` (5b).
 - [ ] `config/pg_service.conf` poza gitem (w repo tylko `pg_service.conf.example`), żeby
       hasło na serwerze nie blokowało `git pull`.
 - [x] Mapa (z podkładami) także bez wybranego projektu / dla niezalogowanych (razem z wydrukiem).

@@ -33,9 +33,10 @@ tar -czf "$DEST/projects.tar.gz" -C "$APP_DIR/data" \
   --exclude='*.jp2' --exclude='*.ecw' --exclude='*.vrt' --exclude='*.aux.xml' \
   projects
 
-# 3. Zdjęcia i dokumenty wysłane z WebUI (bez miniatur — odtwarzają się same)
+# 3. Zdjęcia i dokumenty wysłane z WebUI (bez miniatur — odtwarzają się same — i bez kosza:
+#    pliki w koszu są już w starszych kopiach)
 if [[ -d "$APP_DIR/data/uploads" ]]; then
-  tar -czf "$DEST/uploads.tar.gz" -C "$APP_DIR/data" --exclude='.miniatury' uploads
+  tar -czf "$DEST/uploads.tar.gz" -C "$APP_DIR/data" --exclude='.miniatury' --exclude='.kosz' uploads
 fi
 
 # 4. Konfiguracja (zawiera hasła — katalog kopii ma prawa 700)

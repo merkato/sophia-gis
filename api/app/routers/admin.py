@@ -13,6 +13,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from pydantic import BaseModel
 
+from .. import uploads
 from ..config import get_settings
 from ..db import layer_conn, portal_conn
 from ..qgsproject import get_project
@@ -223,6 +224,57 @@ async def set_project_access(project_id: int, groups: list[ProjectAccessIn], lay
                    VALUES (%s, %s, %s, %s, %s, %s, %s)""",
                 (project_id, la.group_id, la.layer_id, la.can_view, la.can_insert, la.can_update, la.can_delete))
     return {"ok": True}
+
+
+# ------------------------------------------------------------------------------ pliki (uploady)
+
+async def _project_for_uploads(project_id: int):
+    row = await _exec("SELECT slug, file_name FROM portal.projects WHERE id=%s", (project_id,))
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Nieznany projekt")
+    path = (get_settings().projects_dir / row["file_name"]).resolve()
+    return row["slug"], (get_project(path) if path.exists() else None)
+
+
+@router.get("/uploads")
+async def uploads_overview(min_age_days: float = 7):
+    """Pliki zdjęć i dokumentów w projektach: ile ich jest, ile osieroconych, ile w koszu.
+    Katalogi uploadów bez zarejestrowanego projektu — tylko rozmiar (do ręcznej decyzji)."""
+    rows = await _all("SELECT id, slug, title, file_name FROM portal.projects ORDER BY sort_order, title")
+    out, known = [], set()
+    for r in rows:
+        known.add(r["slug"])
+        path = (get_settings().projects_dir / r["file_name"]).resolve()
+        rep = await uploads.analyze(r["slug"], get_project(path) if path.exists() else None, min_age_days)
+        out.append({"project_id": r["id"], "title": r["title"], **rep.as_dict()})
+    root = get_settings().uploads_dir
+    unregistered = []
+    if root.is_dir():
+        for d in sorted(p for p in root.iterdir() if p.is_dir() and p.name not in known):
+            files = uploads.scan_files(d)
+            unregistered.append({"slug": d.name, "files": len(files), "size": sum(f.size for f in files)})
+    return {"projects": out, "unregistered": unregistered, "min_age_days": min_age_days}
+
+
+@router.post("/uploads/{project_id}/cleanup")
+async def uploads_cleanup(project_id: int, min_age_days: float = 7):
+    """Przenosi osierocone pliki projektu do kosza (.kosz/<data>/…). Nic nie jest kasowane."""
+    if min_age_days < 1:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Próg wieku pliku: co najmniej 1 dzień")
+    slug, project = await _project_for_uploads(project_id)
+    rep = await uploads.analyze(slug, project, min_age_days)
+    if rep.error:
+        raise HTTPException(status.HTTP_409_CONFLICT, rep.error)
+    moved = uploads.move_to_trash(slug, [f.path for f in rep.orphans])
+    return {"moved": moved, "size": sum(f.size for f in rep.orphans)}
+
+
+@router.post("/uploads/{project_id}/purge-trash")
+async def uploads_purge(project_id: int, older_than_days: float = 30):
+    """Trwale usuwa z kosza projektu wpisy starsze niż `older_than_days` (0 = cały kosz)."""
+    slug, _ = await _project_for_uploads(project_id)
+    n, size = uploads.purge_trash(slug, older_than_days)
+    return {"deleted": n, "size": size}
 
 
 @router.get("/projects/{project_id}/scope")

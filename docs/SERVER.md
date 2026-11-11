@@ -223,6 +223,29 @@ w projekcie to samo `service='sophia' … table=…`. Na serwerze ta sama nazwa 
 kontener `db`, więc projekt działa po publikacji bez żadnych zmian. Nie zapisuj w połączeniu
 loginu ani hasła: trafiłyby do projektu, a diagnostyka Fii zgłosi taką warstwę.
 
+## 5b. Osierocone pliki zdjęć i dokumentów
+
+Zdjęcie usunięte z pola albo rekord zdjęcia/dokumentu usunięty w WebUI zostawia plik w
+`data/uploads/<projekt>/`. Sprzątanie jest w panelu administratora (zakładka **Pliki**) albo z konsoli:
+
+```bash
+docker compose exec api python -m app.uploads              # raport (nic nie zmienia)
+docker compose exec api python -m app.uploads --apply      # sieroty starsze niż 7 dni -> kosz projektu
+docker compose exec api python -m app.uploads --purge 30   # usuń z koszy wpisy starsze niż 30 dni
+```
+
+- Osierocony = brak odwołania w jakimkolwiek rekordzie warstw projektu (wszystkie rekordy, bez filtrów).
+- Pliki młodsze niż 7 dni (`--min-age`) zostają — mogą czekać na zapis formularza.
+- Pliki trafiają do `data/uploads/<projekt>/.kosz/<data>/…` z zachowaniem ścieżki; odzyskanie =
+  przeniesienie z powrotem. Kopia zapasowa pomija kosz.
+- Gdy którejś warstwy nie da się odczytać (np. baza niedostępna), projekt jest pomijany.
+
+Automatycznie, np. co tydzień (cron użytkownika z dostępem do Dockera):
+
+```bash
+0 4 * * 0  cd /opt/sophia && docker compose exec -T api python -m app.uploads --apply --purge 30 >> /var/log/sophia-uploads.log 2>&1
+```
+
 ## 6. Kopie zapasowe
 
 ```bash
