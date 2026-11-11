@@ -61,6 +61,7 @@ class LayerDef:
     popup: bool = True
     hidden: bool = False
     tile_format: str | None = None      # rastry: format kafli w WebUI (None = wektor, bez kafli)
+    source: str | None = None           # źródło warstw WMS/WMTS/XYZ — dopasowanie podkładu z katalogu do wydruku
     # zakres danych (app/scope.py): spatial | attribute | relation | none; "auto" rozstrzygane po wczytaniu
     scope_mode: str = "none"
     scope_field: str | None = None
@@ -110,6 +111,30 @@ class ReportDef:
     layout: str
     title: str
     layer_id: str | None = None         # warstwa atlasu — raport "dla obiektu"
+    map_mm: list[float] | None = None   # rozmiar pierwszej mapy szablonu [szer., wys.] w mm (= map0 w GetPrint)
+    labels: list[str] = field(default_factory=list)   # identyfikatory etykiet (np. tytul, opis)
+
+
+_UNIT_MM = {"mm": 1.0, "cm": 10.0, "m": 1000.0, "in": 25.4, "pt": 25.4 / 72, "pica": 25.4 / 6}
+MAP_ITEM, LABEL_ITEM = "65639", "65641"   # typy elementów układu QGIS (QgsLayoutItemRegistry)
+
+
+def layout_items(layout_el: etree._Element) -> tuple[list[float] | None, list[str]]:
+    """(rozmiar pierwszej mapy w mm, identyfikatory etykiet). QGIS Server adresuje mapy KOLEJNOŚCIĄ:
+    map0 = pierwsza mapa układu, niezależnie od jej identyfikatora."""
+    map_mm, labels = None, []
+    for item in layout_el.iter("LayoutItem"):
+        typ = item.get("type")
+        if map_mm is None and (typ == MAP_ITEM or item.find("Extent") is not None):
+            try:
+                w, h, unit = (item.get("size") or "").split(",")
+                k = _UNIT_MM.get(unit.strip(), 1.0)
+                map_mm = [round(float(w) * k, 2), round(float(h) * k, 2)]
+            except ValueError:
+                pass
+        elif (typ == LABEL_ITEM or item.get("labelText") is not None) and item.get("id"):
+            labels.append(item.get("id"))
+    return map_mm, labels
 
 
 @dataclass
@@ -395,6 +420,8 @@ def load_project(path: Path) -> Project:
         )
         if lyr.type == "raster":
             lyr.tile_format = raster_tile_format(provider, ml.findtext("datasource") or "")
+            if provider == "wms":
+                lyr.source = ml.findtext("datasource") or None
         if lyr.type == "vector":
             lyr.fields = _parse_fields(ml)
             if provider == "postgres":
@@ -438,7 +465,9 @@ def load_project(path: Path) -> Project:
             continue
         atlas = layout_el.find("Atlas")
         atlas_layer = atlas.get("coverageLayer") if atlas is not None and atlas.get("enabled") == "1" else None
-        reports.append(ReportDef(layout=name, title=rc.get("title", name), layer_id=atlas_layer))
+        map_mm, labels = layout_items(layout_el)
+        reports.append(ReportDef(layout=name, title=rc.get("title", name), layer_id=atlas_layer,
+                                 map_mm=map_mm, labels=labels))
 
     crs = root.findtext("./projectCrs/spatialrefsys/authid") or "EPSG:2180"
 

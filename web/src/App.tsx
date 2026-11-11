@@ -7,7 +7,7 @@ import { MapView, type Tool } from "./components/MapView";
 import { LayerTree, initialVisibility, nodeKey, visibleWmsNames } from "./components/LayerTree";
 import { FeaturePanel, type FeaturePanelHandle } from "./components/FeaturePanel";
 import { AttributeTable } from "./components/AttributeTable";
-import { PrintDialog } from "./components/PrintDialog";
+import { PrintPanel } from "./components/PrintPanel";
 import GeoJSON from "ol/format/GeoJSON";
 import { Toolbar } from "./components/Toolbar";
 import { FetchCard } from "./components/FetchCard";
@@ -76,6 +76,7 @@ export default function App() {
   const [baseReady, setBaseReady] = useState(false);
   useEffect(() => { ensureProjection("EPSG:2180").then(() => setBaseReady(true)).catch(() => setBaseReady(true)); }, []);
   const [showPrint, setShowPrint] = useState(false);
+  const [printFrame, setPrintFrame] = useState<[number, number] | null>(null);
   const [editLayerId, setEditLayerId] = useState<string | null>(null);
   const [tool, setTool] = useState<Tool>("identify");
   const [selection, setSelection] = useState<Selection | null>(null);
@@ -216,7 +217,7 @@ export default function App() {
 
   // tabela atrybutów (okno na środku ekranu) — jedna naraz
   const [tableLayerId, setTableLayerId] = useState<string | null>(null);
-  useEffect(() => { setTableLayerId(null); }, [slug]);
+  useEffect(() => { setTableLayerId(null); setShowPrint(false); }, [slug]);
   const tableIds = useMemo(
     () => new Set(Object.values(config?.layers ?? {}).filter((l) => l.primary_key && l.type === "vector").map((l) => l.id)),
     [config]);
@@ -333,21 +334,6 @@ export default function App() {
                 onEditLayer={chooseEditLayer} tableIds={tableIds} onOpenTable={setTableLayerId} />
 
 
-              {config.reports.some((r) => !r.layer_id) && (
-                <section>
-                  <h3>Wydruki</h3>
-                  {config.reports.filter((r) => !r.layer_id).map((r) => (
-                    <button key={r.layout} className="block" onClick={() => {
-                      const map = mapRef.current;
-                      if (!map) return;
-                      const extent = map.getView().calculateExtent(map.getSize());
-                      window.open(api.reportUrl(config.slug, r.layout, {
-                        extent: extent.join(","), layers: [...wmsLayers].reverse().join(","),
-                      }), "_blank");
-                    }}>🖨 {r.title}</button>
-                  ))}
-                </section>
-              )}
             </>
           ) : <p className="muted">{projects.length ? "Wybierz projekt z menu." : user
             ? "Nie masz dostępu do żadnego projektu — poproś administratora o nadanie uprawnień."
@@ -363,6 +349,7 @@ export default function App() {
               onIdentify={openFeature}
               onFetchClick={fetchAt}
               preview={fetchTool ? fetchState.result?.geometry ?? null : null}
+              printFrame={showPrint ? printFrame : null}
               onSelect={(layerId, feature) => guard(() => setSelection({ layerId, feature, isNew: false }))}
               onDrawn={(layerId, geometry) => guard(() =>
                 setSelection({ layerId, isNew: true, feature: { type: "Feature", id: "", geometry, properties: {} } }))}
@@ -392,6 +379,16 @@ export default function App() {
               onOpenExisting={(r) => openFeature(r.layer_id, r.existing_pk!)}
               onClose={() => chooseTool(editLayerId ? "select" : "identify")} />
           )}
+          {showPrint && mapConfig && (
+            <PrintPanel config={mapConfig} basemaps={printBasemaps} wmsLayers={config ? wmsLayers : []}
+              layerNames={printLayerNames} onFrame={setPrintFrame} onClose={() => setShowPrint(false)}
+              getView={() => {
+                const map = mapRef.current;
+                if (!map) return null;
+                const view = map.getView();
+                return { extent: view.calculateExtent(map.getSize()), center: view.getCenter() ?? [0, 0] };
+              }} />
+          )}
           {message && <div className="toast" onClick={() => setMessage(null)}>{message}</div>}
           {config && selection && (
             <FeaturePanel
@@ -415,16 +412,6 @@ export default function App() {
         <UnsavedDialog onSave={() => resolvePending("save")} onDiscard={() => resolvePending("discard")}
           onCancel={() => resolvePending("cancel")} />
       )}
-
-      {showPrint && mapConfig && mapRef.current && (() => {
-        const map = mapRef.current;
-        const view = map.getView();
-        return (
-          <PrintDialog config={mapConfig} basemaps={printBasemaps} wmsLayers={config ? wmsLayers : []}
-            layerNames={printLayerNames} extent={view.calculateExtent(map.getSize())} center={view.getCenter() ?? [0, 0]}
-            onClose={() => setShowPrint(false)} />
-        );
-      })()}
 
       {showAdmin && user?.is_admin && (
         <AdminPanel onClose={() => setShowAdmin(false)} onChanged={refreshSession} />

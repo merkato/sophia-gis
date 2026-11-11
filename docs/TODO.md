@@ -110,7 +110,10 @@ Potrzebny do projektów z podziałem danych na jednostki terenowe (centrala widz
       restartuje QGIS Server i czyści cache kafli.
 - [x] Podkład z katalogu w wydruku widoku mapy — wydruk w przeglądarce (`web/src/print.ts`): bieżący widok
       z podkładami i warstwami na A4/A3, tytuł, skala, podziałka, data, źródła. QGIS Server 4.2 nie tworzy
-      warstw zewnętrznych (`EXTERNAL_WMS:`), a żaden projekt nie ma szablonu wydruku.
+      warstw zewnętrznych (`EXTERNAL_WMS:`). Szablony QGIS: panel „Wydruk” (stałe skale, ramka na mapie,
+      tytuł/opis do etykiet `tytul`/`opis`, podkład z warstwy projektu tej samej usługi) — `docs/user/wydruki.md`.
+      Poprawione: GetPrint w WMS 1.1.1 (w 1.3.0 EPSG:2180 ma osie y,x — wydruk trafiał obok) i kolejność
+      warstw (pierwsza = spód).
 - [x] Sprzątanie plików osieroconych w `data/uploads` — `api/app/uploads.py` (kosz projektu, próg 7 dni),
       panel → Pliki, `python -m app.uploads`; opis w `docs/SERVER.md` (5b).
 - [ ] `config/pg_service.conf` poza gitem (w repo tylko `pg_service.conf.example`), żeby

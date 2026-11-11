@@ -168,10 +168,16 @@ button.block, .reports .button { display: block; width: 100%; text-align: left; 
 .login h2 { margin: 0 0 6px; }
 .dialog { background: var(--surface); padding: 18px 20px; border-radius: 10px; width: min(360px, calc(100% - 32px));
   box-shadow: 0 12px 32px rgba(0,0,0,.3); }
-.print-dialog { width: min(460px, calc(100% - 32px)); }
-.print-dialog .inline { gap: 8px; align-items: flex-start; }
-.print-dialog .inline .field { flex: 1; }
-.print-dialog .field input, .print-dialog .field select { width: 100%; }
+/* --- panel wydruku (obok mapy; mapa zostaje aktywna) */
+.print-panel { position: absolute; z-index: 7; top: 10px; right: 10px; width: min(340px, calc(100% - 20px));
+  max-height: calc(100% - 20px); overflow: auto; background: var(--surface); border: 1px solid var(--line);
+  border-radius: 10px; padding: 10px 14px; box-shadow: 0 8px 24px rgba(0,0,0,.2); }
+.print-panel header { display: flex; align-items: center; justify-content: space-between; }
+.print-panel h3 { margin: 0; font-size: 15px; }
+.print-panel .inline { gap: 8px; align-items: flex-start; }
+.print-panel .inline .field { flex: 1; min-width: 0; }
+.print-panel .field input, .print-panel .field select { width: 100%; }
+.print-panel .notice { font-size: 12px; }
 .dialog h3 { margin: 0 0 6px; font-size: 16px; }
 .dialog p { margin: 0; color: var(--muted); }
 

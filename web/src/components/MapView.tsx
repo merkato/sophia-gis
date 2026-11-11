@@ -17,6 +17,8 @@ import { Circle, Fill, Stroke, Style } from "ol/style";
 import { unByKey } from "ol/Observable";
 import type { EventsKey } from "ol/events";
 import type Feature from "ol/Feature";
+import OlFeature from "ol/Feature";
+import { fromExtent as polygonFromExtent } from "ol/geom/Polygon";
 import type { Geometry } from "ol/geom";
 import { api } from "../api";
 import type { Basemap, GeoJSONFeature, ProjectConfig, TreeNode } from "../types";
@@ -57,6 +59,7 @@ interface Props {
   onGeometryModified: (layerId: string, pk: string, geometry: GeoJSONFeature["geometry"]) => void;
   onFetchClick?: (coordinate: number[]) => void;         // narzędzie pobierania (ULDK…)
   preview?: GeoJSONFeature["geometry"] | null;           // obrys pobranego obiektu przed dodaniem
+  printFrame?: [number, number] | null;                  // obszar wydruku [szer., wys.] w metrach, wokół środka widoku
   mapRef: MutableRefObject<OlMap | null>;
 }
 
@@ -72,6 +75,11 @@ const previewStyle = new Style({
   image: new Circle({ radius: 7, fill: new Fill({ color: "#1c7ed6" }), stroke: new Stroke({ color: "#fff", width: 2 }) }),
 });
 
+const frameStyle = new Style({
+  stroke: new Stroke({ color: "#1c7ed6", width: 2.5 }),
+  fill: new Fill({ color: "rgba(28,126,214,0.06)" }),
+});
+
 const DRAW_TYPE = { Point: "Point", Line: "LineString", Polygon: "Polygon" } as const;
 
 export function MapView(props: Props) {
@@ -85,6 +93,7 @@ export function MapView(props: Props) {
   const tileLayersRef = useRef(new Map<string, TileLayer<TileWMS>>());
   const editSourceRef = useRef(new VectorSource<Feature<Geometry>>());
   const previewSourceRef = useRef(new VectorSource<Feature<Geometry>>());
+  const frameSourceRef = useRef(new VectorSource<Feature<Geometry>>());
   const selectRef = useRef<Select | null>(null);
   const cbRef = useRef(props);
   cbRef.current = props;
@@ -118,6 +127,7 @@ export function MapView(props: Props) {
         wmsLayer,
         new VectorLayer({ source: editSourceRef.current, style: editStyle }),
         new VectorLayer({ source: previewSourceRef.current, style: previewStyle }),
+        new VectorLayer({ source: frameSourceRef.current, style: frameStyle }),
       ],
       // Poziomy powiększenia = rozdzielczości siatki kafli: kafle wyświetlane 1:1, ostre.
       view: new View({
@@ -215,6 +225,28 @@ export function MapView(props: Props) {
     return () => { cancelled = true; map.un("moveend", load); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [editLayerId, reloadToken, config.slug]);
+
+  // --- ramka obszaru wydruku: stały rozmiar w terenie, zawsze na środku widoku
+  const { printFrame } = props;
+  useEffect(() => {
+    const map = mapRef.current;
+    const src = frameSourceRef.current;
+    src.clear();
+    if (!map || !printFrame) return;
+    const view = map.getView();
+    const f = new OlFeature<Geometry>();
+    const update = () => {
+      const c = view.getCenter();
+      if (!c) return;
+      const [w, h] = printFrame;
+      f.setGeometry(polygonFromExtent([c[0] - w / 2, c[1] - h / 2, c[0] + w / 2, c[1] + h / 2]));
+    };
+    update();
+    src.addFeature(f);
+    view.on("change:center", update);
+    return () => { view.un("change:center", update); src.clear(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [printFrame?.[0], printFrame?.[1], config.slug]);
 
   // --- podgląd obiektu z narzędzia pobierania
   const { preview } = props;

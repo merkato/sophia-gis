@@ -68,7 +68,9 @@ export interface RelationDef {
 export interface ReportDef {
   layout: string;
   title: string;
-  layer_id: string | null;
+  layer_id: string | null;           // atlas: raport dla obiektu
+  map_mm: [number, number] | null;   // pierwsza mapa szablonu (map0) w mm
+  labels: string[];                  // identyfikatory etykiet (tytul, opis…)
 }
 
 export interface ProjectConfig {

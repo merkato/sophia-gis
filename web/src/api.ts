@@ -93,6 +93,8 @@ export const api = {
     request<FetchResult>(`/api/projects/${enc(slug)}/tools/${enc(toolId)}/fetch?${new URLSearchParams({
       x: String(x), y: String(y), crs })}`),
 
+  reportInfo: (slug: string, layout: string, basemapIds: number[]) =>
+    request<ReportInfo>(`/api/projects/${enc(slug)}/reports/${enc(layout)}/info?basemaps=${basemapIds.join(",")}`),
   reportUrl: (slug: string, layout: string, params: Record<string, string>) =>
     `/api/projects/${enc(slug)}/reports/${enc(layout)}?${new URLSearchParams(params)}`,
 
@@ -139,6 +141,16 @@ export const adminApi = {
   capabilities: (src: { url?: string; xml?: string }) =>
     request<WmtsCapabilities>("/api/admin/basemaps/capabilities", json("POST", src)),
 };
+
+/** Szablon wydruku QGIS dla panelu: rozmiar mapy, etykiety, czy podkład da się wydrukować. */
+export interface ReportInfo {
+  layout: string;
+  map_mm: [number, number] | null;
+  labels: string[];
+  title_label: string | null;
+  note_label: string | null;
+  basemaps: { id: number; name: string; layer: string | null }[];
+}
 
 /** Pliki zdjęć i dokumentów w projektach (zakładka „Pliki” panelu). */
 export interface UploadsOverview {
