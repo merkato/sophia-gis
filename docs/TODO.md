@@ -61,6 +61,9 @@ Lista z 10.11.2026. Kolejność jest kolejnością realizacji (od 11.11.2026).
 - [ ] `sync-rasters.ps1`: wysyła nowe arkusze biblioteki, przebudowuje VRT i piramidy,
       restartuje QGIS Server i czyści cache kafli.
 - [ ] Podkład z katalogu w wydruku widoku mapy (GetPrint).
+- [ ] Sprzątanie plików osieroconych w `data/uploads` (zdjęcie usunięte z pola/rekordu zostaje na dysku).
+- [ ] Zasięg obiektu nadrzędnego także dla list/odczytu rekordów tabel bez geometrii (teraz: zdjęcia
+      i ich pliki; zwykłe rekordy dzieci bez geometrii — tylko uprawnienie do warstwy).
 - [ ] `config/pg_service.conf` poza gitem (w repo tylko `pg_service.conf.example`), żeby
       hasło na serwerze nie blokowało `git pull`.
 - [ ] Mapa (z podkładami) także bez wybranego projektu / dla niezalogowanych.

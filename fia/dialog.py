@@ -11,12 +11,31 @@ from qgis.core import QgsLayerTreeGroup, QgsProject, QgsRasterLayer, QgsSettings
 from qgis.PyQt.QtCore import Qt
 from qgis.PyQt.QtGui import QColor
 from qgis.PyQt.QtWidgets import (
-    QAbstractItemView, QCheckBox, QDialog, QDialogButtonBox, QFileDialog, QFormLayout, QHBoxLayout,
-    QHeaderView, QInputDialog, QLabel, QLineEdit, QMessageBox, QPushButton, QTableWidget,
-    QTableWidgetItem, QTabWidget, QTreeWidget, QTreeWidgetItem, QVBoxLayout, QWidget,
+    QAbstractItemView,
+    QApplication,
+    QCheckBox,
+    QDialog,
+    QDialogButtonBox,
+    QFileDialog,
+    QFormLayout,
+    QHBoxLayout,
+    QHeaderView,
+    QInputDialog,
+    QLabel,
+    QLineEdit,
+    QMessageBox,
+    QProgressDialog,
+    QPushButton,
+    QTableWidget,
+    QTableWidgetItem,
+    QTabWidget,
+    QTreeWidget,
+    QTreeWidgetItem,
+    QVBoxLayout,
+    QWidget,
 )
 
-from . import checks, publish, rasters
+from . import checks, credentials, photosync, publish, rasters
 
 SCOPE = "sophia"
 LEVEL_COLORS = {"error": QColor("#c92a2a"), "warning": QColor("#e67700"), "info": QColor("#1971c2")}
@@ -65,7 +84,7 @@ class FiaDialog(QDialog):
         self.tabs.addTab(self._build_rasters_tab(), "Rastry")
         self.tabs.addTab(self._build_reports_tab(), "Raporty")
         self.tabs.addTab(self._build_diag_tab(), "Diagnostyka")
-        self.tabs.addTab(self._build_publish_tab(), "Publikacja")
+        self.tabs.addTab(self._build_publish_tab(), "Serwer")
 
         buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Save | QDialogButtonBox.StandardButton.Close)
         buttons.button(QDialogButtonBox.StandardButton.Save).setText("Zapisz konfigurację")
@@ -277,6 +296,10 @@ class FiaDialog(QDialog):
         self.login = QLineEdit(s.value("fia/login", "admin"))
         self.password = QLineEdit()
         self.password.setEchoMode(QLineEdit.EchoMode.Password)
+        self.remember = QCheckBox("Zapamiętaj w menedżerze uwierzytelniania QGIS")
+        self.remember.setChecked(bool(credentials.saved_id()))
+        if credentials.saved_id():
+            self.password.setPlaceholderText("zapisane w menedżerze uwierzytelniania QGIS")
         self.verify = QCheckBox("Weryfikuj certyfikat SSL")
         self.verify.setChecked(s.value("fia/verify_ssl", True, type=bool))
         title = self.cfg.get("title") or self.prj.title() or self.prj.baseName()
@@ -284,17 +307,28 @@ class FiaDialog(QDialog):
         self.slug = QLineEdit(self.cfg.get("slug") or slugify(title))
         btn = QPushButton("Zapisz projekt i opublikuj")
         btn.clicked.connect(self.on_publish)
+        sync_btn = QPushButton("Pobierz zdjęcia z serwera do folderu projektu")
+        sync_btn.clicked.connect(self.on_sync_photos)
 
         form = QFormLayout(w)
         form.addRow("Adres portalu", self.url)
-        form.addRow("Login administratora", self.login)
+        form.addRow("Login", self.login)
         form.addRow("Hasło", self.password)
+        form.addRow("", self.remember)
         form.addRow("", self.verify)
         form.addRow("Tytuł projektu (menu)", self.title)
         form.addRow("Identyfikator (URL)", self.slug)
         form.addRow("", btn)
-        form.addRow(QLabel("Hasło nie jest zapisywane. Rastry (data/rasters) kopiuj na serwer osobno — "
-                           "publikacja wysyła tylko plik projektu i konfigurację."))
+        note = QLabel("Publikacja (konto administratora) wysyła tylko plik projektu i konfigurację; "
+                      "rastry biblioteki (data/rasters) kopiuj na serwer osobno.")
+        note.setWordWrap(True)
+        form.addRow(note)
+        form.addRow("", sync_btn)
+        note2 = QLabel("Zdjęcia dodane w WebUI trafiają do podkatalogu „zdjecia” folderu projektu — QGIS pokazuje je "
+                       "w formularzu (widżet Załącznik, ścieżka względna). Pobierane są tylko zdjęcia obiektów, "
+                       "które Twoje konto może oglądać, i tylko nowe lub zmienione pliki.")
+        note2.setWordWrap(True)
+        form.addRow(note2)
         return w
 
     # ------------------------------------------------------------------ zapis / publikacja
@@ -337,6 +371,72 @@ class FiaDialog(QDialog):
                 json.dump(self._portal_json(self.cfg), f, ensure_ascii=False, indent=2)
         self.iface.messageBar().pushSuccess("Fia", "Konfiguracja zapisana (zapisz też projekt).")
 
+    # ------------------------------------------------------------------ logowanie / zdjęcia
+    def _token(self) -> str | None:
+        """Loguje do Sophii: hasło z pola albo z menedżera uwierzytelniania QGIS. Rzuca publish.ApiError."""
+        url, login, password = self.url.text().strip(), self.login.text().strip(), self.password.text()
+        typed = bool(password)
+        if not typed:
+            saved = credentials.load()
+            if saved and (not login or saved[0] == login):
+                login, password = saved
+        if not password:
+            QMessageBox.warning(self, "Fia", "Podaj hasło (albo zapisz je w menedżerze uwierzytelniania QGIS).")
+            return None
+        s = QgsSettings()
+        s.setValue("fia/url", url)
+        s.setValue("fia/login", login)
+        s.setValue("fia/verify_ssl", self.verify.isChecked())
+        token = publish.login(url, login, password, self.verify.isChecked())
+        if self.remember.isChecked() and (typed or not credentials.saved_id()):
+            if not credentials.save(url, login, password):
+                self.iface.messageBar().pushWarning("Fia", "Nie udało się zapisać hasła w menedżerze uwierzytelniania.")
+        elif not self.remember.isChecked() and credentials.saved_id():
+            credentials.forget()
+        self.password.clear()
+        if credentials.saved_id():
+            self.password.setPlaceholderText("zapisane w menedżerze uwierzytelniania QGIS")
+        return token
+
+    def on_sync_photos(self):
+        home = self.prj.homePath()
+        slug = (self.cfg.get("slug") or self.slug.text()).strip()
+        if not self.prj.fileName() or not home:
+            QMessageBox.warning(self, "Fia", "Najpierw zapisz projekt — zdjęcia trafią do jego folderu.")
+            return
+        if not slug:
+            QMessageBox.warning(self, "Fia", "Projekt nie był publikowany — brak identyfikatora (URL).")
+            return
+        prog = QProgressDialog("Pobieranie listy zdjęć…", "Przerwij", 0, 0, self)
+        prog.setWindowTitle("Fia – zdjęcia")
+        prog.setWindowModality(Qt.WindowModality.WindowModal)
+        prog.setMinimumDuration(300)
+
+        def progress(i: int, n: int, path: str) -> bool:
+            prog.setMaximum(n)
+            prog.setValue(i)
+            prog.setLabelText(f"{i + 1} / {n}\n{path}")
+            QApplication.processEvents()
+            return not prog.wasCanceled()
+
+        try:
+            token = self._token()
+            if token is None:
+                return
+            res = photosync.sync(self.url.text().strip(), token, slug, home, self.verify.isChecked(), progress)
+        except publish.ApiError as e:
+            QMessageBox.critical(self, "Fia", f"Pobieranie zdjęć nie powiodło się:\n{e}")
+            return
+        finally:
+            prog.close()
+        msg = f"Pobrano: {res.downloaded}, aktualne: {res.up_to_date}."
+        if res.cancelled:
+            msg += " Przerwano."
+        if res.errors:
+            QMessageBox.warning(self, "Fia", msg + f"\n\nBłędy ({len(res.errors)}):\n" + "\n".join(res.errors[:15]))
+        else:
+            self.iface.messageBar().pushSuccess("Fia", f"Zdjęcia z Sophii → {home}. {msg}")
+
     def on_publish(self):
         if self.run_diagnostics():
             self.tabs.setCurrentIndex(3)
@@ -353,14 +453,11 @@ class FiaDialog(QDialog):
             return
         self.prj.write()
 
-        s = QgsSettings()
-        s.setValue("fia/url", self.url.text().strip())
-        s.setValue("fia/login", self.login.text().strip())
-        s.setValue("fia/verify_ssl", self.verify.isChecked())
         try:
             self.setCursor(Qt.CursorShape.WaitCursor)
-            token = publish.login(self.url.text().strip(), self.login.text().strip(), self.password.text(),
-                                  self.verify.isChecked())
+            token = self._token()
+            if token is None:
+                return
             res = publish.publish(self.url.text().strip(), token, self.cfg["slug"], self.cfg["title"],
                                   self.prj.fileName(), self._portal_json(self.cfg), self.verify.isChecked())
         except publish.ApiError as e:

@@ -1,8 +1,15 @@
 import { useEffect, useState } from "react";
 import { api } from "../api";
 import type { FieldDef } from "../types";
+import { PhotoField, isPhotoField } from "./Photos";
 
-interface Source { slug: string; layerId: string; version: number }
+interface Source {
+  slug: string;
+  layerId: string;
+  version: number;
+  pk?: string | null;                 // zapisany obiekt (null = nowy) — podgląd plików z pól „Załącznik”
+  crs?: string;
+}
 type Option = { value: string; label: string };
 
 // Listy wartości dzielone między formularzami (klucz: projekt/warstwa/pole/wersja projektu)
@@ -44,12 +51,13 @@ function RelationSelect({ field, value, onChange, disabled, source }: {
 }
 
 /** Kontrolka formularza odwzorowująca widżet edycji z projektu QGIS. */
-export function FieldInput({ field, value, onChange, readOnly, source }: {
+export function FieldInput({ field, value, onChange, readOnly, source, saved }: {
   field: FieldDef;
   value: unknown;
   onChange: (v: unknown) => void;
   readOnly: boolean;
-  source?: Source;                    // potrzebne dla widżetów relacyjnych (lista wartości z API)
+  source?: Source;                    // potrzebne dla widżetów relacyjnych i załączników
+  saved?: unknown;                    // wartość zapisana w bazie (odróżnia nowe, niezapisane zdjęcie)
 }) {
   const cfg = field.widget_config as Record<string, unknown>;
   const disabled = readOnly || !field.editable;
@@ -92,6 +100,22 @@ export function FieldInput({ field, value, onChange, readOnly, source }: {
           min={cfg.Min as number | undefined} max={cfg.Max as number | undefined} step={(cfg.Step as number) ?? "any"}
           onChange={(e) => onChange(e.target.value === "" ? null : Number(e.target.value))} />
       );
+    case "ExternalResource":
+      if (source && isPhotoField(field)) {
+        return <PhotoField field={field} value={value} saved={saved} onChange={onChange} disabled={disabled}
+          slug={source.slug} layerId={source.layerId} pk={source.pk ?? null} crs={source.crs ?? "EPSG:2180"} />;
+      }
+      if (source?.pk && str && str === String(saved ?? "")) {
+        // inne pliki (PDF, DOCX…): pobieranie; wysyłanie z WebUI — punkt 5 TODO
+        return (
+          <div className="inline">
+            <input value={str} disabled={disabled} onChange={(e) => onChange(e.target.value || null)} />
+            <a className="button" href={api.fileUrl(source.slug, source.layerId, source.pk, field.name, str)}
+              target="_blank" rel="noreferrer" title="Otwórz plik">📄</a>
+          </div>
+        );
+      }
+      return <input value={str} disabled={disabled} onChange={(e) => onChange(e.target.value || null)} />;
     case "RelationReference":
     case "ValueRelation":
       if (source) return <RelationSelect field={field} value={value} onChange={onChange} disabled={disabled} source={source} />;

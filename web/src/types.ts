@@ -101,6 +101,16 @@ export interface Attachment {
   uploaded_by: string | null;
 }
 
+/** Zdjęcie po przetworzeniu na serwerze (ścieżka względna do wpisania w pole „Załącznik”). */
+export interface PhotoMeta {
+  path: string;
+  width: number;
+  height: number;
+  taken_at: string | null;
+  lon: number | null;
+  lat: number | null;
+}
+
 export interface RelatedGroup {
   relation: string;
   name: string;

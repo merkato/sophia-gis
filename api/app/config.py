@@ -19,6 +19,9 @@ class Settings(BaseSettings):
     projects_dir: Path = Path("/projects")
     attachments_dir: Path = Path("/attachments")
     max_attachment_mb: int = 50
+    # Zdjęcia i pliki wysyłane z WebUI: <uploads_dir>/<slug>/zdjecia/... (data/uploads na hoście)
+    uploads_dir: Path = Path("/uploads")
+    max_photo_mb: int = 40
 
     qgis_server_url: str = "http://qgis:80/"
 

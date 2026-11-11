@@ -60,10 +60,12 @@ services:
       PGSERVICEFILE: /etc/sophia/pg_service.conf
       PROJECTS_DIR: /projects
       ATTACHMENTS_DIR: /attachments
+      UPLOADS_DIR: /uploads
       QGIS_SERVER_URL: http://qgis:80/
     volumes:
       - ./data/projects:/projects        # rw: publikacja projektów z wtyczki QGIS
       - attachments:/attachments
+      - ./data/uploads:/uploads          # zdjęcia z WebUI: data/uploads/<slug>/zdjecia/...
       - ./config/pg_service.conf:/etc/sophia/pg_service.conf:ro
     depends_on:
       db:

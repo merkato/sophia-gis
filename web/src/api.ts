@@ -1,5 +1,5 @@
 import type {
-  AdminProject, AdminUser, Attachment, Basemap, GeoJSONFeature, Group, ProjectAccess, ProjectConfig,
+  AdminProject, AdminUser, Attachment, Basemap, GeoJSONFeature, Group, PhotoMeta, ProjectAccess, ProjectConfig,
   ProjectSummary, RelatedGroup, User, WmtsCapabilities,
 } from "./types";
 
@@ -66,6 +66,22 @@ export const api = {
   },
   deleteAttachment: (slug: string, layerId: string, pk: string, id: string) =>
     request<void>(`${featuresUrl(slug, layerId)}/${enc(pk)}/attachments/${id}`, { method: "DELETE" }),
+
+  /** Zdjęcie do pola „Załącznik”. Z parent: od razu rekord w tabeli zdjęć powiązanej relacją. */
+  uploadPhoto: (slug: string, layerId: string, field: string, file: File, crs: string,
+    parent?: { layerId: string; pk: string }) => {
+    const fd = new FormData();
+    fd.append("file", file);
+    fd.append("field", field);
+    fd.append("crs", crs);
+    if (parent) { fd.append("parent_layer", parent.layerId); fd.append("parent_pk", parent.pk); }
+    return request<PhotoMeta & Partial<GeoJSONFeature> & { photo?: PhotoMeta }>(
+      `/api/projects/${enc(slug)}/layers/${enc(layerId)}/photos`, { method: "POST", body: fd });
+  },
+  /** Plik z pola „Załącznik” zapisanego obiektu; v = wartość pola, żeby zmiana zdjęcia omijała cache. */
+  fileUrl: (slug: string, layerId: string, pk: string, field: string, value: unknown, thumb = false) =>
+    `${featuresUrl(slug, layerId)}/${enc(pk)}/files/${enc(field)}?${new URLSearchParams({
+      ...(thumb ? { thumb: "1" } : {}), v: String(value ?? "") })}`,
 
   reportUrl: (slug: string, layout: string, params: Record<string, string>) =>
     `/api/projects/${enc(slug)}/reports/${enc(layout)}?${new URLSearchParams(params)}`,

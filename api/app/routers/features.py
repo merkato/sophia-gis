@@ -265,8 +265,10 @@ async def related_features(slug: str, layer_id: str, pk: str, crs: str = "EPSG:3
     extent = await user_extent_ewkb(user, "view")
     out = []
     async with layer_conn(lyr.pg.conninfo) as conn:
-        me = await (await conn.execute(sql.SQL("SELECT * FROM {t} WHERE {k}::text = {pk}").format(
-            t=_table(lyr), k=sql.Identifier(lyr.pg.key), pk=sql.Literal(pk)))).fetchone()
+        g = sql.Identifier(lyr.pg.geometry_column) if lyr.pg.geometry_column else sql.SQL("NULL")
+        me = await (await conn.execute(sql.SQL("SELECT * FROM {t} WHERE {k}::text = {pk} AND {f} AND {e}").format(
+            t=_table(lyr), k=sql.Identifier(lyr.pg.key), pk=sql.Literal(pk), f=_base_filter(lyr),
+            e=_extent_condition(lyr, g, extent)))).fetchone()
         if me is None:
             raise HTTPException(status.HTTP_404_NOT_FOUND, "Brak obiektu")
         for rel in ctx.project.relations:

@@ -32,6 +32,29 @@ def _raster_location(src: str, home: str) -> list[tuple[str, str]]:
                          "serwer go nie znajdzie. Przenieś go do biblioteki albo obok projektu"))]
 
 
+IMAGE_EXT = (".jpg", ".jpeg", ".png", ".heic", ".webp", ".gif", ".tif", ".tiff", ".bmp")
+
+
+def _resource_field_issues(layer: QgsVectorLayer) -> list[tuple[str, str]]:
+    """Pola z widżetem „Załącznik” (zdjęcia w WebUI) — docs/user/zdjecia.md."""
+    out: list[tuple[str, str]] = []
+    for idx, fld in enumerate(layer.fields()):
+        setup = layer.editorWidgetSetup(idx)
+        if setup.type() != "ExternalResource":
+            continue
+        cfg = setup.config() or {}
+        name = fld.name()
+        if fld.isNumeric():
+            out.append(("error", f"Pole „{name}”: widżet Załącznik wymaga pola tekstowego"))
+        if int(cfg.get("RelativeStorage") or 0) != 1:
+            out.append(("warning", (f"Pole „{name}”: ustaw „Ścieżka względna do projektu” — "
+                                    "inaczej WebUI nie znajdzie zdjęć")))
+        flt = str(cfg.get("FileWidgetFilter") or "").lower()
+        if str(cfg.get("DocumentViewer")) != "1" and not any(e in flt for e in IMAGE_EXT):
+            out.append(("info", f"Pole „{name}”: bez podglądu „Obraz” — WebUI pokaże plik, nie zdjęcie z aparatem"))
+    return out
+
+
 def layer_issues(layer: QgsMapLayer, want_edit: bool = False) -> list[tuple[str, str]]:
     """Lista (poziom, komunikat) dla jednej warstwy. Poziomy: error | warning | info."""
     out: list[tuple[str, str]] = []
@@ -54,6 +77,7 @@ def layer_issues(layer: QgsMapLayer, want_edit: bool = False) -> list[tuple[str,
             out.append(("error", f"Edycja w portalu wymaga PostGIS (dostawca: {layer.providerType()})"))
         elif layer.providerType() == "ogr":
             out.append(("warning", "Plik lokalny — na serwerze musi leżeć w tej samej ścieżce względnej"))
+        out.extend(_resource_field_issues(layer))
         props = layer.serverProperties() if hasattr(layer, "serverProperties") else layer
         if not props.shortName() and (not layer.name().isascii() or " " in layer.name()):
             out.append(("info", "Brak nazwy krótkiej (shortname) — WMS użyje pełnej nazwy warstwy"))

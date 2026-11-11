@@ -2,6 +2,7 @@ import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffec
 import { api } from "../api";
 import type { Attachment, GeoJSONFeature, ProjectConfig, RelatedGroup } from "../types";
 import { FieldInput } from "./FieldInput";
+import { PhotoGallery, photoFieldOf } from "./Photos";
 
 interface Props {
   config: ProjectConfig;
@@ -14,7 +15,7 @@ interface Props {
   onOpenRelated: (layerId: string, pk: string) => void;
 }
 
-type Tab = "attrs" | "related" | "docs" | "reports";
+type Tab = "attrs" | "photos" | "related" | "docs" | "reports";
 
 /** Dla App: czy formularz ma niezapisane zmiany i zapis „z zewnątrz” (okno zapisz/odrzuć/anuluj). */
 export interface FeaturePanelHandle {
@@ -123,15 +124,26 @@ export const FeaturePanel = forwardRef<FeaturePanelHandle, Props>(function Featu
     if (isNew) setTab("attrs");
   }, [feature, isNew]);
 
+  const loadRelated = useCallback(() => {
+    if (!pk || !config.relations.some((r) => r.parent_layer === layerId || r.child_layer === layerId)) return;
+    api.related(config.slug, layerId, pk, config.crs).then(setRelated).catch(() => setRelated([]));
+  }, [pk, layerId, config]);
+
   useEffect(() => {
     if (!pk) { setRelated([]); setAttachments([]); return; }
-    if (config.relations.some((r) => r.parent_layer === layerId || r.child_layer === layerId)) {
-      api.related(config.slug, layerId, pk, config.crs).then(setRelated).catch(() => setRelated([]));
-    }
+    loadRelated();
     if (layer.attachments) {
       api.attachments(config.slug, layerId, pk).then(setAttachments).catch(() => setAttachments([]));
     }
-  }, [pk, layerId, config, layer.attachments]);
+  }, [pk, layerId, config, layer.attachments, loadRelated]);
+
+  // Wariant B zdjęć: tabela dzieci z polem „Załącznik” (obraz) -> galeria zamiast listy powiązanych
+  const photoGroups = related.filter((g) => g.direction === "child" && photoFieldOf(config.layers[g.layer_id]));
+  const otherGroups = related.filter((g) => !photoGroups.includes(g));
+  const photoCount = photoGroups.reduce((n, g) => n + g.features.length, 0);
+  useEffect(() => {
+    if ((tab === "related" && !otherGroups.length && related.length) || (tab === "photos" && !photoGroups.length && related.length)) setTab("attrs");
+  }, [tab, related.length, otherGroups.length, photoGroups.length]);
 
   const visibleFields = layer.fields.filter((f) => f.widget !== "Hidden" && f.name !== layer.primary_key);
 
@@ -208,7 +220,8 @@ export const FeaturePanel = forwardRef<FeaturePanelHandle, Props>(function Featu
       {!isNew && (
         <nav className="tabs">
           <button className={tab === "attrs" ? "active" : ""} onClick={() => setTab("attrs")}>Atrybuty</button>
-          {related.length > 0 && <button className={tab === "related" ? "active" : ""} onClick={() => setTab("related")}>Powiązane</button>}
+          {photoGroups.length > 0 && <button className={tab === "photos" ? "active" : ""} onClick={() => setTab("photos")}>Zdjęcia ({photoCount})</button>}
+          {otherGroups.length > 0 && <button className={tab === "related" ? "active" : ""} onClick={() => setTab("related")}>Powiązane</button>}
           {layer.attachments && <button className={tab === "docs" ? "active" : ""} onClick={() => setTab("docs")}>Dokumenty ({attachments.length})</button>}
           {reports.length > 0 && <button className={tab === "reports" ? "active" : ""} onClick={() => setTab("reports")}>Raporty</button>}
         </nav>
@@ -222,7 +235,8 @@ export const FeaturePanel = forwardRef<FeaturePanelHandle, Props>(function Featu
             <label key={f.name} className="field">
               <span>{f.alias ?? f.name}{f.not_null && f.editable ? " *" : ""}</span>
               <FieldInput field={f} value={values[f.name]} readOnly={!canEdit}
-                source={{ slug: config.slug, layerId, version: config.version }}
+                source={{ slug: config.slug, layerId, version: config.version, pk: pk === null ? null : String(pk), crs: config.crs }}
+                saved={isNew ? undefined : feature?.properties[f.name]}
                 onChange={(v) => setValues((s) => ({ ...s, [f.name]: v }))} />
             </label>
           ))}
@@ -235,7 +249,12 @@ export const FeaturePanel = forwardRef<FeaturePanelHandle, Props>(function Featu
         </div>
       )}
 
-      {tab === "related" && related.map((g) => (
+      {tab === "photos" && pk && photoGroups.map((g) => (
+        <PhotoGallery key={g.relation} config={config} group={g} parentLayerId={layerId} parentPk={String(pk)}
+          onChanged={loadRelated} onOpenRecord={onOpenRelated} />
+      ))}
+
+      {tab === "related" && otherGroups.map((g) => (
         <section key={g.relation} className="related">
           <h4>{g.name} <span className="muted">({g.features.length})</span></h4>
           <ul>

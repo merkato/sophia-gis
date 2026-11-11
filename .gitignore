@@ -8,5 +8,7 @@ node_modules/
 web/dist/
 data/projects/*
 data/rasters/*
+data/uploads/*
 !data/projects/.gitkeep
 !data/rasters/.gitkeep
+!data/uploads/.gitkeep
