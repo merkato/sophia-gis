@@ -5,7 +5,7 @@ import { ensureProjection } from "./projections";
 import type { Basemap, GeoJSONFeature, ProjectConfig, ProjectSummary, TreeNode, User } from "./types";
 import { MapView, type Tool } from "./components/MapView";
 import { LayerTree, initialVisibility, nodeKey, visibleWmsNames } from "./components/LayerTree";
-import { FeaturePanel } from "./components/FeaturePanel";
+import { FeaturePanel, type FeaturePanelHandle } from "./components/FeaturePanel";
 import { RecordList } from "./components/RecordList";
 import { AdminPanel } from "./components/AdminPanel";
 import { BasemapSwitcher, initialBasemapChoice, saveBasemapChoice } from "./components/BasemapSwitcher";
@@ -14,6 +14,24 @@ interface Selection {
   layerId: string;
   feature: GeoJSONFeature;
   isNew: boolean;
+}
+
+/** Niezapisane zmiany w formularzu, a użytkownik otwiera inny obiekt / zamyka okno. */
+function UnsavedDialog({ onSave, onDiscard, onCancel }: { onSave: () => void; onDiscard: () => void; onCancel: () => void }) {
+  return (
+    <div className="modal" onClick={(e) => e.target === e.currentTarget && onCancel()}
+      onKeyDown={(e) => e.key === "Escape" && onCancel()}>
+      <div className="dialog" role="alertdialog" aria-labelledby="unsaved-title">
+        <h3 id="unsaved-title">Niezapisane zmiany</h3>
+        <p>Formularz ma zmiany, które nie zostały zapisane.</p>
+        <div className="actions">
+          <button className="primary" onClick={onSave} autoFocus>Zapisz</button>
+          <button className="danger" onClick={onDiscard}>Odrzuć</button>
+          <button onClick={onCancel}>Anuluj</button>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 function LoginForm({ onLogin }: { onLogin: () => void }) {
@@ -51,6 +69,32 @@ export default function App() {
   const [baseId, setBaseId] = useState<number | null>(null);
   const [overlayIds, setOverlayIds] = useState<Set<number>>(new Set());
   const mapRef = useRef<OlMap | null>(null);
+  const panelRef = useRef<FeaturePanelHandle>(null);
+  const [pending, setPending] = useState<(() => void) | null>(null);
+
+  /**
+   * Każda zmiana obiektu w formularzu (kliknięcie na mapie, lista rekordów, powiązane,
+   * nowy obiekt, zamknięcie) idzie przez guard: przy niezapisanych zmianach pyta
+   * zapisz / odrzuć / anuluj, inaczej od razu podmienia formularz.
+   */
+  const guard = (action: () => void) => {
+    if (panelRef.current?.isDirty()) setPending(() => action);
+    else action();
+  };
+
+  const resolvePending = async (choice: "save" | "discard" | "cancel") => {
+    const action = pending;
+    setPending(null);
+    if (!action) return;
+    if (choice === "save") {
+      if (await panelRef.current?.save()) action();   // błąd zapisu widać w formularzu
+    } else if (choice === "discard") {
+      if (selection?.isNew) setReloadToken((t) => t + 1);   // usuń szkic z mapy
+      action();
+    } else {
+      setReloadToken((t) => t + 1);   // zdejmij zaznaczenie / szkic klikniętego obiektu
+    }
+  };
 
   const refreshSession = useCallback(async () => {
     setUser(await api.me().catch(() => null));
@@ -110,7 +154,7 @@ export default function App() {
     });
   };
 
-  const openFeature = async (layerId: string, pk: string) => {
+  const openFeature = (layerId: string, pk: string) => guard(async () => {
     if (!config) return;
     try {
       const f = await api.feature(config.slug, layerId, pk, config.crs);
@@ -118,7 +162,7 @@ export default function App() {
     } catch (e) {
       setMessage((e as Error).message);
     }
-  };
+  });
 
   const editLayer = editLayerId ? config?.layers[editLayerId] : null;
 
@@ -151,12 +195,12 @@ export default function App() {
               <h3>Warstwy</h3>
               <LayerTree tree={config.tree} visible={visible} onToggle={toggle}
                 editableIds={editableIds} editLayerId={editLayerId}
-                onEditLayer={(id) => {
+                onEditLayer={(id) => guard(() => {
                   setEditLayerId(id);
                   // tabela bez geometrii: nic do zaznaczania na mapie — lista rekordów w panelu
                   setTool(id && config.layers[id]?.geometry_type ? "select" : "identify");
                   setSelection(null);
-                }} />
+                })} />
 
               {editLayer && (
                 <section className="edit-tools">
@@ -165,7 +209,7 @@ export default function App() {
                     <RecordList config={config} layer={editLayer} reloadToken={reloadToken}
                       selectedId={selection && selection.layerId === editLayer.id && !selection.isNew ? String(selection.feature.id) : null}
                       onOpen={(pk) => openFeature(editLayer.id, pk)}
-                      onNew={() => setSelection({ layerId: editLayer.id, isNew: true, feature: { type: "Feature", id: "", geometry: null, properties: {} } })} />
+                      onNew={() => guard(() => setSelection({ layerId: editLayer.id, isNew: true, feature: { type: "Feature", id: "", geometry: null, properties: {} } }))} />
                   ) : (
                   <div className="toolgroup">
                     <button className={tool === "select" ? "active" : ""} onClick={() => setTool("select")}>Wybierz</button>
@@ -208,9 +252,9 @@ export default function App() {
               reloadToken={reloadToken} mapRef={mapRef}
               basemaps={basemaps} baseId={baseId} overlayIds={overlayIds}
               onIdentify={openFeature}
-              onSelect={(layerId, feature) => setSelection({ layerId, feature, isNew: false })}
-              onDrawn={(layerId, geometry) =>
-                setSelection({ layerId, isNew: true, feature: { type: "Feature", id: "", geometry, properties: {} } })}
+              onSelect={(layerId, feature) => guard(() => setSelection({ layerId, feature, isNew: false }))}
+              onDrawn={(layerId, geometry) => guard(() =>
+                setSelection({ layerId, isNew: true, feature: { type: "Feature", id: "", geometry, properties: {} } }))}
               onGeometryModified={async (layerId, pk, geometry) => {
                 try {
                   await api.updateFeature(config.slug, layerId, pk, { geometry }, config.crs);
@@ -225,15 +269,26 @@ export default function App() {
           {message && <div className="toast" onClick={() => setMessage(null)}>{message}</div>}
           {config && selection && (
             <FeaturePanel
+              ref={panelRef}
               config={config} layerId={selection.layerId} feature={selection.feature} isNew={selection.isNew}
-              onSaved={(f) => { setSelection({ layerId: selection.layerId, feature: f, isNew: false }); setReloadToken((t) => t + 1); }}
+              onSaved={(f) => {
+                // po zapisie nowego obiektu: następne kliknięcie wybiera obiekt, nie zaczyna rysowania
+                if (selection.isNew && tool === "draw") setTool("select");
+                setSelection({ layerId: selection.layerId, feature: f, isNew: false });
+                setReloadToken((t) => t + 1);
+              }}
               onDeleted={() => { setSelection(null); setReloadToken((t) => t + 1); }}
-              onClose={() => { if (selection.isNew) setReloadToken((t) => t + 1); setSelection(null); }}
+              onClose={() => guard(() => { if (selection.isNew) setReloadToken((t) => t + 1); setSelection(null); })}
               onOpenRelated={openFeature}
             />
           )}
         </main>
       </div>
+
+      {pending && (
+        <UnsavedDialog onSave={() => resolvePending("save")} onDiscard={() => resolvePending("discard")}
+          onCancel={() => resolvePending("cancel")} />
+      )}
 
       {showAdmin && user?.is_admin && (
         <AdminPanel onClose={() => setShowAdmin(false)} onChanged={refreshSession} />

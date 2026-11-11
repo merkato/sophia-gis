@@ -76,6 +76,7 @@ export function MapView(props: Props) {
   const basemapLayersRef = useRef(new Map<string, TileLayer>());
   const tileLayersRef = useRef(new Map<string, TileLayer<TileWMS>>());
   const editSourceRef = useRef(new VectorSource<Feature<Geometry>>());
+  const selectRef = useRef<Select | null>(null);
   const cbRef = useRef(props);
   cbRef.current = props;
   const crs = config.crs;
@@ -189,6 +190,7 @@ export function MapView(props: Props) {
     const map = mapRef.current;
     const source = editSourceRef.current;
     source.clear();
+    selectRef.current?.getFeatures().clear();   // zaznaczenie wskazywałoby stary, usunięty obiekt
     if (!map || !editLayerId || !config.layers[editLayerId]?.geometry_type) return;   // bez geometrii: lista w panelu
     let cancelled = false;
     const load = async () => {
@@ -249,6 +251,17 @@ export function MapView(props: Props) {
         if (f) cbRef.current.onSelect(layerInfo.id, format.writeFeatureObject(f) as unknown as GeoJSONFeature);
       });
       interactions.push(select);
+      selectRef.current = select;
+    }
+
+    // W trybie zmiany geometrii kliknięcie (bez przeciągania) też otwiera obiekt w formularzu
+    if (layerInfo && tool === "modify") {
+      const handler = (evt: { pixel: number[] }) => {
+        const f = map.forEachFeatureAtPixel(evt.pixel, (x) => x as Feature<Geometry>,
+          { layerFilter: (l) => l instanceof VectorLayer && l.getSource() === source, hitTolerance: 4 });
+        if (f) cbRef.current.onSelect(layerInfo.id, format.writeFeatureObject(f) as unknown as GeoJSONFeature);
+      };
+      clickKey = map.on("singleclick", handler as never) as EventsKey;
     }
 
     if (layerInfo && tool === "draw" && layerInfo.perms.insert && layerInfo.geometry_type) {
@@ -274,6 +287,7 @@ export function MapView(props: Props) {
     return () => {
       interactions.forEach((i) => map.removeInteraction(i));
       if (clickKey) unByKey(clickKey);
+      selectRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tool, editLayerId, config.slug, wmsLayers]);

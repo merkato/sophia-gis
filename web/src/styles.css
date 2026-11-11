@@ -90,9 +90,13 @@ button.block, .reports .button { display: block; width: 100%; text-align: left; 
 
 .toast { position: absolute; bottom: 20px; left: 50%; transform: translateX(-50%); background: var(--ink);
   color: var(--bg); padding: 10px 16px; border-radius: 8px; cursor: pointer; max-width: 80%; }
-.modal { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: grid; place-items: center; z-index: 10; }
+.modal { position: fixed; inset: 0; background: rgba(0,0,0,.4); display: grid; place-items: center; z-index: 30; }
 .login { background: var(--surface); padding: 24px; border-radius: 10px; width: 320px; display: flex; flex-direction: column; gap: 10px; }
 .login h2 { margin: 0 0 6px; }
+.dialog { background: var(--surface); padding: 18px 20px; border-radius: 10px; width: min(360px, calc(100% - 32px));
+  box-shadow: 0 12px 32px rgba(0,0,0,.3); }
+.dialog h3 { margin: 0 0 6px; font-size: 16px; }
+.dialog p { margin: 0; color: var(--muted); }
 
 /* --- podkłady w panelu bocznym */
 .basemaps .tree-row label { gap: 8px; }

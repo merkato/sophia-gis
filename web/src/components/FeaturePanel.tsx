@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useLayoutEffect, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { api } from "../api";
 import type { Attachment, GeoJSONFeature, ProjectConfig, RelatedGroup } from "../types";
 import { FieldInput } from "./FieldInput";
@@ -15,6 +15,15 @@ interface Props {
 }
 
 type Tab = "attrs" | "related" | "docs" | "reports";
+
+/** Dla App: czy formularz ma niezapisane zmiany i zapis „z zewnątrz” (okno zapisz/odrzuć/anuluj). */
+export interface FeaturePanelHandle {
+  isDirty: () => boolean;
+  save: () => Promise<boolean>;
+}
+
+/** Porównanie wartości pola niezależnie od typu z inputa (liczba vs tekst, null vs ""). */
+const norm = (v: unknown) => (v === null || v === undefined ? "" : String(v));
 
 interface Pos { x: number; y: number }
 
@@ -93,7 +102,8 @@ function useFloatingWindow() {
   };
 }
 
-export function FeaturePanel({ config, layerId, feature, isNew, onSaved, onDeleted, onClose, onOpenRelated }: Props) {
+export const FeaturePanel = forwardRef<FeaturePanelHandle, Props>(function FeaturePanel(
+  { config, layerId, feature, isNew, onSaved, onDeleted, onClose, onOpenRelated }, ref) {
   const layer = config.layers[layerId];
   const [values, setValues] = useState<Record<string, unknown>>({});
   const [tab, setTab] = useState<Tab>("attrs");
@@ -125,14 +135,22 @@ export function FeaturePanel({ config, layerId, feature, isNew, onSaved, onDelet
 
   const visibleFields = layer.fields.filter((f) => f.widget !== "Hidden" && f.name !== layer.primary_key);
 
-  const save = async () => {
+  const editableFields = visibleFields.filter((f) => f.editable);
+
+  // nowy obiekt z narysowaną geometrią to też praca do stracenia
+  const isDirty = () => canEdit && (
+    (isNew && !!feature?.geometry)
+    || editableFields.some((f) => norm(values[f.name]) !== norm(feature?.properties[f.name])));
+
+  const save = async (): Promise<boolean> => {
     const missing = visibleFields.filter((f) => f.not_null && f.editable && (values[f.name] ?? "") === "");
     if (missing.length) {
+      setTab("attrs");
       setError(`Wymagane pola: ${missing.map((f) => f.alias ?? f.name).join(", ")}`);
-      return;
+      return false;
     }
     const props = Object.fromEntries(
-      visibleFields.filter((f) => f.editable).map((f) => [f.name, values[f.name] ?? null]));
+      editableFields.map((f) => [f.name, values[f.name] ?? null]));
     setBusy(true);
     setError(null);
     try {
@@ -140,12 +158,18 @@ export function FeaturePanel({ config, layerId, feature, isNew, onSaved, onDelet
         ? await api.createFeature(config.slug, layerId, { type: "Feature", geometry: feature?.geometry ?? null, properties: props }, config.crs)
         : await api.updateFeature(config.slug, layerId, pk!, { properties: props }, config.crs);
       onSaved(saved);
+      return true;
     } catch (e) {
+      setTab("attrs");
       setError((e as Error).message);
+      return false;
     } finally {
       setBusy(false);
     }
   };
+
+  // isDirty/save zależą od bieżących wartości — uchwyt odświeżany przy każdym renderze
+  useImperativeHandle(ref, () => ({ isDirty, save }));
 
   const remove = async () => {
     if (!pk || !confirm("Usunąć obiekt? Tej operacji nie można cofnąć.")) return;
@@ -264,4 +288,4 @@ export function FeaturePanel({ config, layerId, feature, isNew, onSaved, onDelet
       </div>
     </aside>
   );
-}
+});
