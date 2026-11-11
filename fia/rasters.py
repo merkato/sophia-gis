@@ -36,6 +36,26 @@ def add_as_group(folder: str, group_name: str) -> QgsLayerTreeGroup:
     return group
 
 
+def overview_settings(ds) -> tuple[str, str]:
+    """Kompresja i próbkowanie piramid (.ovr) zależnie od kanałów rastra:
+    3 × Byte (RGB) -> JPEG w YCbCr (10–20× mniejsze), RGB + alfa (VRT z addAlpha, przezroczystość poza
+    arkuszami) -> WEBP (zachowuje kanał alfa; JPEG YCbCr przyjmuje tylko 3 kanały), raster z paletą ->
+    DEFLATE z próbkowaniem NEAREST (nie miesza indeksów kolorów), pozostałe -> DEFLATE."""
+    from osgeo import gdal
+
+    n = ds.RasterCount
+    bands = [ds.GetRasterBand(i + 1) for i in range(n)]
+    byte = all(b.DataType == gdal.GDT_Byte for b in bands)
+    interp = [b.GetColorInterpretation() for b in bands]
+    if n == 1 and interp[0] == gdal.GCI_PaletteIndex:
+        return "DEFLATE", "NEAREST"
+    if byte and n == 3:
+        return "JPEG", "AVERAGE"
+    if byte and n == 4 and interp[3] == gdal.GCI_AlphaBand:
+        return "WEBP", "AVERAGE"
+    return "DEFLATE", "AVERAGE"
+
+
 def build_vrt(folder: str, vrt_path: str, group_name: str, build_overviews: bool = True) -> QgsRasterLayer:
     """Strategia 2: VRT z wszystkich GeoTIFF w katalogu, dodany jako warstwa w grupie."""
     from osgeo import gdal  # dostępne w każdej instalacji QGIS
@@ -43,14 +63,27 @@ def build_vrt(folder: str, vrt_path: str, group_name: str, build_overviews: bool
     files = find_geotiffs(folder)
     if not files:
         raise ValueError(f"Brak plików GeoTIFF w {folder}")
-    vrt = gdal.BuildVRT(vrt_path, files, options=gdal.BuildVRTOptions(resolution="highest", addAlpha=True))
+    # addAlpha: przezroczystość poza arkuszami (z NoData źródeł); hideNodata: kanały RGB bez NoData —
+    # maską jest tylko kanał alfa (inaczej czarne piksele wewnątrz skanu też byłyby przezroczyste)
+    vrt = gdal.BuildVRT(vrt_path, files, options=gdal.BuildVRTOptions(resolution="highest", addAlpha=True,
+                                                                     hideNodata=True))
     if vrt is None:
         raise RuntimeError("gdal.BuildVRT nie powiodło się — sprawdź, czy pliki mają ten sam układ i liczbę kanałów")
     if build_overviews:
-        gdal.SetConfigOption("COMPRESS_OVERVIEW", "JPEG")
-        gdal.SetConfigOption("PHOTOMETRIC_OVERVIEW", "YCBCR")
-        gdal.SetConfigOption("INTERLEAVE_OVERVIEW", "PIXEL")
-        vrt.BuildOverviews("AVERAGE", [2, 4, 8, 16, 32, 64, 128])
+        compress, resampling = overview_settings(vrt)
+        options = {"COMPRESS_OVERVIEW": compress, "INTERLEAVE_OVERVIEW": "PIXEL",
+                   "PHOTOMETRIC_OVERVIEW": "YCBCR" if compress == "JPEG" else None,
+                   "JPEG_QUALITY_OVERVIEW": "85" if compress == "JPEG" else None,
+                   "WEBP_LEVEL_OVERVIEW": "85" if compress == "WEBP" else None,
+                   "PREDICTOR_OVERVIEW": "2" if compress == "DEFLATE" else None}
+        try:
+            for k, v in options.items():
+                gdal.SetConfigOption(k, v)
+            if vrt.BuildOverviews(resampling, [2, 4, 8, 16, 32, 64, 128]) != 0:
+                raise RuntimeError(f"Budowa piramid ({compress}) nie powiodła się: {gdal.GetLastErrorMsg()}")
+        finally:
+            for k in options:
+                gdal.SetConfigOption(k, None)   # nie zostawiamy ustawień dla innych operacji QGIS
     vrt = None  # zapis na dysk
 
     prj = QgsProject.instance()
