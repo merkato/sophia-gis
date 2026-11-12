@@ -22,6 +22,7 @@ z kontrolą uprawnień i zasięgów przestrzennych.
 
 ```bash
 cp .env.example .env              # ustaw hasła, JWT_SECRET, SITE_ADDRESS
+cp config/pg_service.conf.example config/pg_service.conf
 # hasło w config/pg_service.conf musi być takie samo jak POSTGRES_PASSWORD
 docker compose up -d --build
 ```
@@ -32,7 +33,7 @@ Konto administratora tworzy się przy pierwszym starcie z `ADMIN_LOGIN` / `ADMIN
 ## Przygotowanie projektu QGIS
 
 1. Połączenie z bazą **wyłącznie przez usługę** `service=sophia` (plik `pg_service.conf` na desktopie —
-   patrz komentarz w `config/pg_service.conf`). Nie zapisuj haseł w projekcie.
+   patrz komentarz w `config/pg_service.conf.example`). Nie zapisuj haseł w projekcie.
 2. Tabele edytowalne muszą mieć klucz główny i określony typ geometrii/SRID.
 3. Formularze, aliasy, słowniki (ValueMap), relacje i wydruki ustawiasz normalnie w QGIS — portal je odczyta.
 4. Zainstaluj wtyczkę: skopiuj katalog `fia` do katalogu wtyczek profilu QGIS

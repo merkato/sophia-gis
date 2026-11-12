@@ -60,7 +60,8 @@ git clone https://github.com/merkato/sophia-gis.git /opt/sophia
 cd /opt/sophia
 cp .env.example .env && nano .env          # SITE_ADDRESS=webgis.giswgorach.pl, ACME_EMAIL, hasła, JWT_SECRET
 echo 'COMPOSE_FILE=docker-compose.yml:docker-compose.small.yml' >> .env
-nano config/pg_service.conf                # to samo hasło co POSTGRES_PASSWORD
+cp config/pg_service.conf.example config/pg_service.conf
+nano config/pg_service.conf                # to samo hasło co POSTGRES_PASSWORD (plik poza gitem)
 
 docker compose up -d --build
 docker compose ps
@@ -77,6 +78,16 @@ Nie uruchamiaj na hoście drugiego proxy (nginx/Apache) na portach 80/443.
 
 ```bash
 cd /opt/sophia && git pull -q && docker compose up -d --build api web
+```
+
+**Jednorazowo na instancjach sprzed 12.11.2026** (wtedy `config/pg_service.conf` wyszedł z gita, w repo
+jest tylko `pg_service.conf.example`): zmieniony plik z hasłem blokuje `git pull`. Zachowaj go,
+pobierz zmiany i przywróć — od tej pory git go nie dotyka:
+```bash
+cd /opt/sophia && cp config/pg_service.conf /tmp/pg_service.conf.bak \
+  && git checkout -- config/pg_service.conf && git pull -q \
+  && cp /tmp/pg_service.conf.bak config/pg_service.conf && rm /tmp/pg_service.conf.bak
+docker compose up -d --force-recreate api qgis       # pojedynczy plik zamontowany w kontenerach
 ```
 
 Dwie usługi wymagają dodatkowego kroku, bo `up --build` ich nie restartuje, gdy nie zmienia się

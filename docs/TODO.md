@@ -117,8 +117,8 @@ Potrzebny do projektów z podziałem danych na jednostki terenowe (centrala widz
       warstw (pierwsza = spód).
 - [x] Sprzątanie plików osieroconych w `data/uploads` — `api/app/uploads.py` (kosz projektu, próg 7 dni),
       panel → Pliki, `python -m app.uploads`; opis w `docs/SERVER.md` (5b).
-- [ ] `config/pg_service.conf` poza gitem (w repo tylko `pg_service.conf.example`), żeby
-      hasło na serwerze nie blokowało `git pull`.
+- [x] `config/pg_service.conf` poza gitem (w repo tylko `pg_service.conf.example`), żeby
+      hasło na serwerze nie blokowało `git pull` (12.11).
 - [x] Mapa (z podkładami) także bez wybranego projektu / dla niezalogowanych (razem z wydrukiem).
 - [x] Fia: VRT z piramidami dla rastrów RGBA (kompresja piramid zależna od pasm, `hideNodata`) (11.11).
 - [x] Panel warstw: podkład i nakładki na dole, suwak przezroczystości ◐ dla rastrów, podkładów

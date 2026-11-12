@@ -1,4 +1,5 @@
 .env
+config/pg_service.conf
 .venv/
 __pycache__/
 *.egg-info/

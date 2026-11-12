@@ -172,6 +172,7 @@ $(printf '\033[1;32mSerwer gotowy.\033[0m') Dalej (jako $APP_USER, po ponownym z
   1. Repo:             git clone https://github.com/merkato/sophia-gis.git $APP_DIR
   2. Konfiguracja:      cd $APP_DIR && cp .env.example .env && nano .env
                         echo 'COMPOSE_FILE=docker-compose.yml:docker-compose.small.yml' >> .env
+                        cp config/pg_service.conf.example config/pg_service.conf
                         (hasło w config/pg_service.conf = POSTGRES_PASSWORD)
   3. DNS:               rekord A domeny -> $(curl -fsS4 --max-time 5 https://ifconfig.me 2>/dev/null || echo '<IP serwera>')
   4. Start:             docker compose up -d --build
