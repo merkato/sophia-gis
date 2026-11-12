@@ -57,6 +57,12 @@ export const api = {
   updateFeature: (slug: string, layerId: string, pk: string, f: Partial<GeoJSONFeature>, crs: string) =>
     request<GeoJSONFeature>(`${featuresUrl(slug, layerId)}/${enc(pk)}?crs=${enc(crs)}`,
       { method: "PATCH", body: JSON.stringify({ type: "Feature", properties: {}, ...f }) }),
+  /** Podział linią (POST …/split): dryRun — tylko klucze obiektów, które linia dzieli. */
+  splitFeatures: (slug: string, layerId: string, line: GeoJSONFeature["geometry"], crs: string,
+    o: { pks?: string[]; dryRun?: boolean } = {}) =>
+    request<{ pks?: string[]; updated?: GeoJSONFeature[]; created?: GeoJSONFeature[] }>(
+      `${featuresUrl(slug, layerId)}/split?crs=${enc(crs)}`,
+      { method: "POST", body: JSON.stringify({ line, pks: o.pks ?? null, dry_run: !!o.dryRun }) }),
   deleteFeature: (slug: string, layerId: string, pk: string) =>
     request<void>(`${featuresUrl(slug, layerId)}/${enc(pk)}`, { method: "DELETE" }),
   related: (slug: string, layerId: string, pk: string, crs: string) =>

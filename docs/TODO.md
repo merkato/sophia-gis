@@ -103,6 +103,43 @@ Potrzebny do projektów z podziałem danych na jednostki terenowe (centrala widz
 - Zrobione: `AttributeTable.tsx`, wspólne okno `FloatingWindow.tsx`, API listy z `offset/sort/desc/q/
   geometry/total`; `RecordList` usunięty; opis w `docs/user/README.md`.
 
+### 10. Narzędzia edycji poligonów: podział, pierścień, pierścień wypełniony
+
+- [x] **Podział** (12.11): `POST …/features/split`, narzędzie na pasku, Esc/Backspace w szkicach,
+      polityki podziału z projektu, opis w `docs/user/README.md`.
+- [ ] Pierścień.
+- [ ] Pierścień wypełniony.
+
+Odpowiedniki QGIS: *Podziel obiekty*, *Dodaj pierścień*, *Wypełnij pierścień*. Na pasku przy narzędziu
+wierzchołków: podział dla poligonów i linii, oba pierścienie tylko dla poligonów. Szkic rysowany
+w OL z przyciąganiem (Snap) do warstwy edycyjnej, a **geometrię liczy PostGIS po stronie API**:
+w układzie warstwy, w jednej transakcji, z kontrolą zakresu danych i wpisem do audytu. Klient tylko
+wysyła szkic. W przeglądarce nie dokładamy biblioteki topologii (JSTS).
+
+- **Podział** — `POST …/features/split {line, pks?}`:
+  - cel: zaznaczony obiekt, a bez zaznaczenia wszystkie obiekty przecięte linią (w zakresie
+    użytkownika, z potwierdzeniem „podzielić N obiektów?”), jak w QGIS;
+  - `ST_Split` → `ST_Dump`. Największa część zostaje pod starym kluczem (UPDATE, zdjęcia, dokumenty
+    i rekordy powiązane przy niej), pozostałe to INSERT z atrybutami według **polityk podziału
+    pól z projektu QGIS** (*Właściwości warstwy → Atrybuty → Polityka podziału*: duplikuj /
+    wartość domyślna / puste / proporcjonalnie do powierzchni). Klucz główny i pola z domyślną
+    wartością z bazy zawsze pomijane;
+  - linia, która nie przecina obiektu na wylot (< 2 części) → 422 z komunikatem;
+  - kolumna Multi*: każda część to osobny obiekt (`ST_Multi` przy zapisie, jak dziś).
+- **Pierścień (dziura)** — `POST …/features/{pk}/ring {ring}` albo bez `pk`: obiekt, który
+  zawiera szkic. Warunek `ST_Within(ring, geom)`, inaczej 422 („pierścień musi leżeć w całości
+  w obiekcie”). Wynik `ST_Difference`, a `ST_IsValid` przed zapisem.
+- **Pierścień wypełniony** — szkic jak wyżej, potem formularz **nowego** obiektu (isNew, geometria
+  = pierścień). Dziura wycina się dopiero przy zapisie formularza: `POST …/features` z `cut_from:
+  pk`, a INSERT i `ST_Difference` idą w jednej transakcji. Anulowanie formularza niczego nie zmienia.
+- Wspólne:
+  - `qgsproject.py` czyta polityki podziału (`<splitPolicies>`);
+  - po operacji: `reloadToken` (warstwa edycyjna i WMS), formularz z obiektem źródłowym;
+  - niezapisane zmiany w formularzu → istniejące pytanie `guard()`;
+  - Esc przerywa szkic, Backspace cofa wierzchołek;
+  - testy w `api/tests` (polityki, walidacja szkicu) plus próba SQL na bazie serwera;
+  - opis w `docs/user/README.md` (tabela narzędzi).
+
 ## Zaległe z wcześniejszych dni
 
 - [ ] Edytor schematu bazy w WebUI (tabele, kolumny, relacje, słowniki) — patrz ARCHITECTURE.md.

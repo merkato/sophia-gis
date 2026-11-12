@@ -63,6 +63,7 @@ wyszarzone.
 | zielony punkt / linia / poligon z gwiazdką | **Dodaj obiekt** — ikona zależy od typu geometrii warstwy | Dodaj obiekt punktowy / liniowy / poligonowy |
 | tabela z zielonym plusem | **Dodaj rekord** — dla tabel bez geometrii | Dodaj rekord |
 | poligon z czerwonym węzłem | **Narzędzie wierzchołków** — przeciąganie wierzchołków; zwykłe kliknięcie otwiera obiekt | Narzędzie wierzchołków |
+| poligon rozcięty czerwoną linią | **Podziel obiekty** — linia przez obiekt (poligon albo linię); szczegóły niżej | Podziel obiekty |
 | czerwony kosz | **Usuń zaznaczony obiekt** (z potwierdzeniem) | Usuń zaznaczone |
 | tabela z niebieskim nagłówkiem | **Otwórz tabelę atrybutów** warstwy edycyjnej | Otwórz tabelę atrybutów |
 | obrys działki / domek z niebieską strzałką | **Pobierz z ULDK** — działka lub budynek z kliknięcia do warstwy ([uldk.md](uldk.md)) | — (wtyczki ULDK) |
@@ -98,3 +99,22 @@ z katalogu — na całą Polskę, z możliwością przełączania podkładów i 
 - Tabela bez geometrii (słownik, tabela nadrzędna) po wybraniu do edycji otwiera się od razu jako
   tabela atrybutów; nowy rekord dodajesz przyciskiem **+ Dodaj rekord** w tabeli albo na pasku.
 - Na telefonie panel warstw jest domyślnie schowany i otwiera się ikoną warstw.
+- Podczas rysowania (dodawanie obiektu, linia podziału) **Esc** przerywa szkic, a **Backspace**
+  cofa ostatni wierzchołek. Dwuklik kończy linię.
+
+### Podział obiektów
+- Narysuj linię przecinającą obiekt **na wylot**. Wierzchołki przyciągają się do obiektów warstwy.
+- Gdy obiekt jest otwarty w formularzu, dzielony jest tylko on. Bez tego Sophia dzieli wszystkie
+  obiekty, które linia przecina (przy więcej niż jednym pyta o potwierdzenie, najwyżej 50 naraz).
+- **Największa część zostaje dotychczasowym obiektem**: ten sam identyfikator, zdjęcia, dokumenty
+  i rekordy powiązane. Pozostałe części to nowe obiekty.
+- Atrybuty nowych części wynikają z **polityki podziału** pól w QGIS (*Właściwości warstwy →
+  Atrybuty*, kolumna polityki podziału; nazwy jak w angielskim QGIS):
+  - *Duplicate* (domyślnie) — kopia z obiektu dzielonego, także pól spoza formularza,
+  - *Default value* — wartość domyślna **z bazy** (wyrażenia domyślne QGIS nie są
+    liczone),
+  - *Unset field* — puste pole,
+  - *Geometry ratio* — pola liczbowe (np. powierzchnia, liczba) dzielone proporcjonalnie
+    do powierzchni części (dla linii — do długości), także w obiekcie dotychczasowym.
+- Wszystko w jednej operacji: jeśli któraś część wypadłaby poza Twój zakres danych albo linia
+  nie dzieli obiektu, nic się nie zmienia.

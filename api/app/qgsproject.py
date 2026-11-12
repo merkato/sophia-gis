@@ -30,6 +30,9 @@ class FieldDef:
     editable: bool = True
     not_null: bool = False
     default_expression: str | None = None
+    # Polityka podziału pola (QGIS: Właściwości warstwy → Atrybuty → Polityka podziału) — narzędzie
+    # „Podziel obiekty”: Duplicate | DefaultValue | UnsetField | GeometryRatio. Brak w projekcie = Duplicate.
+    split_policy: str = "Duplicate"
 
 
 @dataclass
@@ -303,6 +306,9 @@ def _geometry_kind(ml: etree._Element) -> str | None:
     return {"Point": "Point", "Line": "Line", "Polygon": "Polygon"}.get(g, g)
 
 
+SPLIT_POLICIES = ("Duplicate", "DefaultValue", "UnsetField", "GeometryRatio")
+
+
 def _parse_fields(ml: etree._Element) -> list[FieldDef]:
     fields: dict[str, FieldDef] = {}
     for f in ml.findall("./fieldConfiguration/field"):
@@ -326,6 +332,9 @@ def _parse_fields(ml: etree._Element) -> list[FieldDef]:
     for e in ml.findall("./editable/field"):
         if e.get("name") in fields:
             fields[e.get("name")].editable = e.get("editable") == "1"
+    for p in ml.findall("./splitPolicies/policy"):
+        if p.get("field") in fields and p.get("policy") in SPLIT_POLICIES:
+            fields[p.get("field")].split_policy = p.get("policy")
     return list(fields.values())
 
 

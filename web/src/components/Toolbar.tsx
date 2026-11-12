@@ -3,7 +3,7 @@ import type { LayerInfo, ProjectConfig } from "../types";
 import type { Tool } from "./MapView";
 import {
   GEOMETRY_ICON, IconAddPolygon, IconAddRecord, IconDelete, IconEdit, IconFetchBuilding, IconFetchParcel, IconIdentify,
-  IconLayers, IconPrint, IconSelect, IconTable, IconVertex,
+  IconLayers, IconPrint, IconSelect, IconSplit, IconTable, IconVertex,
 } from "./Icons";
 
 const DRAW_LABEL = { Point: "Dodaj obiekt punktowy", Line: "Dodaj obiekt liniowy", Polygon: "Dodaj obiekt poligonowy" };
@@ -77,6 +77,9 @@ export function Toolbar({ config, editLayerId, onEditLayer, tool, onTool, canDel
           )}
           <ToolButton icon={IconVertex} label="Narzędzie wierzchołków (zmiana geometrii)" active={tool === "modify"}
             disabled={!geom || !layer?.perms.update} onClick={() => onTool("modify")} />
+          <ToolButton icon={IconSplit} label="Podziel obiekty (linią; zaznaczony obiekt albo wszystkie przecięte)"
+            active={tool === "split"} onClick={() => onTool("split")}
+            disabled={!(geom === "Polygon" || geom === "Line") || !layer?.perms.update || !layer?.perms.insert} />
           <ToolButton icon={IconDelete} label="Usuń zaznaczony obiekt" disabled={!canDelete} onClick={onDelete} />
           <ToolButton icon={IconTable} label={layer ? `Otwórz tabelę atrybutów: ${layer.name}` : "Otwórz tabelę atrybutów"}
             disabled={!layer} onClick={onOpenTable} />

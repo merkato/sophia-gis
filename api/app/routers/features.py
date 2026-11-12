@@ -30,6 +30,15 @@ MAX_FEATURES = 5000
 OUT_OF_SCOPE = "Obiekt poza Twoim zakresem danych"
 
 
+class SplitIn(BaseModel):
+    line: dict[str, Any]                 # linia podziału (GeoJSON LineString w układzie crs)
+    pks: list[str] | None = None         # None = wszystkie obiekty, które linia dzieli (w zakresie edycji)
+    dry_run: bool = False                # tylko lista obiektów do podziału (potwierdzenie w WebUI)
+
+
+SPLIT_LIMIT = 50
+
+
 class FeatureIn(BaseModel):
     type: str = "Feature"
     geometry: dict[str, Any] | None = None
@@ -74,15 +83,22 @@ def _writable_values(lyr: LayerDef, props: dict[str, Any]) -> dict[str, Any]:
     return {k: v for k, v in props.items() if k in allowed}
 
 
-def _geom_sql(lyr: LayerDef, geometry: dict, in_srid: int) -> sql.Composable:
+def _geom_sql(lyr: LayerDef, geometry: dict, in_srid: int, multi: bool = True) -> sql.Composable:
+    """GeoJSON z klienta → geometria w układzie warstwy; multi=False dla szkiców (linia podziału)."""
     target = lyr.pg.srid or 0
     g = sql.SQL("ST_SetSRID(ST_GeomFromGeoJSON({}), {})").format(
         sql.Literal(json.dumps(geometry)), sql.Literal(in_srid))
     if target:
         g = sql.SQL("ST_Transform({}, {})").format(g, sql.Literal(target))
     # Ujednolicenie typu (Polygon -> MultiPolygon itp.), jeśli kolumna jest typu Multi*
+    if multi:
+        g = _as_column_type(lyr, g)
+    return g
+
+
+def _as_column_type(lyr: LayerDef, g: sql.Composable) -> sql.Composable:
     if (lyr.pg.geometry_type or "").upper().startswith("MULTI"):
-        g = sql.SQL("ST_Multi({})").format(g)
+        return sql.SQL("ST_Multi({})").format(g)
     return g
 
 
@@ -324,3 +340,147 @@ async def related_features(slug: str, layer_id: str, pk: str, crs: str = "EPSG:3
                         "layer_id": other_id, "pairs": rel.pairs,
                         "features": [_row_to_feature(r) for r in rows]})
     return out
+
+
+# ---------------------------------------------------------------------------- podział obiektów
+
+
+def _measure(g: sql.Composable) -> sql.Composable:
+    """Miara części do polityki „proporcjonalnie do geometrii”: powierzchnia albo długość."""
+    return sql.SQL("CASE WHEN ST_Dimension({g}) = 2 THEN ST_Area({g}) ELSE ST_Length({g}) END").format(g=g)
+
+
+def _from_ewkb(lyr: LayerDef, wkb: bytes) -> sql.Composable:
+    return _as_column_type(lyr, sql.SQL("ST_GeomFromEWKB({})").format(sql.Literal(wkb)))
+
+
+async def split_columns(conn, lyr: LayerDef) -> list[tuple[str, str]]:
+    """Kolumny kopiowane do nowych części: (nazwa, polityka). Bez klucza, geometrii, kolumn
+    identity/generowanych/z sekwencją; polityka DefaultValue = kolumna pominięta (domyślna z bazy)."""
+    rows = await (await conn.execute(
+        """SELECT a.attname AS name, t.typcategory AS cat
+             FROM pg_attribute a JOIN pg_type t ON t.oid = a.atttypid
+             LEFT JOIN pg_attrdef d ON d.adrelid = a.attrelid AND d.adnum = a.attnum
+            WHERE a.attrelid = to_regclass(format('%%I.%%I', %s::text, %s::text)) AND a.attnum > 0
+              AND NOT a.attisdropped AND a.attgenerated = '' AND a.attidentity = ''
+              AND coalesce(pg_get_expr(d.adbin, d.adrelid), '') NOT LIKE 'nextval(%%'
+            ORDER BY a.attnum""", (lyr.pg.schema, lyr.pg.table))).fetchall()
+    return split_plan(lyr, [(r["name"], r["cat"]) for r in rows])
+
+
+def split_plan(lyr: LayerDef, columns: list[tuple[str, str]]) -> list[tuple[str, str]]:
+    """(kolumna, kategoria typu z pg_type) → (kolumna, polityka) dla nowych części."""
+    policy = {f.name: f.split_policy for f in lyr.fields}
+    out = []
+    for name, cat in columns:
+        if name in (lyr.pg.key, lyr.pg.geometry_column):
+            continue
+        p = policy.get(name, "Duplicate")
+        if p == "GeometryRatio" and cat != "N":
+            p = "Duplicate"                  # proporcja tylko dla liczb
+        if p != "DefaultValue":
+            out.append((name, p))
+    return out
+
+
+@router.post("/split")
+async def split_features(slug: str, layer_id: str, body: SplitIn, crs: str = "EPSG:3857",
+                         user: CurrentUser = Depends(require_user)):
+    """Podział obiektów linią (QGIS: „Podziel obiekty”). Największa część zostaje pod starym kluczem
+    (zdjęcia, dokumenty i rekordy powiązane przy niej), pozostałe są nowymi obiektami z atrybutami
+    według polityk podziału pól z projektu QGIS. Jedna transakcja, kontrola zakresu po zmianie."""
+    ctx = await load_project_context(slug, user)
+    lyr = ctx.require(layer_id, "update")
+    if not ctx.perms(layer_id).insert:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "Podział wymaga prawa dodawania obiektów")
+    if not lyr.pg or not lyr.pg.geometry_column or lyr.geometry_type not in ("Polygon", "Line"):
+        raise HTTPException(status.HTTP_400_BAD_REQUEST, "Podział działa dla warstw poligonowych i liniowych")
+    if body.line.get("type") != "LineString" or len(body.line.get("coordinates") or []) < 2:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Linia podziału musi mieć co najmniej dwa punkty")
+    srid = _srid(crs)
+    g = col(T, lyr.pg.geometry_column)
+    blade = _geom_sql(lyr, body.line, srid, multi=False)
+    alias = sql.Identifier(*T)
+
+    created: list[str] = []
+    updated: list[str] = []
+    old_rows: dict[str, dict] = {}
+    async with layer_conn(lyr.pg.conninfo) as conn, conn.transaction():
+        if body.pks is None:
+            rows = await (await conn.execute(sql.SQL(
+                """SELECT {k}::text AS pk FROM {t} AS {a}
+                    WHERE {f} AND {g} && {b} AND ST_Intersects({g}, {b}) AND ST_NumGeometries(ST_Split({g}, {b})) > 1
+                    ORDER BY 1 LIMIT {n}""").format(
+                k=col(T, lyr.pg.key), t=_table(lyr), a=alias, f=row_filter(ctx, lyr, T, "edit"), g=g, b=blade,
+                n=sql.Literal(SPLIT_LIMIT + 1)))).fetchall()
+            pks = [r["pk"] for r in rows]
+            if len(pks) > SPLIT_LIMIT:
+                raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
+                                    f"Linia dzieli ponad {SPLIT_LIMIT} obiektów — zaznacz obiekt albo skróć linię")
+        else:
+            pks = list(dict.fromkeys(body.pks))
+        if body.dry_run:
+            return {"pks": pks}
+        if not pks:
+            raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
+                                "Linia nie dzieli żadnego obiektu — musi przeciąć obiekt na wylot")
+
+        columns = await split_columns(conn, lyr)
+        names = [*(n for n, _ in columns), lyr.pg.geometry_column]
+
+        def values(ratio: float) -> list[sql.Composable]:
+            out: list[sql.Composable] = []
+            for name, p in columns:
+                if p == "UnsetField":
+                    out.append(sql.NULL)
+                elif p == "GeometryRatio":
+                    out.append(sql.SQL("{} * {}").format(col(T, name), sql.Literal(ratio)))
+                else:
+                    out.append(col(T, name))
+            return out
+
+        for pk in pks:
+            old = await _fetch_one(conn, ctx, lyr, pk, srid, "view")
+            if old is None:
+                raise HTTPException(status.HTTP_404_NOT_FOUND, f"Brak obiektu #{pk}")
+            if not await in_scope(conn, ctx, lyr, pk, "edit"):
+                raise HTTPException(status.HTTP_403_FORBIDDEN, f"{OUT_OF_SCOPE} (#{pk}) — tylko podgląd")
+            parts = await (await conn.execute(sql.SQL(
+                """SELECT ST_AsEWKB(p.geom) AS wkb, {mp} AS m, p.total
+                     FROM (SELECT (ST_Dump(ST_Split({g}, {b}))).geom AS geom, {mt} AS total
+                             FROM {t} AS {a} WHERE {pk}) AS p
+                    WHERE {mp} > 0 ORDER BY 2 DESC""").format(
+                mp=_measure(sql.SQL("p.geom")), mt=_measure(g), g=g, b=blade, t=_table(lyr),
+                a=alias, pk=_pk_is(lyr, pk)))).fetchall()
+            if len(parts) < 2:
+                raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
+                                    f"Linia nie dzieli obiektu #{pk} — musi przeciąć go na wylot")
+            total = parts[0]["total"] or sum(p["m"] for p in parts)
+            old_rows[pk] = old
+
+            # nowe części (atrybuty z oryginału, zanim zmieni się jego wartość proporcjonalna)
+            for part in parts[1:]:
+                q = sql.SQL("INSERT INTO {t} ({c}) SELECT {v} FROM {t} AS {a} WHERE {pk} RETURNING {k}::text AS pk").format(
+                    t=_table(lyr), c=sql.SQL(", ").join(sql.Identifier(n) for n in names),
+                    v=sql.SQL(", ").join([*values(part["m"] / total), _from_ewkb(lyr, part["wkb"])]),
+                    a=alias, pk=_pk_is(lyr, pk), k=sql.Identifier(lyr.pg.key))
+                created.append((await (await conn.execute(q)).fetchone())["pk"])
+            # oryginał: największa część
+            ratio = parts[0]["m"] / total
+            sets = [sql.SQL("{} = {}").format(sql.Identifier(lyr.pg.geometry_column), _from_ewkb(lyr, parts[0]["wkb"]))]
+            sets += [sql.SQL("{n} = {n} * {r}").format(n=sql.Identifier(n), r=sql.Literal(ratio))
+                     for n, p in columns if p == "GeometryRatio"]
+            await conn.execute(sql.SQL("UPDATE {t} SET {s} WHERE {k}::text = {pk}").format(
+                t=_table(lyr), s=sql.SQL(", ").join(sets), k=sql.Identifier(lyr.pg.key), pk=sql.Literal(pk)))
+            updated.append(pk)
+
+        for pk in [*updated, *created]:
+            if not await in_scope(conn, ctx, lyr, pk, "edit"):
+                raise _scope_error(ctx, lyr)  # wyjątek w transakcji = wycofanie całego podziału
+        new = {pk: _row_to_feature(await _fetch_one(conn, None, lyr, pk, srid, None)) for pk in [*updated, *created]}
+
+    for pk in updated:
+        await _audit(ctx, layer_id, pk, "update", _row_to_feature(old_rows[pk]), new[pk])
+    for pk in created:
+        await _audit(ctx, layer_id, pk, "insert", None, new[pk])
+    return {"updated": [new[pk] for pk in updated], "created": [new[pk] for pk in created]}

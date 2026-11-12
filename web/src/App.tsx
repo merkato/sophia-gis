@@ -68,6 +68,12 @@ function LoginForm({ onLogin }: { onLogin: () => void }) {
   );
 }
 
+/** „obiekt” w liczbie mnogiej: 2–4 obiekty, 5+ obiektów (bez 12–14). */
+function objectsWord(n: number): string {
+  const t = n % 10, h = n % 100;
+  return t >= 2 && t <= 4 && !(h >= 12 && h <= 14) ? "obiekty" : "obiektów";
+}
+
 export default function App() {
   const [user, setUser] = useState<User | null>(null);
   const [projects, setProjects] = useState<ProjectSummary[]>([]);
@@ -292,6 +298,34 @@ export default function App() {
       .catch((e) => setFetchState((s) => ({ ...s, error: (e as Error).message })));
   };
 
+  /**
+   * Podział linią: zaznaczony (otwarty w formularzu) obiekt warstwy edycyjnej, a bez zaznaczenia —
+   * wszystkie obiekty, które linia dzieli (z potwierdzeniem, gdy więcej niż jeden). Liczy API.
+   */
+  const splitLine = async (layerId: string, line: GeoJSONFeature["geometry"]) => {
+    if (!config) return;
+    const name = config.layers[layerId]?.name ?? "";
+    const target = selection && selection.layerId === layerId && !selection.isNew ? String(selection.feature.id) : null;
+    try {
+      let pks = target ? [target] : null;
+      if (!pks) {
+        pks = (await api.splitFeatures(config.slug, layerId, line, config.crs, { dryRun: true })).pks ?? [];
+        if (!pks.length) {
+          setMessage("Linia nie dzieli żadnego obiektu — musi przeciąć obiekt na wylot.");
+          return;
+        }
+        if (pks.length > 1 && !confirm(`Linia dzieli ${pks.length} ${objectsWord(pks.length)} warstwy „${name}”. Podzielić wszystkie?`)) return;
+      }
+      const r = await api.splitFeatures(config.slug, layerId, line, config.crs, { pks });
+      const created = r.created ?? [];
+      setReloadToken((t) => t + 1);
+      setMessage(`Podzielono: ${pks.map((p) => `#${p}`).join(", ")} → nowe: ${created.map((f) => `#${f.id}`).join(", ")}`);
+      if (target && r.updated?.[0]) setSelection({ layerId, feature: r.updated[0], isNew: false });
+    } catch (e) {
+      setMessage((e as Error).message);
+    }
+  };
+
   const canDelete = !!(selection && editLayer && selection.layerId === editLayer.id && !selection.isNew && editLayer.perms.delete);
   const deleteSelected = async () => {
     if (!config || !selection || !canDelete) return;
@@ -372,6 +406,7 @@ export default function App() {
               onSelect={(layerId, feature) => guard(() => setSelection({ layerId, feature, isNew: false }))}
               onDrawn={(layerId, geometry) => guard(() =>
                 setSelection({ layerId, isNew: true, feature: { type: "Feature", id: "", geometry, properties: {} } }))}
+              onSplitLine={(layerId, line) => guard(() => { void splitLine(layerId, line); })}
               onGeometryModified={async (layerId, pk, geometry) => {
                 if (!config) return;
                 try {

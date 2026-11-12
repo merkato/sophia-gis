@@ -43,7 +43,7 @@ export function tileFormats(config: ProjectConfig): Map<string, string> {
   return out;
 }
 
-export type Tool = "identify" | "select" | "draw" | "modify" | "fetch";
+export type Tool = "identify" | "select" | "draw" | "modify" | "split" | "fetch";
 
 interface Props {
   config: ProjectConfig;
@@ -58,6 +58,7 @@ interface Props {
   onSelect: (layerId: string, feature: GeoJSONFeature) => void;
   onDrawn: (layerId: string, geometry: GeoJSONFeature["geometry"]) => void;
   onGeometryModified: (layerId: string, pk: string, geometry: GeoJSONFeature["geometry"]) => void;
+  onSplitLine: (layerId: string, line: GeoJSONFeature["geometry"]) => void;   // narzędzie „Podziel obiekty”
   onFetchClick?: (coordinate: number[]) => void;         // narzędzie pobierania (ULDK…)
   preview?: GeoJSONFeature["geometry"] | null;           // obrys pobranego obiektu przed dodaniem
   printFrame?: [number, number] | null;                  // obszar wydruku [szer., wys.] w metrach, wokół środka widoku
@@ -80,6 +81,11 @@ const previewStyle = new Style({
 const frameStyle = new Style({
   stroke: new Stroke({ color: "#1c7ed6", width: 2.5 }),
   fill: new Fill({ color: "rgba(28,126,214,0.06)" }),
+});
+
+const splitStyle = new Style({
+  stroke: new Stroke({ color: "#d9363e", width: 2, lineDash: [6, 4] }),
+  image: new Circle({ radius: 5, fill: new Fill({ color: "#d9363e" }), stroke: new Stroke({ color: "#fff", width: 1.5 }) }),
 });
 
 const DRAW_TYPE = { Point: "Point", Line: "LineString", Polygon: "Polygon" } as const;
@@ -341,6 +347,14 @@ export function MapView(props: Props) {
       interactions.push(draw);
     }
 
+    // Podział: linia szkicu (bez zapisu do warstwy) — geometrię części liczy API (PostGIS)
+    if (layerInfo && tool === "split" && layerInfo.perms.update && layerInfo.perms.insert
+      && (layerInfo.geometry_type === "Polygon" || layerInfo.geometry_type === "Line")) {
+      const draw = new Draw({ type: "LineString", style: splitStyle });
+      draw.on("drawend", (e) => cbRef.current.onSplitLine(layerInfo.id, toGeoJSON(e.feature as Feature<Geometry>)));
+      interactions.push(draw);
+    }
+
     if (layerInfo && tool === "modify" && layerInfo.perms.update) {
       const modify = new Modify({ source });
       modify.on("modifyend", (e) => {
@@ -352,11 +366,22 @@ export function MapView(props: Props) {
     }
 
     // Przyciąganie do wierzchołków i krawędzi obiektów warstwy edycyjnej
-    if (layerInfo && (tool === "draw" || tool === "modify")) interactions.push(new Snap({ source }));
+    if (layerInfo && (tool === "draw" || tool === "modify" || tool === "split")) interactions.push(new Snap({ source }));
+
+    // Szkic: Esc przerywa, Backspace cofa ostatni wierzchołek (poza polami formularza)
+    const draws = interactions.filter((i): i is Draw => i instanceof Draw);
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (el && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName))) return;
+      if (e.key === "Escape") draws.forEach((d) => d.abortDrawing());
+      else if (e.key === "Backspace") { draws.forEach((d) => d.removeLastPoint()); e.preventDefault(); }
+    };
+    if (draws.length) document.addEventListener("keydown", onKey);
 
     interactions.forEach((i) => map.addInteraction(i));
     return () => {
       interactions.forEach((i) => map.removeInteraction(i));
+      document.removeEventListener("keydown", onKey);
       if (clickKey) unByKey(clickKey);
       selectRef.current = null;
     };

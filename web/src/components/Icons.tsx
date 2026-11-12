@@ -93,6 +93,15 @@ export const IconVertex = (p: P) => (
   </Svg>
 );
 
+/** Podziel obiekty: dwie części poligonu rozcięte czerwoną linią. */
+export const IconSplit = (p: P) => (
+  <Svg {...p}>
+    <path d="M3 18.5l1.5-11 6.5-2.6 1.6 15.6z" fill={C.greenFill} fillOpacity=".55" stroke={C.green} strokeWidth="1.4" />
+    <path d="M13.4 4.6l6.1 2.6 1.5 10.6-6 2.8z" fill={C.greenFill} fillOpacity=".55" stroke={C.green} strokeWidth="1.4" />
+    <path d="M12.2 1.8l.9 20.4" stroke={C.red} strokeWidth="1.6" strokeDasharray="2.6 1.8" />
+  </Svg>
+);
+
 /** Usuń zaznaczony obiekt. */
 export const IconDelete = (p: P) => (
   <Svg {...p}>

@@ -5,7 +5,7 @@ from pathlib import Path
 import pytest
 from lxml import etree
 
-from app.qgsproject import get_project, layer_attribution, parse_pg_datasource
+from app.qgsproject import _parse_fields, get_project, layer_attribution, parse_pg_datasource
 
 QGS = """<!DOCTYPE qgis>
 <qgis projectname="Ewidencja testowa" version="4.2.3">
@@ -153,3 +153,13 @@ def test_layer_attribution():
         '<attribution href="javascript:alert(1)"></attribution></maplayer>')
     assert layer_attribution(ml) == ("Domena publiczna", None)
     assert layer_attribution(etree.fromstring("<maplayer/>")) == (None, None)
+
+
+def test_split_policies():
+    ml = etree.fromstring(
+        '<maplayer><fieldConfiguration><field name="id"/><field name="nazwa"/><field name="pow"/>'
+        '<field name="nr"/></fieldConfiguration><splitPolicies>'
+        '<policy field="id" policy="DefaultValue"/><policy field="pow" policy="GeometryRatio"/>'
+        '<policy field="nr" policy="Nieznana"/></splitPolicies></maplayer>')
+    pol = {f.name: f.split_policy for f in _parse_fields(ml)}
+    assert pol == {"id": "DefaultValue", "nazwa": "Duplicate", "pow": "GeometryRatio", "nr": "Duplicate"}
