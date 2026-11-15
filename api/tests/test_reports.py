@@ -3,7 +3,7 @@ from types import SimpleNamespace
 from lxml import etree
 
 from app.qgsproject import LayerDef, layout_items
-from app.routers.reports import _label_text, project_basemap_layer
+from app.routers.reports import _label_text, fit_extent, project_basemap_layer
 
 # Fragment układu w formacie zapisywanym przez QGIS 4 (typy: 65639 mapa, 65641 etykieta, 65638 strona)
 LAYOUT = """<Layout name="Mapa A4 pozioma">
@@ -43,3 +43,14 @@ def test_catalog_basemap_matches_project_layer():
 
 def test_label_text_strips_expressions():
     assert _label_text("Mapa [% env('PGPASSWORD') %] obszaru") == "Mapa  env('PGPASSWORD')  obszaru"
+
+
+def test_fit_extent_keeps_frame_proportions():
+    frame = [200.0, 250.0]                                   # mm, pion 4:5
+    # stała skala: rozmiar ramki × skala wokół środka widoku (proporcje ekranu bez znaczenia)
+    assert fit_extent([0, 0, 1000, 200], frame, 1000) == [400.0, -25.0, 600.0, 225.0]
+    # cały widok, ekran szeroki: wysokość dociągnięta do proporcji ramki
+    assert fit_extent([0, 0, 1000, 200], frame, None) == [0.0, -525.0, 1000.0, 725.0]
+    # cały widok, ekran wysoki: szerokość dociągnięta
+    assert fit_extent([0, 0, 100, 1000], frame, None) == [-350.0, 0.0, 450.0, 1000.0]
+    assert fit_extent([0, 0, 10, 10], None, 500) == [0, 0, 10, 10]

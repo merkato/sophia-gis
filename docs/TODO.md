@@ -145,6 +145,34 @@ wysyła szkic. W przeglądarce nie dokładamy biblioteki topologii (JSTS).
   - testy w `api/tests` (polityki, walidacja szkicu) plus próba SQL na bazie serwera;
   - opis w `docs/user/README.md` (tabela narzędzi).
 
+### 11. Wydruki (bez raportów) — plan z 15.11
+
+Stan: dwa rodzaje wydruku — szablon QGIS (GetPrint, PDF z QGIS Server) i układ Sophii (w przeglądarce,
+z kafli). Pierwszy szablon na serwerze: projekt kolejowy, „Linia kolejowa” (A4 pion, mapa 198×254 mm,
+etykiety `title` i `copyright`) — GetPrint działa (PDF 150 dpi w ~4 s), tytuł z Sophii trafia do etykiety.
+
+1. [x] **Błąd: ramka mapy szablonu przyjmuje proporcje zasięgu z ekranu.** Poprawione 15.11
+   (`fit_extent` w `reports.py`, test; próba GetPrint: ramka 198×254 mm przy szerokim ekranie i stałej skali). QGIS Server dopasowuje
+   wysokość mapy do proporcji `map0:EXTENT` (wysoki ekran — ramka wychodzi poza kartkę, szeroki —
+   spłaszczona). Poprawka w `api/app/routers/reports.py`: zasięg o proporcjach `map_mm` szablonu —
+   przy stałej skali środek widoku ± `map_mm × skala`, przy „cały widok” zasięg widoku powiększony do
+   proporcji ramki. Test: GetPrint do PNG, ramka = rozmiar z szablonu. Mała zmiana, najpierw.
+2. [ ] **Więcej etykiet z Sophii** (obok `tytul`/`title`, `opis`/`description`): `zrodla` — atrybucje
+   widocznych warstw i podkładu (jak „Źródła” w układzie Sophii, dziś w szablonie trzeba je wpisać
+   ręcznie), `autor` — nazwa zalogowanego użytkownika. Skala, data, północ — wyrażenia QGIS (bez zmian).
+   Panel pokazuje, które etykiety szablon obsługuje.
+3. [ ] **Przezroczystość w szablonie QGIS**: ◐ z panelu warstw (rastry, podkład z warstwy projektu) jako
+   `OPACITIES` w GetPrint — najpierw sprawdzić, czy QGIS Server 4.2 przyjmuje je dla `map0:LAYERS`.
+4. [ ] **Układ Sophii przy dużych rastrach** (dziś limit 60 s, zimny cache, QGIS Server: 3 procesy):
+   pomiar na Schmettau; licznik postępu kafli w karcie „Przygotowywanie…”, limit zależny od liczby kafli,
+   najwyżej kilka zapytań naraz (bez kolejki w QGIS Server), ewentualnie poziom kafli dobrany do dpi.
+5. [ ] **Dokumentacja `docs/user/wydruki.md`**: proporcje ramki (pkt 1), identyfikatory etykiet (pkt 2),
+   legenda powiązana z mapą i „aktualizuj automatycznie”, mapa przeglądowa (`map1` podąża za `map0`).
+6. [ ] **Do sprawdzenia w przeglądarce**: wydruk z szablonu z panelu (po pkt 1), mapa bez projektu
+   z wydrukiem dla niezalogowanych.
+7. [ ] Później / do decyzji: podkład z katalogu w szablonie bez warstwy w projekcie (dziś wymóg — może
+   ostrzeżenie w Diagnostyce Fii), obrót wydruku (`map0:ROTATION`), wybór DPI w szablonie (jest).
+
 ## Zaległe z wcześniejszych dni
 
 - [ ] Edytor schematu bazy w WebUI (tabele, kolumny, relacje, słowniki) — patrz ARCHITECTURE.md.
@@ -170,7 +198,9 @@ wysyła szkic. W przeglądarce nie dokładamy biblioteki topologii (JSTS).
 
 ## Do sprawdzenia (zrobione, nieprzetestowane w pełni)
 
-- [ ] Wydruk z szablonu QGIS przez Sophię — żaden projekt na serwerze nie ma jeszcze szablonu.
+- [x] Wydruk z szablonu QGIS przez Sophię — sprawdzony 15.11 na projekcie kolejowym: działa, błąd proporcji
+      ramki → punkt 11.1. Przy okazji: od 12.11 QGIS Server nie czytał `pg_service.conf` (prawa 600 po
+      przeniesieniu poza gita) — warstwy PostGIS były „nieprawidłowe”; poprawione (`chmod 644`).
 - [ ] Mapa bez projektu (same podkłady), także dla niezalogowanych.
 - [ ] Zakładki Fii w QGIS: „Zakres danych”, „Narzędzia pobierania”, zapamiętane poświadczenia.
 - [ ] Wydruk w układzie Sophii przy dużych rastrach projektu: kafle z zimnego cache bywają wolne

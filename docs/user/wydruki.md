@@ -42,7 +42,9 @@ szablonu na liście w Sophii (w Fii, zakładka **Raporty**, można ją zmienić 
    - **Zablokuj warstwy** i **Podążaj za motywem mapy** — **wyłączone**. Sophia podaje warstwy
      widoczne w przeglądarce; zablokowane warstwy albo motyw zastąpiłyby wybór użytkownika,
    - skala i zasięg zapisane w szablonie nie mają znaczenia — Sophia ustawia środek i skalę przy
-     każdym wydruku. Zostaw np. widok całego projektu.
+     każdym wydruku. Zostaw np. widok całego projektu,
+   - kształt ramki zostaje taki, jak w szablonie. Przy opcji „cały widok mapy” Sophia rozszerza widok
+     z ekranu do proporcji ramki (na wydruku może być trochę więcej terenu niż na ekranie, nigdy mniej).
 
 ### 2. Tytuł i opis z Sophii
 

@@ -7,6 +7,9 @@ tytuł i opis do etykiet o identyfikatorach `tytul` / `opis`. docs/user/wydruki.
 
 QGIS Server adresuje mapy szablonu kolejnością: map0 = pierwsza mapa układu. map0:LAYERS — pierwsza
 warstwa na spodzie (jak w GetMap); podkład z katalogu idzie więc na początek listy.
+
+map0:EXTENT musi mieć proporcje ramki mapy szablonu — QGIS Server dopasowuje wysokość ramki do
+proporcji zasięgu (zasięg ekranu: ramka wychodzi poza kartkę albo się spłaszcza), patrz fit_extent.
 """
 from __future__ import annotations
 
@@ -76,6 +79,25 @@ async def _basemaps(project: Project, ids: list[int]) -> list[dict]:
     return out
 
 
+def fit_extent(extent: list[float], map_mm: list[float] | None, scale: float | None) -> list[float]:
+    """Zasięg o proporcjach ramki mapy szablonu wokół środka widoku: przy stałej skali rozmiar
+    ramki × skala, bez skali — widok powiększony do proporcji ramki (cały widok na wydruku)."""
+    if not map_mm or map_mm[0] <= 0 or map_mm[1] <= 0:
+        return extent
+    minx, miny, maxx, maxy = extent
+    cx, cy = (minx + maxx) / 2, (miny + maxy) / 2
+    if scale:
+        w, h = map_mm[0] * scale / 1000, map_mm[1] * scale / 1000
+    else:
+        w, h = maxx - minx, maxy - miny
+        ratio = map_mm[0] / map_mm[1]
+        if w / h > ratio:
+            h = w / ratio
+        else:
+            w = h * ratio
+    return [cx - w / 2, cy - h / 2, cx + w / 2, cy + h / 2]
+
+
 def _ids(s: str | None) -> list[int]:
     return [int(x) for x in (s or "").split(",") if x.strip().isdigit()]
 
@@ -138,7 +160,13 @@ async def render_report(
         params["ATLAS_PK"] = pk
     else:
         if extent:
-            params["map0:EXTENT"] = extent
+            try:
+                box = [float(v) for v in extent.split(",")]
+                if len(box) != 4 or box[2] <= box[0] or box[3] <= box[1]:
+                    raise ValueError
+            except ValueError as exc:
+                raise HTTPException(status.HTTP_400_BAD_REQUEST, "Błędny zasięg (extent)") from exc
+            params["map0:EXTENT"] = ",".join(f"{v:.3f}" for v in fit_extent(box, report.map_mm, scale))
         if scale:
             params["map0:SCALE"] = str(round(scale))
         requested = [n for n in (layers or "").split(",") if n]
