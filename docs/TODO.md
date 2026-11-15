@@ -14,8 +14,9 @@ Oznaczenia: ✅ zrobione · ✔️ zrobione częściowo (co zostało — w plani
 - ⬜ Obrót wydruku (`map0:ROTATION`).
 
 ### ⬜ 2. Do przetestowania (zrobione, nieprzetestowane w pełni)
-- ⬜ Po wdrożeniu (15.11): etykiety `zrodla`/`autor` i przezroczystość w szablonie, postęp wydruku
-  w układzie Sophii (Schmettau, duże rastry), mapa „bez projektu” z listy i jej wydruk.
+- ⬜ Postęp wydruku w układzie Sophii na dużym rastrze (Schmettau, A3, 200 dpi) — test 15.11 w schowanym
+  panelu przeglądarki przerwał się (karta nie rysowała klatek); powtórzyć w widocznym oknie.
+- ⬜ Etykiety `zrodla`/`autor` na szablonie, który je ma (szablon projektu kolejowego ma tylko `title`).
 - ⬜ Zakładki Fii w QGIS: „Zakres danych”, „Narzędzia pobierania”, zapamiętane poświadczenia.
 - ⬜ Narzędzia edycji geometrii w przeglądarce na prawdziwych danych, cofanie (Ctrl+Z).
 
@@ -82,6 +83,7 @@ danych, wpis do dziennika zmian. Opis: `docs/user/README.md`.
 ### ✅ Mapa, warstwy i podkłady
 - ✅ Mapa z podkładami także bez projektu i dla niezalogowanych; na liście projektów pozycja
   „bez projektu (same podkłady)” (15.11 — wcześniej tryb był dostępny tylko bez żadnego projektu).
+  Sprawdzone w przeglądarce jako gość: mapa całej Polski i wydruk A4 z ortofotomapą i źródłem GUGiK.
 - ✅ Panel warstw: podkład i nakładki na dole, przezroczystość ◐ dla rastrów, podkładów i nakładek
   (af0ccb6).
 - ✅ Atrybucja warstw z projektu QGIS na mapie i w „Źródłach” wydruku (56a4ef9).
@@ -97,7 +99,8 @@ danych, wpis do dziennika zmian. Opis: `docs/user/README.md`.
 - ✅ Ramka mapy szablonu zachowuje proporcje z szablonu (`fit_extent`, a77be9a). Wydruk z panelu
   sprawdzony w przeglądarce 15.11 (gość, projekt kolejowy, 1:50 000 — zgodny z ramką na mapie).
 - ✅ Etykiety `zrodla` (atrybucje) i `autor` (zalogowany użytkownik), przezroczystość ◐ w szablonie
-  (`OPACITIES` w GetPrint), panel podaje, co wpisze do szablonu (15.11).
+  (`OPACITIES` w GetPrint), panel podaje, co wpisze do szablonu (15.11, 6c84653). Krycie z panelu
+  dociera do QGIS Server (sprawdzone w przeglądarce).
 - ✅ Układ Sophii przy dużych rastrach: licznik postępu kafli, najwyżej 6 zapytań naraz, limit od
   ostatniego postępu (45 s) zamiast stałych 60 s, najwyżej 5 min (15.11).
 - ✅ Dokumentacja `docs/user/wydruki.md`: etykiety, legenda, mapa przeglądowa, postęp i limity.

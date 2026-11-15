@@ -149,6 +149,8 @@ export async function renderPrintMap(src: PrintSource, o: PrintOptions, onProgre
       const t0 = Date.now();
       const timer = setInterval(() => {
         const now = Date.now();
+        // karta w tle: przeglądarka wstrzymuje rysowanie, a z nim wczytywanie kafli — czekamy bez limitu
+        if (document.hidden) { lastProgress = now; return; }
         if (now - lastProgress > STALL_MS) {
           reject(new Error(`Mapa do wydruku przestała się wczytywać (wczytano ${finished} z ${started} kafli). `
             + "Spróbuj ponownie za chwilę — serwer mógł być zajęty — albo wybierz niższą jakość."));
