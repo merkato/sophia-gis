@@ -18,8 +18,9 @@ Wspólne ustawienia w panelu:
   1:10 000, 1:25 000, 1:50 000, 1:100 000, 1:250 000, 1:500 000. Środek wydruku = środek mapy.
 - **Tytuł** i **opis** — trafiają do etykiet szablonu (niżej) albo do nagłówka układu Sophii.
 - **Jakość** — 96 / 150 / 200 dpi (szablon QGIS także 300 dpi).
-- Na wydruku są warstwy włączone w panelu warstw i wybrany podkład, w kolejności jak na ekranie.
-  Każdy widzi tylko dane ze swojego zakresu ([uprawnienia](uprawnienia.md)).
+- Na wydruku są warstwy włączone w panelu warstw i wybrany podkład, w kolejności jak na ekranie,
+  z **przezroczystością** ustawioną suwakiem ◐ (rastry, podkład). Każdy widzi tylko dane ze swojego
+  zakresu ([uprawnienia](uprawnienia.md)).
 
 Raporty **dla obiektu** (szablony z atlasem) są w formularzu obiektu, zakładka **Raporty**.
 
@@ -46,17 +47,20 @@ szablonu na liście w Sophii (w Fii, zakładka **Raporty**, można ją zmienić 
    - kształt ramki zostaje taki, jak w szablonie. Przy opcji „cały widok mapy” Sophia rozszerza widok
      z ekranu do proporcji ramki (na wydruku może być trochę więcej terenu niż na ekranie, nigdy mniej).
 
-### 2. Tytuł i opis z Sophii
+### 2. Tytuł, opis, źródła i autor z Sophii
 
 Dodaj etykiety (*Dodaj element → Etykieta*) i nadaj im **identyfikatory elementu**:
 
-| Identyfikator | Treść z panelu Sophii |
+| Identyfikator | Treść z Sophii |
 |---|---|
-| `tytul` | pole **Tytuł** |
-| `opis` | pole **Opis** (np. stan na dzień, sygnatura sprawy) |
+| `tytul` (albo `title`) | pole **Tytuł** z panelu |
+| `opis` (albo `description`) | pole **Opis** (np. stan na dzień, sygnatura sprawy) |
+| `zrodla` (albo `sources`) | **źródła** — atrybucje podkładu i włączonych warstw, rozdzielone średnikiem (jak „Źródła” w układzie Sophii) |
+| `autor` (albo `author`) | imię i nazwisko zalogowanego użytkownika (albo login), z serwera — przy wydruku bez logowania zostaje tekst z szablonu |
 
-Tekst wpisany w QGIS jest wartością domyślną — Sophia go zastępuje. Gdy szablon nie ma takiej
-etykiety, pole w panelu jest wyłączone. Wyrażenia `[% … %]` wpisane przez użytkownika w Sophii są
+Tekst wpisany w QGIS jest wartością domyślną — Sophia go zastępuje w całości, więc stały napis
+(„Źródła:”, „Opracował:”) umieść w osobnej etykiecie obok. Gdy szablon nie ma etykiety tytułu albo
+opisu, pole w panelu jest wyłączone; pod ustawieniami panel podaje, co Sophia wpisze do szablonu. Wyrażenia `[% … %]` wpisane przez użytkownika w Sophii są
 usuwane (nie wykonują się na serwerze); wyrażenia w etykietach szablonu działają normalnie.
 
 ### 3. Skala, podziałka, północ, data
@@ -70,6 +74,11 @@ usuwane (nie wykonują się na serwerze); wyrażenia w etykietach szablonu dzia�
 - **Data wydruku**: etykieta `[% format_date(now(), 'dd.MM.yyyy') %]`.
 - **Legenda**: *Dodaj element → Legenda*, *Mapa* = mapa główna; włącz *Automatyczna aktualizacja*,
   wtedy legenda pokazuje warstwy z wydruku (opcjonalnie *Filtruj legendę według zawartości mapy*).
+  Bez automatycznej aktualizacji legenda pokazuje listę zapisaną w QGIS, niezależnie od warstw
+  włączonych w Sophii.
+- **Mapa przeglądowa**: druga mapa (dodana **po** mapie głównej) z *Podglądem* (*Overview*)
+  ustawionym na mapę główną — prostokąt podąża za środkiem i skalą wydruku z Sophii, a zasięg samej
+  mapy przeglądowej jest ten z szablonu.
 - **Siatka współrzędnych**: we właściwościach mapy głównej, *Siatki* — działa w każdej skali.
 
 ### 4. Podkład z katalogu na wydruku z szablonu
@@ -100,5 +109,9 @@ skala → **Utwórz PDF**. Zmiany w szablonie są widoczne po ponownej publikacj
 - Pozostałe mapy szablonu (przeglądowe) pokazują to, co zapisano w QGIS (mogą mieć *Podgląd*
   zasięgu mapy głównej).
 - Duże formaty w 300 dpi generują się kilkanaście–kilkadziesiąt sekund.
+- Układ Sophii pobiera mapę kaflami: przycisk pokazuje postęp („Przygotowywanie… 40/120”). Przy
+  dużych rastrach, gdy kafle nie są jeszcze w pamięci podręcznej serwera, trwa to dłużej — wydruk
+  przerywa się dopiero, gdy przez 45 s nie przyjdzie żaden kafel (albo po 5 minutach). Wtedy spróbuj
+  ponownie (część kafli jest już gotowa) albo wybierz niższą jakość.
 - Układ Sophii otwiera stronę w nowej karcie — jeśli nic się nie dzieje, zezwól przeglądarce na
   wyskakujące okna dla Sophii.

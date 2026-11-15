@@ -190,6 +190,8 @@ export interface ReportInfo {
   labels: string[];
   title_label: string | null;
   note_label: string | null;
+  sources_label: string | null;       // etykieta źródeł (atrybucje warstw i podkładu)
+  author_label: string | null;        // etykieta autora (zalogowany użytkownik)
   basemaps: { id: number; name: string; layer: string | null }[];
 }
 

@@ -1,213 +1,108 @@
-# TO DO — WebUI i Fia
+# TO DO — Sophia (WebUI, API, Fia)
 
-Lista z 10.11.2026 (aktualizacja 11.11.2026, wieczór). Kolejność jest kolejnością realizacji.
+Aktualizacja 15.11.2026. Na górze plan (kolejność = kolejność realizacji), niżej zrobione — tematycznie.
 
-## Główne zadania
+Oznaczenia: ✅ zrobione · ✔️ zrobione częściowo (co zostało — w planie) · ⬜ do zrobienia
 
-### 1. ✅ Edytor atrybutów jako okno na środku ekranu (a048d5b)
-- Formularz obiektu (atrybuty, powiązane, dokumenty) jako okno modalne / pływające na środku,
-  zamiast panelu przy prawej krawędzi. Mapa pod spodem nadal widoczna (półprzezroczyste tło
-  albo okno przesuwalne).
-- Na telefonie: pełny ekran.
-- Dotyczy: `web/src/components/FeaturePanel.tsx`, `App.tsx`, `styles.css`.
+---
 
-### 2. ✅ Po zapisie kliknięcie w inny obiekt wczytuje go do formularza (1a90dd1)
-- Teraz po zapisie formularz zostaje otwarty na zapisanym obiekcie, a kolejne kliknięcie
-  na mapie go nie podmienia.
-- Oczekiwane: jeśli w formularzu nie ma niezapisanych zmian, kliknięcie (identyfikacja albo
-  „Wybierz”) wczytuje nowy obiekt. Przy niezapisanych zmianach pytamy: zapisz / odrzuć / anuluj.
+## Plan
 
-### 3. ✅ Fotografie, także z aparatu telefonu/tabletu (08a7116)
-- Załącznik typu zdjęcie: `<input type="file" accept="image/*" capture="environment">`
-  otwiera aparat w przeglądarce mobilnej.
-- Po stronie serwera: JPEG/PNG/HEIC (konwersja HEIC → JPEG), zmniejszenie do rozsądnego
-  rozmiaru, miniatury, EXIF (data, GPS, orientacja). Galeria w formularzu.
-- Zrobione inaczej niż w planie: bez ustawienia w Fii — pole z widżetem QGIS „Załącznik” (wariant A)
-  albo tabela zdjęć w relacji (wariant B), galeria z wizytacjami, pobieranie do QGIS przez Fię.
-  Opis: `docs/user/zdjecia.md`.
+### ⬜ 1. Wydruki — do decyzji
+- ⬜ Podkład z katalogu w szablonie bez warstwy w projekcie (dziś wymóg; panel uprzedza) — może
+  ostrzeżenie w Diagnostyce Fii.
+- ⬜ Obrót wydruku (`map0:ROTATION`).
 
-### 4. ✅ Ikony zamiast napisów na przyciskach (razem z punktem 7)
-- Uniwersalne, w stylu QGIS (zestaw ikon SVG w repo, np. na licencji zgodnej z QGIS):
-  wybierz, rysuj punkt / linię / poligon, zmień geometrię, usuń, zapisz, identyfikacja,
-  pomiar, wydruk, warstwy, podkłady.
-- Podpowiedź (`title` / tooltip) z pełną nazwą przy każdej ikonie.
-- Zrobione: własne SVG w stylu QGIS (`web/src/components/Icons.tsx`) — bez kopiowania grafik QGIS (GPL).
-  Pomiar i wydruk dojdą do paska razem z tymi narzędziami.
+### ⬜ 2. Do przetestowania (zrobione, nieprzetestowane w pełni)
+- ⬜ Po wdrożeniu (15.11): etykiety `zrodla`/`autor` i przezroczystość w szablonie, postęp wydruku
+  w układzie Sophii (Schmettau, duże rastry), mapa „bez projektu” z listy i jej wydruk.
+- ⬜ Zakładki Fii w QGIS: „Zakres danych”, „Narzędzia pobierania”, zapamiętane poświadczenia.
+- ⬜ Narzędzia edycji geometrii w przeglądarce na prawdziwych danych, cofanie (Ctrl+Z).
 
-### 5. ✅ Załączniki (PDF i inne) z WebUI — osobny katalog na projekt
-- **Stan obecny:** WebUI już dodaje PDF (zakładka „Dokumenty” w formularzu), jeśli warstwa ma
-  w Fii zaznaczone „Załączniki PDF”. Ograniczenia: tylko PDF (sprawdzanie `%PDF-`), pliki we
-  wspólnym wolumenie `attachments` (`xx/yy/<uuid>.pdf`), nie w katalogu projektu.
-- Zrobione jak zdjęcia (`docs/user/zalaczniki.md`): pole „Załącznik” bez podglądu obrazu albo tabela
-  dokumentów w relacji; typy z filtra plików widżetu QGIS; pliki bez zmian w `data/uploads/<slug>/pliki`;
-  stary mechanizm „Załączniki PDF” usunięty (na serwerze nie było plików). Limit per warstwa — z punktem 8.
-- Pierwotny plan: dozwolone typy konfigurowane w Fii (PDF, obrazy, DOCX/ODT, ZIP…), limit
-  rozmiaru per warstwa, katalog uploadów per projekt (np. `data/uploads/<slug>/…`),
-  uwzględnienie w kopii zapasowej, podgląd/pobieranie z formularza.
+### ⬜ 3. Drobne zaległości
+- ⬜ **Pomiar** (długość, powierzchnia) na pasku narzędzi — był na liście ikon, nie powstał.
+- ⬜ **Limit wielkości plików per warstwa** (zdjęcia, dokumenty) — dziś globalne limity w konfiguracji API.
+- ⬜ Kolejne źródła narzędzi pobierania: PRG adresy, BDOT10k (nowy wpis w `SOURCES` i w `fia/tools.py`).
 
-### 6. ✅ Narzędzie ULDK: działka z kliknięcia do warstwy projektu
-- Kliknięcie w mapę → zapytanie do ULDK (GUGiK, `uldk.gugik.gov.pl`, `GetParcelByXY`) →
-  pokazanie działki (obrys na mapie, identyfikator TERYT, obręb, gmina) → pytanie „Dodać
-  do warstwy …?” → zapis geometrii i atrybutów do warstwy wskazanej w Fii.
-- Konfiguracja w Fii (nowa zakładka „Narzędzia pobierania”): warstwa docelowa, mapowanie
-  pól (TERYT, numer, obręb, gmina, powiat, województwo…), czy otwierać formularz po dodaniu.
-- **Architektura rozszerzalna:** wspólny mechanizm „pobierz obiekt z usługi zewnętrznej
-  i dodaj do warstwy” z wtyczkami źródeł (ULDK działki, ULDK budynki, PRG adresy, BDOT…).
-  Każde źródło: zapytanie po punkcie/identyfikatorze, normalizacja wyniku, mapowanie pól z Fii.
-  Zapytania przez API Sophii (bez CORS, z logiem i limitem).
-- Zrobione: `api/app/fetchers.py` (źródła ULDK działka i budynek), `routers/fetch.py`, zakładka Fii
-  „Narzędzia pobierania” (`fia/tools.py`), przycisk na pasku i karta wyniku w WebUI; `docs/user/uldk.md`.
-  Kolejne źródła (PRG adresy, BDOT10k) — nowy wpis w SOURCES i w `fia/tools.py`.
+### ⬜ 4. Edytor schematu bazy w WebUI
+Tabele, kolumny, relacje, słowniki — patrz `docs/ARCHITECTURE.md`.
 
-### 7. ✅ Górny pasek narzędzi edycji
-- Wszystkie narzędzia edycyjne (wybierz, rysuj, zmień geometrię, usuń, ULDK…) w pasku
-  u góry ekranu zamiast w panelu bocznym.
-- Gdy żadna warstwa nie jest aktywna do edycji, narzędzia są **wyszarzone** (nie znikają).
-- Wybór aktywnej warstwy edycyjnej: z drzewa (ołówek) i z listy w pasku.
+### ⬜ 5. Raporty po stronie Sophii (na sam koniec)
+Zamiast raportów z menedżera wydruków QGIS — np. raporty z oględzin terenowych do PDF, z filtrem zakresu
+użytkownika. Najpierw analiza dotychczasowego rozwiązania raportów w projekcie, który będzie przenoszony.
 
-### 8. ✅ Model uprawnień: serwer → projekt → zakres danych
-Potrzebny do projektów z podziałem danych na jednostki terenowe (centrala widzi wszystko, oddziały — swoje).
-- **Serwer:** administrator zawsze wszystko; flaga **Autor projektów** przy użytkowniku — publikacja
-  przez Fię bez pełnych praw administratora.
-- **Projekt (grupa w projekcie):** rola podgląd / edycja, prawo do zdjęć i PDF (domyślnie włączone),
-  wyjątki per warstwa (już są: `layer_access`).
-- **Zakres danych (grupa w projekcie):** „cały obszar” albo lista kodów (np. `od01`, `od02`).
-  W Fii autor definiuje **wymiar zakresu** (warstwa granic + pole z kodem) i regułę dla każdej
-  warstwy: *przestrzennie* (dokładna geometria, nie bbox), *atrybut* (pole = kod), *przez relację*
-  (dziedziczy po obiekcie nadrzędnym — oględziny, zdjęcia, PDF), *bez filtra* (słowniki).
-- Granica: widzi każda jednostka, której obszar obiekt przecina; edytuje ta, w której obszarze leży punkt
-  wewnętrzny obiektu (jeden właściciel). Kilka grup = suma zakresów.
-- **Jeden filtr wszędzie:** API (lista, odczyt, edycja, powiązane, zdjęcia, PDF), **QGIS Server**
-  (mapa, identyfikacja, wydruk — wtyczka kontroli dostępu z filtrem SQL od API; dziś zasięgi
-  działają tylko w API, obraz mapy pokazuje wszystkie obiekty!), pobieranie zdjęć przez Fię, raporty.
-- Kolejność: silnik filtra w API → filtr w QGIS Server → model danych i migracja obecnych zasięgów
-  (`extents`, `extent_assignments`) → Fia i panel administratora → dokumentacja na fikcyjnym przykładzie.
-- Wchłania zaległe: zasięg obiektu nadrzędnego dla tabel bez geometrii.
-- Zrobione: `api/app/scope.py` (jeden warunek SQL dla API i QGIS Server), wtyczka
-  `qgis-server-plugins/sophia_filter`, migracja `permissions_v2`, panel (autor projektów, grupy i zakres),
-  Fia (zakładka „Zakres danych”), `docs/user/uprawnienia.md`. Stare zasięgi (`extent_assignments`)
-  wycofane. Limit wielkości plików per warstwa — nie zrobiony (globalne limity w konfiguracji API).
+---
 
-### 9. ✅ Tabela atrybutów zamiast listy rekordów w panelu bocznym
-- Usunąć listę rekordów tabel bez geometrii z panelu bocznego (`RecordList`). Przy dużej tabeli
-  z kilkunastoma atrybutami lista z jedną etykietą nie wystarcza.
-- Kliknięcie warstwy w panelu bocznym (lub ikona „Otwórz tabelę atrybutów” na pasku, jak w QGIS)
-  otwiera **tabelę atrybutów na środku ekranu**: okno przesuwane jak formularz obiektu, na telefonie
-  pełny ekran.
-- **Sortowanie** po kliknięciu nagłówka kolumny (rosnąco / malejąco).
-- **Ukrywanie kolumn** przez użytkownika — tymczasowe (bez zapisu w projekcie; najwyżej zapamiętane
-  w przeglądarce).
-- Kliknięcie wiersza otwiera rekord w formularzu (z pytaniem o niezapisane zmiany), „Dodaj rekord”
-  z paska działa jak dotąd. Także dla warstw z geometrią (wiersz → przybliżenie do obiektu).
-- Wyszukiwanie / filtr, stronicowanie po stronie API dla dużych tabel.
-- Zrobione: `AttributeTable.tsx`, wspólne okno `FloatingWindow.tsx`, API listy z `offset/sort/desc/q/
-  geometry/total`; `RecordList` usunięty; opis w `docs/user/README.md`.
+## Zrobione
 
-### 10. Narzędzia edycji geometrii
+### ✅ Formularz i tabela atrybutów
+- ✅ Formularz obiektu jako okno nad mapą: przesuwane, zmiana rozmiaru, zwijanie; na telefonie pełny ekran
+  (a048d5b).
+- ✅ Po zapisie kliknięcie innego obiektu wczytuje go do formularza; przy niezapisanych zmianach pytanie
+  zapisz / odrzuć / anuluj (1a90dd1).
+- ✅ Tabela atrybutów zamiast listy rekordów: okno nad mapą, sortowanie i wyszukiwanie po stronie API,
+  ukrywanie kolumn, stronicowanie, wiersz → formularz i przybliżenie (`AttributeTable.tsx`,
+  `FloatingWindow.tsx`).
 
-- [x] **Podział** (12.11): `POST …/features/split`, narzędzie na pasku, Esc/Backspace w szkicach,
-      polityki podziału z projektu, opis w `docs/user/README.md`.
-- [x] **Pierścień**, **pierścień wypełniony** (`POST …/ring`, `POST …?cut_from=`), **usuń pierścień**,
-      **usuń część** (`…/delete-ring`, `…/delete-part`), **połącz obiekty** (`…/merge`, dzieci relacji
-      przechodzą do obiektu, który zostaje), **przesuń obiekt** (OL Translate) (14.11).
-- [x] **Dodaj część** (`…/add-part`), **przekształć** (`…/reshape`, poligony i linie), **obróć**
-      (w przeglądarce, zapis jak przy wierzchołkach), **kopiuj** (`…/{pk}/copy`, polityki duplikowania),
-      **cofnij** (`/api/projects/{slug}/undo`, Ctrl+Z; dziennik zmian z `op`/`srid`, migracja
-      `audit_undo`) (15.11).
+### ✔️ Zdjęcia, dokumenty i pliki
+- ✅ Zdjęcia, także z aparatu telefonu: pole „Załącznik” (wariant A) albo tabela zdjęć w relacji
+  (wariant B), HEIC → JPEG, miniatury, EXIF, galeria, pobieranie do QGIS przez Fię (08a7116,
+  `docs/user/zdjecia.md`).
+- ✅ Dokumenty (PDF, GML, DOCX…) tak samo jak zdjęcia, pliki bez zmian w `data/uploads/<slug>/pliki`
+  (`docs/user/zalaczniki.md`).
+- ✅ Sprzątanie plików osieroconych: kosz projektu, próg 7 dni, panel → Pliki, `python -m app.uploads`
+  (`docs/SERVER.md`, 5b).
+- ⬜ Limit wielkości plików per warstwa → plan, punkt 3.
 
-Odpowiedniki QGIS: *Podziel obiekty*, *Dodaj pierścień*, *Wypełnij pierścień*. Na pasku przy narzędziu
-wierzchołków: podział dla poligonów i linii, oba pierścienie tylko dla poligonów. Szkic rysowany
-w OL z przyciąganiem (Snap) do warstwy edycyjnej, a **geometrię liczy PostGIS po stronie API**:
-w układzie warstwy, w jednej transakcji, z kontrolą zakresu danych i wpisem do audytu. Klient tylko
-wysyła szkic. W przeglądarce nie dokładamy biblioteki topologii (JSTS).
+### ✔️ Pasek narzędzi
+- ✅ Górny pasek narzędzi edycji, wyszarzony bez warstwy edycyjnej; wybór warstwy z drzewa i z listy.
+- ✅ Ikony w stylu QGIS z podpowiedziami — własne SVG (`Icons.tsx`), bez grafik QGIS (GPL).
+- ⬜ Pomiar → plan, punkt 3.
 
-- **Podział** — `POST …/features/split {line, pks?}`:
-  - cel: zaznaczony obiekt, a bez zaznaczenia wszystkie obiekty przecięte linią (w zakresie
-    użytkownika, z potwierdzeniem „podzielić N obiektów?”), jak w QGIS;
-  - `ST_Split` → `ST_Dump`. Największa część zostaje pod starym kluczem (UPDATE, zdjęcia, dokumenty
-    i rekordy powiązane przy niej), pozostałe to INSERT z atrybutami według **polityk podziału
-    pól z projektu QGIS** (*Właściwości warstwy → Atrybuty → Polityka podziału*: duplikuj /
-    wartość domyślna / puste / proporcjonalnie do powierzchni). Klucz główny i pola z domyślną
-    wartością z bazy zawsze pomijane;
-  - linia, która nie przecina obiektu na wylot (< 2 części) → 422 z komunikatem;
-  - kolumna Multi*: każda część to osobny obiekt (`ST_Multi` przy zapisie, jak dziś).
-- **Pierścień (dziura)** — `POST …/features/{pk}/ring {ring}` albo bez `pk`: obiekt, który
-  zawiera szkic. Warunek `ST_Within(ring, geom)`, inaczej 422 („pierścień musi leżeć w całości
-  w obiekcie”). Wynik `ST_Difference`, a `ST_IsValid` przed zapisem.
-- **Pierścień wypełniony** — szkic jak wyżej, potem formularz **nowego** obiektu (isNew, geometria
-  = pierścień). Dziura wycina się dopiero przy zapisie formularza: `POST …/features` z `cut_from:
-  pk`, a INSERT i `ST_Difference` idą w jednej transakcji. Anulowanie formularza niczego nie zmienia.
-- Wspólne:
-  - `qgsproject.py` czyta polityki podziału (`<splitPolicies>`);
-  - po operacji: `reloadToken` (warstwa edycyjna i WMS), formularz z obiektem źródłowym;
-  - niezapisane zmiany w formularzu → istniejące pytanie `guard()`;
-  - Esc przerywa szkic, Backspace cofa wierzchołek;
-  - testy w `api/tests` (polityki, walidacja szkicu) plus próba SQL na bazie serwera;
-  - opis w `docs/user/README.md` (tabela narzędzi).
+### ✅ Edycja geometrii
+Szkic w przeglądarce z przyciąganiem, geometrię liczy PostGIS w API: jedna transakcja, kontrola zakresu
+danych, wpis do dziennika zmian. Opis: `docs/user/README.md`.
+- ✅ Podział obiektów (polityki podziału pól z projektu QGIS), Esc/Backspace w szkicach (12.11).
+- ✅ Pierścień, pierścień wypełniony, usuń pierścień, usuń część, połącz obiekty (zdjęcia i rekordy
+  powiązane przechodzą do obiektu, który zostaje), przesuń obiekt (14.11).
+- ✅ Dodaj część, przekształć (poligony i linie), obróć, kopiuj (polityki duplikowania) (15.11, 70af12f).
+- ✅ Cofnij ostatnią operację z dziennika zmian, Ctrl+Z; odmowa, gdy obiekt zmieniono później
+  (migracja `audit_undo`).
 
-### 11. Wydruki (bez raportów) — plan z 15.11
+### ✅ Uprawnienia i zakres danych
+- ✅ Serwer → projekt → zakres danych: autor projektów, role w grupach, prawa do zdjęć i plików, zakres
+  przestrzenny / atrybut / przez relację / bez filtra (`api/app/scope.py`).
+- ✅ Jeden filtr w API i w QGIS Server (wtyczka `sophia_filter`), Fia: zakładka „Zakres danych”,
+  `docs/user/uprawnienia.md`. Stare zasięgi wycofane.
 
-Stan: dwa rodzaje wydruku — szablon QGIS (GetPrint, PDF z QGIS Server) i układ Sophii (w przeglądarce,
-z kafli). Pierwszy szablon na serwerze: projekt kolejowy, „Linia kolejowa” (A4 pion, mapa 198×254 mm,
-etykiety `title` i `copyright`) — GetPrint działa (PDF 150 dpi w ~4 s), tytuł z Sophii trafia do etykiety.
+### ✅ Narzędzia pobierania
+- ✅ ULDK: działka i budynek z kliknięcia do warstwy projektu, mapowanie pól w Fii, karta wyniku
+  (`api/app/fetchers.py`, `fia/tools.py`, `docs/user/uldk.md`). Kolejne źródła → plan, punkt 3.
 
-1. [x] **Błąd: ramka mapy szablonu przyjmuje proporcje zasięgu z ekranu.** Poprawione 15.11
-   (`fit_extent` w `reports.py`, test; próba GetPrint: ramka 198×254 mm przy szerokim ekranie i stałej skali). QGIS Server dopasowuje
-   wysokość mapy do proporcji `map0:EXTENT` (wysoki ekran — ramka wychodzi poza kartkę, szeroki —
-   spłaszczona). Poprawka w `api/app/routers/reports.py`: zasięg o proporcjach `map_mm` szablonu —
-   przy stałej skali środek widoku ± `map_mm × skala`, przy „cały widok” zasięg widoku powiększony do
-   proporcji ramki. Test: GetPrint do PNG, ramka = rozmiar z szablonu. Mała zmiana, najpierw.
-2. [ ] **Więcej etykiet z Sophii** (obok `tytul`/`title`, `opis`/`description`): `zrodla` — atrybucje
-   widocznych warstw i podkładu (jak „Źródła” w układzie Sophii, dziś w szablonie trzeba je wpisać
-   ręcznie), `autor` — nazwa zalogowanego użytkownika. Skala, data, północ — wyrażenia QGIS (bez zmian).
-   Panel pokazuje, które etykiety szablon obsługuje.
-3. [ ] **Przezroczystość w szablonie QGIS**: ◐ z panelu warstw (rastry, podkład z warstwy projektu) jako
-   `OPACITIES` w GetPrint — najpierw sprawdzić, czy QGIS Server 4.2 przyjmuje je dla `map0:LAYERS`.
-4. [ ] **Układ Sophii przy dużych rastrach** (dziś limit 60 s, zimny cache, QGIS Server: 3 procesy):
-   pomiar na Schmettau; licznik postępu kafli w karcie „Przygotowywanie…”, limit zależny od liczby kafli,
-   najwyżej kilka zapytań naraz (bez kolejki w QGIS Server), ewentualnie poziom kafli dobrany do dpi.
-5. [ ] **Dokumentacja `docs/user/wydruki.md`**: proporcje ramki (pkt 1), identyfikatory etykiet (pkt 2),
-   legenda powiązana z mapą i „aktualizuj automatycznie”, mapa przeglądowa (`map1` podąża za `map0`).
-6. [ ] **Do sprawdzenia w przeglądarce**: wydruk z szablonu z panelu (po pkt 1), mapa bez projektu
-   z wydrukiem dla niezalogowanych.
-7. [ ] Później / do decyzji: podkład z katalogu w szablonie bez warstwy w projekcie (dziś wymóg — może
-   ostrzeżenie w Diagnostyce Fii), obrót wydruku (`map0:ROTATION`), wybór DPI w szablonie (jest).
+### ✅ Mapa, warstwy i podkłady
+- ✅ Mapa z podkładami także bez projektu i dla niezalogowanych; na liście projektów pozycja
+  „bez projektu (same podkłady)” (15.11 — wcześniej tryb był dostępny tylko bez żadnego projektu).
+- ✅ Panel warstw: podkład i nakładki na dole, przezroczystość ◐ dla rastrów, podkładów i nakładek
+  (af0ccb6).
+- ✅ Atrybucja warstw z projektu QGIS na mapie i w „Źródłach” wydruku (56a4ef9).
+- ✅ Rastry: `sync-rasters.ps1` (wysyłka zmienionych plików, restart QGIS Server, czyszczenie cache kafli),
+  Fia: VRT z piramidami, także RGBA (11.11).
 
-## Zaległe z wcześniejszych dni
+### ✔️ Wydruki
+- ✅ Układ Sophii w przeglądarce: bieżący widok z podkładami i warstwami na A4/A3, tytuł, skala,
+  podziałka, data, źródła (`web/src/print.ts`).
+- ✅ Szablony QGIS z panelu „Wydruk”: stałe skale, ramka na mapie, tytuł/opis do etykiet `tytul`/`opis`,
+  podkład z warstwy projektu tej samej usługi; GetPrint w WMS 1.1.1, kolejność warstw
+  (`docs/user/wydruki.md`).
+- ✅ Ramka mapy szablonu zachowuje proporcje z szablonu (`fit_extent`, a77be9a). Wydruk z panelu
+  sprawdzony w przeglądarce 15.11 (gość, projekt kolejowy, 1:50 000 — zgodny z ramką na mapie).
+- ✅ Etykiety `zrodla` (atrybucje) i `autor` (zalogowany użytkownik), przezroczystość ◐ w szablonie
+  (`OPACITIES` w GetPrint), panel podaje, co wpisze do szablonu (15.11).
+- ✅ Układ Sophii przy dużych rastrach: licznik postępu kafli, najwyżej 6 zapytań naraz, limit od
+  ostatniego postępu (45 s) zamiast stałych 60 s, najwyżej 5 min (15.11).
+- ✅ Dokumentacja `docs/user/wydruki.md`: etykiety, legenda, mapa przeglądowa, postęp i limity.
+- ⬜ Podkład bez warstwy w projekcie, obrót → plan, punkt 1.
 
-- [ ] Edytor schematu bazy w WebUI (tabele, kolumny, relacje, słowniki) — patrz ARCHITECTURE.md.
-- [x] `sync-rasters.ps1`: wysyła nowe/zmienione rastry (MD5) do biblioteki albo katalogu projektu,
-      restartuje QGIS Server, czyści cache kafli po podmianie; VRT i piramidy buduje Fia lokalnie.
-      Opis: `docs/SERVER.md` („Wysyłanie rastrów”).
-- [x] Podkład z katalogu w wydruku widoku mapy — wydruk w przeglądarce (`web/src/print.ts`): bieżący widok
-      z podkładami i warstwami na A4/A3, tytuł, skala, podziałka, data, źródła. QGIS Server 4.2 nie tworzy
-      warstw zewnętrznych (`EXTERNAL_WMS:`). Szablony QGIS: panel „Wydruk” (stałe skale, ramka na mapie,
-      tytuł/opis do etykiet `tytul`/`opis`, podkład z warstwy projektu tej samej usługi) — `docs/user/wydruki.md`.
-      Poprawione: GetPrint w WMS 1.1.1 (w 1.3.0 EPSG:2180 ma osie y,x — wydruk trafiał obok) i kolejność
-      warstw (pierwsza = spód).
-- [x] Sprzątanie plików osieroconych w `data/uploads` — `api/app/uploads.py` (kosz projektu, próg 7 dni),
-      panel → Pliki, `python -m app.uploads`; opis w `docs/SERVER.md` (5b).
-- [x] `config/pg_service.conf` poza gitem (w repo tylko `pg_service.conf.example`), żeby
-      hasło na serwerze nie blokowało `git pull` (12.11).
-- [x] Mapa (z podkładami) także bez wybranego projektu / dla niezalogowanych (razem z wydrukiem).
-- [x] Fia: VRT z piramidami dla rastrów RGBA (kompresja piramid zależna od pasm, `hideNodata`) (11.11).
-- [x] Panel warstw: podkład i nakładki na dole, suwak przezroczystości ◐ dla rastrów, podkładów
-      i nakładek — zapamiętany w przeglądarce, uwzględniany na wydruku (af0ccb6).
-- [x] Atrybucja warstw z projektu QGIS (QGIS Server → Atrybucja, zapasowo Metadane → Prawa) na mapie
-      i w „Źródłach” wydruku (56a4ef9).
-
-## Do sprawdzenia (zrobione, nieprzetestowane w pełni)
-
-- [x] Wydruk z szablonu QGIS przez Sophię — sprawdzony 15.11 na projekcie kolejowym: działa, błąd proporcji
-      ramki → punkt 11.1. Przy okazji: od 12.11 QGIS Server nie czytał `pg_service.conf` (prawa 600 po
-      przeniesieniu poza gita) — warstwy PostGIS były „nieprawidłowe”; poprawione (`chmod 644`).
-- [ ] Mapa bez projektu (same podkłady), także dla niezalogowanych.
-- [ ] Zakładki Fii w QGIS: „Zakres danych”, „Narzędzia pobierania”, zapamiętane poświadczenia.
-- [ ] Wydruk w układzie Sophii przy dużych rastrach projektu: kafle z zimnego cache bywają wolne
-      (QGIS Server: 3 procesy), limit 60 s.
-
-## Na sam koniec
-
-- [ ] **Raporty po stronie Sophii** (zamiast raportów z menedżera wydruków QGIS) — np. raporty
-      z oględzin terenowych do PDF, z filtrem zakresu użytkownika (punkt 8). Najpierw analiza
-      dotychczasowego rozwiązania raportów w projekcie, który będzie przenoszony.
+### ✅ Serwer i wdrożenie
+- ✅ `config/pg_service.conf` poza gitem, w repo `pg_service.conf.example` (d5478d1). Plik musi być
+  czytelny dla QGIS Server (`chmod 644`; od 12.11 do 15.11 prawa 600 psuły warstwy PostGIS, ffc1245).

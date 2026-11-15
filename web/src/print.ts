@@ -45,6 +45,15 @@ export function mapAreaMm(o: PrintOptions): [number, number] {
 
 const mmToPx = (mm: number, dpi: number) => Math.round((mm / 25.4) * dpi);
 
+// Wczytywanie kafli: najwyżej kilka zapytań naraz (QGIS Server ma 3 procesy — większa liczba tylko
+// kolejkuje się na serwerze), a limit czasu liczony od ostatniego postępu, nie od początku:
+// duży wydruk z zimnego cache może trwać długo, byle kafle stale przychodziły.
+const MAX_TILES_LOADING = 6;
+const STALL_MS = 45000;            // bez żadnego wczytanego kafla/obrazu przez tyle — błąd
+const HARD_LIMIT_MS = 300000;      // i najwyżej 5 minut łącznie
+
+export type PrintProgress = (done: number, total: number) => void;
+
 /** Składa canvasy warstw OpenLayers w jeden obraz (przykład „export map” z OpenLayers). */
 function composite(map: OlMap, size: number[]): HTMLCanvasElement {
   const out = document.createElement("canvas");
@@ -70,7 +79,8 @@ function composite(map: OlMap, size: number[]): HTMLCanvasElement {
 }
 
 /** Renderuje mapę poza ekranem i zwraca obraz (data URL JPEG) oraz rzeczywistą skalę. */
-export async function renderPrintMap(src: PrintSource, o: PrintOptions): Promise<{ image: string; scale: number; widthMm: number; heightMm: number }> {
+export async function renderPrintMap(src: PrintSource, o: PrintOptions, onProgress?: PrintProgress):
+  Promise<{ image: string; scale: number; widthMm: number; heightMm: number }> {
   const [wMm, hMm] = mapAreaMm(o);
   const size = [mmToPx(wMm, o.dpi), mmToPx(hMm, o.dpi)];
   const crs = src.config.crs;
@@ -120,13 +130,37 @@ export async function renderPrintMap(src: PrintSource, o: PrintOptions): Promise
     resolution = Math.max((maxx - minx) / size[0], (maxy - miny) / size[1]);
   }
   view.setResolution(resolution);
-  const map = new OlMap({ target: host, layers, view, controls: [], interactions: [], pixelRatio: 1 });
+  const map = new OlMap({ target: host, layers, view, controls: [], interactions: [], pixelRatio: 1,
+    maxTilesLoading: MAX_TILES_LOADING });
+
+  // postęp: kafle i obrazy wszystkich warstw (zaczęte / zakończone, także z błędem)
+  let started = 0, finished = 0, lastProgress = Date.now();
+  const report = () => onProgress?.(finished, started);
+  for (const l of layers) {
+    const s = l.getSource() as unknown as { on?: (t: string[], f: () => void) => void } | null;
+    s?.on?.(["tileloadstart", "imageloadstart"], () => { started++; report(); });
+    s?.on?.(["tileloadend", "tileloaderror", "imageloadend", "imageloaderror"], () => {
+      finished++; lastProgress = Date.now(); report();
+    });
+  }
 
   try {
     const image = await new Promise<string>((resolve, reject) => {
-      const timer = setTimeout(() => reject(new Error("Przekroczono czas wczytywania mapy do wydruku (60 s)")), 60000);
+      const t0 = Date.now();
+      const timer = setInterval(() => {
+        const now = Date.now();
+        if (now - lastProgress > STALL_MS) {
+          reject(new Error(`Mapa do wydruku przestała się wczytywać (wczytano ${finished} z ${started} kafli). `
+            + "Spróbuj ponownie za chwilę — serwer mógł być zajęty — albo wybierz niższą jakość."));
+        } else if (now - t0 > HARD_LIMIT_MS) {
+          reject(new Error("Przekroczono czas przygotowania wydruku (5 min) — wybierz niższą jakość albo mniejszy obszar."));
+        } else {
+          return;
+        }
+        clearInterval(timer);
+      }, 1000);
       map.once("rendercomplete", () => {
-        clearTimeout(timer);
+        clearInterval(timer);
         try {
           resolve(composite(map, size).toDataURL("image/jpeg", 0.92));
         } catch {

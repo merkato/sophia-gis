@@ -41,6 +41,7 @@ export function PrintPanel({ config, basemaps, wmsLayers, layerNames, opacity, g
   const [scale, setScale] = useState<number | null>(saved.scale ?? null);
   const [info, setInfo] = useState<ReportInfo | null>(null);
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState<[number, number] | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const isLayout = template !== SOPHIA;
@@ -67,6 +68,13 @@ export function PrintPanel({ config, basemaps, wmsLayers, layerNames, opacity, g
     try { localStorage.setItem(STORE, JSON.stringify({ template, paper, orientation, dpi, scale })); } catch { /* */ }
   };
 
+  // źródła: podkład i nakładki z katalogu + atrybucje widocznych warstw projektu (jak w układzie Sophii)
+  const attributions = () => [...new Set([
+    ...basemaps.map((b) => b.attribution ?? b.name),
+    ...(config.slug ? projectAttributions(config, wmsLayers).map((a) => a.text) : []),
+  ])];
+  const basemapOpacity = (b: Basemap) => opacity[`bm:${b.id}`] ?? Math.round(b.opacity * 100);
+
   const run = async () => {
     const v = getView();
     if (!v) return;
@@ -81,6 +89,10 @@ export function PrintPanel({ config, basemaps, wmsLayers, layerNames, opacity, g
       if (scale) p.scale = String(scale);
       if (info?.title_label) p.title = title;
       if (info?.note_label) p.note = note;
+      if (info?.sources_label) p.sources = attributions().join("; ");
+      // krycie jak na ekranie (◐ w panelu warstw): warstwy projektu i podkład z warstwy projektu
+      p.opacity = wmsLayers.map((n) => String(opacity[`${config.slug}/${n}`] ?? 100)).join(",");
+      p.basemap_opacity = basemaps.map((b) => String(basemapOpacity(b))).join(",");
       window.open(api.reportUrl(config.slug, template, p), "_blank");
       return;
     }
@@ -88,13 +100,11 @@ export function PrintPanel({ config, basemaps, wmsLayers, layerNames, opacity, g
     if (win) win.document.write("<p style='font-family:sans-serif;padding:20px'>Przygotowywanie wydruku…</p>");
     setBusy(true);
     try {
-      const r = await renderPrintMap({ config, basemaps, wmsLayers, extent: v.extent, center: v.center, opacity }, opts);
+      const r = await renderPrintMap({ config, basemaps, wmsLayers, extent: v.extent, center: v.center, opacity }, opts,
+        (done, total) => setProgress([done, total]));
       const html = printPageHtml(r, opts, {
         project: config.slug ? config.title : null, layers: layerNames,
-        attributions: [
-          ...basemaps.map((b) => b.attribution ?? b.name),
-          ...(config.slug ? projectAttributions(config, wmsLayers).map((a) => a.text) : []),
-        ],
+        attributions: attributions(),
       });
       if (win) { win.document.open(); win.document.write(html); win.document.close(); }
       else if (!window.open(URL.createObjectURL(new Blob([html], { type: "text/html" })), "_blank")) {
@@ -105,6 +115,7 @@ export function PrintPanel({ config, basemaps, wmsLayers, layerNames, opacity, g
       setError((e as Error).message);
     } finally {
       setBusy(false);
+      setProgress(null);
     }
   };
 
@@ -159,6 +170,12 @@ export function PrintPanel({ config, basemaps, wmsLayers, layerNames, opacity, g
         {mapMm && <> Pole mapy: {Math.round(mapMm[0])} × {Math.round(mapMm[1])} mm.</>}
         {isLayout && info && !info.map_mm && " Szablon nie ma mapy — wydrukuje się bez mapy."}
       </p>
+      {isLayout && info && (
+        <p className="muted">Sophia wpisze do szablonu: {[
+          info.title_label && "tytuł", info.note_label && "opis", info.sources_label && "źródła",
+          info.author_label && "autora",
+        ].filter(Boolean).join(", ") || "nic — szablon nie ma etykiet tytul, opis, zrodla, autor"}.</p>
+      )}
       {missingBase.length > 0 && (
         <div className="notice">
           Podkład „{missingBase.map((b) => b.name).join(", ")}” nie zostanie wydrukowany z szablonem QGIS — projekt nie
@@ -168,7 +185,8 @@ export function PrintPanel({ config, basemaps, wmsLayers, layerNames, opacity, g
       {error && <div className="error">{error}</div>}
       <div className="actions">
         <button className="primary" disabled={busy || (isLayout && !info)} onClick={run}>
-          {busy ? "Przygotowywanie…" : isLayout ? "Utwórz PDF" : "Utwórz wydruk"}</button>
+          {busy ? `Przygotowywanie…${progress && progress[1] ? ` ${progress[0]}/${progress[1]}` : ""}`
+            : isLayout ? "Utwórz PDF" : "Utwórz wydruk"}</button>
         <button onClick={onClose}>Zamknij</button>
       </div>
       <p className="muted">Wydruk otworzy się w nowej karcie.{isLayout ? "" : " Tam „Drukuj” albo „Zapisz jako PDF”."}</p>

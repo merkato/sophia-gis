@@ -33,6 +33,29 @@ router = APIRouter(prefix="/api/projects/{slug}/reports", tags=["reports"])
 
 TITLE_LABELS = ("tytul", "title")
 NOTE_LABELS = ("opis", "description")
+SOURCES_LABELS = ("zrodla", "sources")      # atrybucje widocznych warstw i podkładu (z WebUI)
+AUTHOR_LABELS = ("autor", "author")         # zalogowany użytkownik (z serwera, nie z przeglądarki)
+
+
+def _label(report: ReportDef, ids: tuple[str, ...]) -> str | None:
+    return next((x for x in ids if x in report.labels), None)
+
+
+def opacities(names: list[str], given: dict[str, int]) -> str | None:
+    """OPACITIES do GetPrint w kolejności map0:LAYERS (0–255); None, gdy wszystko w pełni kryjące."""
+    vals = [round(max(0, min(100, given.get(n, 100))) * 255 / 100) for n in names]
+    return ",".join(map(str, vals)) if any(v < 255 for v in vals) else None
+
+
+def _percents(names: list[str], values: str | None) -> dict[str, int]:
+    """„70,100,…” z WebUI (kolejność jak names) → {nazwa: krycie w %}; błędne wpisy pomijane."""
+    out: dict[str, int] = {}
+    for n, v in zip(names, (values or "").split(",")):
+        try:
+            out[n] = int(float(v))
+        except ValueError:
+            continue
+    return out
 
 
 def _label_text(text: str) -> str:
@@ -118,8 +141,10 @@ async def report_info(slug: str, layout: str, basemaps: str | None = None,
     report = _report(ctx, layout)
     return {
         "layout": report.layout, "map_mm": report.map_mm, "labels": report.labels,
-        "title_label": next((x for x in TITLE_LABELS if x in report.labels), None),
-        "note_label": next((x for x in NOTE_LABELS if x in report.labels), None),
+        "title_label": _label(report, TITLE_LABELS),
+        "note_label": _label(report, NOTE_LABELS),
+        "sources_label": _label(report, SOURCES_LABELS),
+        "author_label": _label(report, AUTHOR_LABELS),
         "basemaps": await _basemaps(ctx.project, _ids(basemaps)),
     }
 
@@ -135,6 +160,9 @@ async def render_report(
     dpi: int = Query(200, ge=72, le=400),
     title: str | None = Query(None, max_length=300),
     note: str | None = Query(None, max_length=500),
+    sources: str | None = Query(None, max_length=1000, description="Źródła (atrybucje) do etykiety zrodla"),
+    opacity: str | None = Query(None, description="Krycie 0–100 warstw z `layers`, w tej samej kolejności"),
+    basemap_opacity: str | None = Query(None, description="Krycie 0–100 podkładów z `basemaps`"),
     user: CurrentUser | None = Depends(optional_user),
 ):
     ctx = await load_project_context(slug, user)
@@ -173,13 +201,21 @@ async def render_report(
         if set(requested) - allowed:
             raise HTTPException(status.HTTP_403_FORBIDDEN, "Brak dostępu do części warstw")
         # podkład z katalogu -> warstwa projektu z tej samej usługi (pod warstwami z WebUI)
-        under = [b["layer"] for b in await _basemaps(ctx.project, _ids(basemaps)) if b["layer"]]
+        bms = await _basemaps(ctx.project, _ids(basemaps))
+        under = [b["layer"] for b in bms if b["layer"]]
+        given = _percents([str(b["id"]) for b in bms], basemap_opacity)
+        given = {b["layer"]: given[str(b["id"])] for b in bms if b["layer"] and str(b["id"]) in given}
+        given.update(_percents(requested, opacity))
         if requested or under:
-            params["map0:LAYERS"] = ",".join(dict.fromkeys([*under, *requested]))
+            names = list(dict.fromkeys([*under, *requested]))
+            params["map0:LAYERS"] = ",".join(names)
+            if op := opacities(names, given):
+                params["OPACITIES"] = op
 
-    # tytuł i opis -> etykiety szablonu o umówionych identyfikatorach
-    for text, ids in ((title, TITLE_LABELS), (note, NOTE_LABELS)):
-        label = next((x for x in ids if x in report.labels), None)
+    # tytuł, opis, źródła -> etykiety szablonu o umówionych identyfikatorach; autor — z sesji
+    author = (user.full_name or user.login) if user else None
+    for text, ids in ((title, TITLE_LABELS), (note, NOTE_LABELS), (sources, SOURCES_LABELS), (author, AUTHOR_LABELS)):
+        label = _label(report, ids)
         if text is not None and label:
             params[label] = _label_text(text)
 

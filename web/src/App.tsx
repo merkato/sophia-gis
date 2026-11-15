@@ -160,7 +160,14 @@ export default function App() {
   useEffect(() => { refreshSession(); }, [refreshSession]);
 
   useEffect(() => {
-    if (!slug) { setConfig(null); return; }
+    if (!slug) {   // bez projektu: same podkłady z katalogu
+      setConfig(null);
+      setSelection(null);
+      setEditLayerId(null);
+      setTool("identify");
+      if (location.search) history.replaceState(null, "", location.pathname);
+      return;
+    }
     history.replaceState(null, "", `?p=${encodeURIComponent(slug)}`);
     setSelection(null);
     setEditLayerId(null);
@@ -487,7 +494,7 @@ export default function App() {
       <header className="topbar">
         <strong className="brand">Sophia</strong>
         <select value={slug ?? ""} onChange={(e) => setSlug(e.target.value || null)} aria-label="Projekt">
-          {projects.length === 0 && <option value="">Brak dostępnych projektów</option>}
+          <option value="">{projects.length === 0 ? "Brak dostępnych projektów" : "— bez projektu (same podkłady) —"}</option>
           {projects.map((p) => <option key={p.slug} value={p.slug}>{p.title}</option>)}
         </select>
         <div className="spacer" />

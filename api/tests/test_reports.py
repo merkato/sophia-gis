@@ -3,7 +3,7 @@ from types import SimpleNamespace
 from lxml import etree
 
 from app.qgsproject import LayerDef, layout_items
-from app.routers.reports import _label_text, fit_extent, project_basemap_layer
+from app.routers.reports import _label_text, _percents, fit_extent, opacities, project_basemap_layer
 
 # Fragment układu w formacie zapisywanym przez QGIS 4 (typy: 65639 mapa, 65641 etykieta, 65638 strona)
 LAYOUT = """<Layout name="Mapa A4 pozioma">
@@ -54,3 +54,12 @@ def test_fit_extent_keeps_frame_proportions():
     # cały widok, ekran wysoki: szerokość dociągnięta
     assert fit_extent([0, 0, 100, 1000], frame, None) == [-350.0, 0.0, 450.0, 1000.0]
     assert fit_extent([0, 0, 10, 10], None, 500) == [0, 0, 10, 10]
+
+
+def test_opacities_follow_layer_order():
+    names = ["orto", "skan", "dzialki"]
+    assert opacities(names, {}) is None                                  # wszystko kryjące — bez parametru
+    assert opacities(names, {"skan": 60, "orto": 100}) == "255,153,255"
+    assert opacities(names, {"orto": 150, "dzialki": -5}) == "255,255,0"   # przycięte do 0–100
+    assert _percents(["a", "b", "c"], "70,x,30") == {"a": 70, "c": 30}
+    assert _percents(["a"], None) == {}

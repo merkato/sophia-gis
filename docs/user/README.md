@@ -86,8 +86,9 @@ skali niebieska ramka na mapie pokazuje obszar wydruku — przesuń mapę, żeby
 i przygotowanie szablonu w QGIS: [wydruki.md](wydruki.md).
 
 ### Mapa bez projektu
-Bez zalogowania (albo bez dostępu do żadnego projektu) Sophia pokazuje mapę z podkładami
-z katalogu — na całą Polskę, z możliwością przełączania podkładów i wydruku.
+Na liście projektów jest pozycja **— bez projektu (same podkłady) —**: mapa z podkładami z katalogu
+na całą Polskę, z przełączaniem podkładów i wydrukiem w układzie Sophii. Tak wygląda też Sophia dla
+gościa, gdy nie ma żadnego publicznego projektu.
 
 ### Tabela atrybutów
 - Otwierasz ją ikoną tabeli przy warstwie w panelu warstw (każda warstwa z bazy) albo ikoną
