@@ -160,6 +160,11 @@ def test_split_policies():
         '<maplayer><fieldConfiguration><field name="id"/><field name="nazwa"/><field name="pow"/>'
         '<field name="nr"/></fieldConfiguration><splitPolicies>'
         '<policy field="id" policy="DefaultValue"/><policy field="pow" policy="GeometryRatio"/>'
-        '<policy field="nr" policy="Nieznana"/></splitPolicies></maplayer>')
-    pol = {f.name: f.split_policy for f in _parse_fields(ml)}
+        '<policy field="nr" policy="Nieznana"/></splitPolicies>'
+        '<duplicatePolicies><policy field="nr" policy="UnsetField"/><policy field="pow" policy="GeometryRatio"/>'
+        '</duplicatePolicies></maplayer>')
+    fields = _parse_fields(ml)
+    pol = {f.name: f.split_policy for f in fields}
     assert pol == {"id": "DefaultValue", "nazwa": "Duplicate", "pow": "GeometryRatio", "nr": "Duplicate"}
+    assert {f.name: f.duplicate_policy for f in fields} == {
+        "id": "Duplicate", "nazwa": "Duplicate", "pow": "Duplicate", "nr": "UnsetField"}

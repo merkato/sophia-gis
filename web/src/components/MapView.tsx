@@ -10,7 +10,10 @@ import TileWMS from "ol/source/TileWMS";
 import Collection from "ol/Collection";
 import VectorSource from "ol/source/Vector";
 import GeoJSON from "ol/format/GeoJSON";
-import { Draw, Modify, Select, Snap } from "ol/interaction";
+import { Draw, Modify, Select, Snap, Translate } from "ol/interaction";
+import type Interaction from "ol/interaction/Interaction";
+import PointerInteraction from "ol/interaction/Pointer";
+import { getCenter } from "ol/extent";
 import { click } from "ol/events/condition";
 import { ScaleLine, defaults as defaultControls } from "ol/control";
 import { Circle, Fill, Stroke, Style } from "ol/style";
@@ -43,7 +46,11 @@ export function tileFormats(config: ProjectConfig): Map<string, string> {
   return out;
 }
 
-export type Tool = "identify" | "select" | "draw" | "modify" | "split" | "fetch";
+export type Tool = "identify" | "select" | "draw" | "modify" | "split" | "ring" | "fillring" | "delring"
+  | "delpart" | "addpart" | "reshape" | "move" | "rotate" | "copy" | "merge" | "fetch";
+
+/** Narzędzia, które klikają w obiekt warstwy edycyjnej (wynik liczy API). */
+export type PointTool = "delring" | "delpart";
 
 interface Props {
   config: ProjectConfig;
@@ -59,6 +66,13 @@ interface Props {
   onDrawn: (layerId: string, geometry: GeoJSONFeature["geometry"]) => void;
   onGeometryModified: (layerId: string, pk: string, geometry: GeoJSONFeature["geometry"]) => void;
   onSplitLine: (layerId: string, line: GeoJSONFeature["geometry"]) => void;   // narzędzie „Podziel obiekty”
+  onRing: (layerId: string, ring: GeoJSONFeature["geometry"], fill: boolean) => void;   // pierścień / wypełniony
+  onPointTool: (layerId: string, tool: PointTool, coordinate: number[], tolerance: number) => void;
+  onMergePick: (layerId: string, pk: string) => void;   // „Połącz obiekty”: kliknięty obiekt do zestawu
+  onAddPart: (layerId: string, part: GeoJSONFeature["geometry"]) => void;
+  onReshape: (layerId: string, line: GeoJSONFeature["geometry"]) => void;
+  onCopy: (layerId: string, pk: string, geometry: GeoJSONFeature["geometry"]) => void;   // kopia w nowym miejscu
+  marked: string[];                                      // obiekty wybrane do połączenia (wyróżnione)
   onFetchClick?: (coordinate: number[]) => void;         // narzędzie pobierania (ULDK…)
   preview?: GeoJSONFeature["geometry"] | null;           // obrys pobranego obiektu przed dodaniem
   printFrame?: [number, number] | null;                  // obszar wydruku [szer., wys.] w metrach, wokół środka widoku
@@ -88,6 +102,18 @@ const splitStyle = new Style({
   image: new Circle({ radius: 5, fill: new Fill({ color: "#d9363e" }), stroke: new Stroke({ color: "#fff", width: 1.5 }) }),
 });
 
+const markStyle = new Style({
+  stroke: new Stroke({ color: "#7048e8", width: 3 }),
+  fill: new Fill({ color: "rgba(112,72,232,0.25)" }),
+  image: new Circle({ radius: 7, fill: new Fill({ color: "#7048e8" }), stroke: new Stroke({ color: "#fff", width: 2 }) }),
+});
+
+const ringStyle = new Style({
+  stroke: new Stroke({ color: "#d9363e", width: 2, lineDash: [6, 4] }),
+  fill: new Fill({ color: "rgba(255,255,255,0.35)" }),
+  image: new Circle({ radius: 5, fill: new Fill({ color: "#d9363e" }), stroke: new Stroke({ color: "#fff", width: 1.5 }) }),
+});
+
 const DRAW_TYPE = { Point: "Point", Line: "LineString", Polygon: "Polygon" } as const;
 
 export function MapView(props: Props) {
@@ -103,6 +129,8 @@ export function MapView(props: Props) {
   const previewSourceRef = useRef(new VectorSource<Feature<Geometry>>());
   const frameSourceRef = useRef(new VectorSource<Feature<Geometry>>());
   const selectRef = useRef<Select | null>(null);
+  const editLayerRef = useRef<VectorLayer | null>(null);
+  const markedRef = useRef(new Set<string>());
   const cbRef = useRef(props);
   cbRef.current = props;
   const crs = config.crs;
@@ -133,7 +161,10 @@ export function MapView(props: Props) {
         basemapGroup,
         rasterGroup,
         wmsLayer,
-        new VectorLayer({ source: editSourceRef.current, style: editStyle }),
+        editLayerRef.current = new VectorLayer({
+          source: editSourceRef.current,
+          style: (f) => (markedRef.current.has(String(f.getId())) ? markStyle : editStyle),
+        }),
         new VectorLayer({ source: previewSourceRef.current, style: previewStyle }),
         new VectorLayer({ source: frameSourceRef.current, style: frameStyle }),
       ],
@@ -284,7 +315,7 @@ export function MapView(props: Props) {
     const map = mapRef.current;
     if (!map) return;
     const source = editSourceRef.current;
-    const interactions: (Draw | Modify | Select | Snap)[] = [];
+    const interactions: Interaction[] = [];
     const layerInfo = editLayerId ? config.layers[editLayerId] : null;
     const toGeoJSON = (f: Feature<Geometry>) =>
       format.writeGeometryObject(f.getGeometry()!) as unknown as GeoJSONFeature["geometry"];
@@ -355,6 +386,115 @@ export function MapView(props: Props) {
       interactions.push(draw);
     }
 
+    // Pierścień (dziura) i pierścień wypełniony: szkic poligonu, obiekt docelowy wskazuje API
+    if (layerInfo && (tool === "ring" || tool === "fillring") && layerInfo.geometry_type === "Polygon"
+      && layerInfo.perms.update && (tool === "ring" || layerInfo.perms.insert)) {
+      const draw = new Draw({ type: "Polygon", style: ringStyle });
+      draw.on("drawend", (e) => cbRef.current.onRing(layerInfo.id, toGeoJSON(e.feature as Feature<Geometry>), tool === "fillring"));
+      interactions.push(draw);
+    }
+
+    // Kliknięcie w obiekt: usuń pierścień / usuń część (tolerancja ~8 px w jednostkach mapy)
+    if (layerInfo && (tool === "delring" || tool === "delpart") && layerInfo.perms.update) {
+      const handler = (evt: { coordinate: number[] }) => cbRef.current.onPointTool(
+        layerInfo.id, tool, evt.coordinate, (map.getView().getResolution() ?? 1) * 8);
+      clickKey = map.on("singleclick", handler as never) as EventsKey;
+    }
+
+    // Połącz obiekty: kliknięcia dodają / zdejmują obiekty z zestawu
+    if (layerInfo && tool === "merge" && layerInfo.perms.update && layerInfo.perms.delete) {
+      const handler = (evt: { pixel: number[] }) => {
+        const f = map.forEachFeatureAtPixel(evt.pixel, (x) => x as Feature<Geometry>,
+          { layerFilter: (l) => l === editLayerRef.current, hitTolerance: 4 });
+        if (f) cbRef.current.onMergePick(layerInfo.id, String(f.getId()));
+      };
+      clickKey = map.on("singleclick", handler as never) as EventsKey;
+    }
+
+    // Przesuń obiekt: przeciągnięcie całego obiektu, zapis jak przy zmianie wierzchołków
+    if (layerInfo && tool === "move" && layerInfo.perms.update) {
+      const translate = new Translate({ layers: [editLayerRef.current!], hitTolerance: 4 });
+      translate.on("translateend", (e) => {
+        for (const f of e.features.getArray() as Feature<Geometry>[]) {
+          cbRef.current.onGeometryModified(layerInfo.id, String(f.getId()), toGeoJSON(f));
+        }
+      });
+      interactions.push(translate);
+    }
+
+    // Dodaj część: szkic typu warstwy, część trafia do obiektu otwartego w formularzu
+    if (layerInfo && tool === "addpart" && layerInfo.perms.update && layerInfo.multi && layerInfo.geometry_type) {
+      const draw = new Draw({ type: DRAW_TYPE[layerInfo.geometry_type], style: ringStyle });
+      draw.on("drawend", (e) => cbRef.current.onAddPart(layerInfo.id, toGeoJSON(e.feature as Feature<Geometry>)));
+      interactions.push(draw);
+    }
+
+    // Przekształć: linia przecinająca granicę dwa razy; wynik liczy API
+    if (layerInfo && tool === "reshape" && layerInfo.perms.update
+      && (layerInfo.geometry_type === "Polygon" || layerInfo.geometry_type === "Line")) {
+      const draw = new Draw({ type: "LineString", style: splitStyle });
+      draw.on("drawend", (e) => cbRef.current.onReshape(layerInfo.id, toGeoJSON(e.feature as Feature<Geometry>)));
+      interactions.push(draw);
+    }
+
+    // Kopiuj: przeciągnięcie zostawia oryginał na miejscu, w nowym miejscu powstaje kopia
+    if (layerInfo && tool === "copy" && layerInfo.perms.insert) {
+      const originals = new Map<Feature<Geometry>, Geometry>();
+      const translate = new Translate({ layers: [editLayerRef.current!], hitTolerance: 4 });
+      translate.on("translatestart", (e) => {
+        originals.clear();
+        for (const f of e.features.getArray() as Feature<Geometry>[]) originals.set(f, f.getGeometry()!.clone());
+      });
+      translate.on("translateend", (e) => {
+        for (const f of e.features.getArray() as Feature<Geometry>[]) {
+          const moved = toGeoJSON(f);
+          const orig = originals.get(f);
+          if (orig) f.setGeometry(orig);
+          cbRef.current.onCopy(layerInfo.id, String(f.getId()), moved);
+        }
+      });
+      interactions.push(translate);
+    }
+
+    // Obróć: przeciąganie wokół środka obiektu, Shift = co 15°; zapis po puszczeniu
+    if (layerInfo && tool === "rotate" && layerInfo.perms.update
+      && (layerInfo.geometry_type === "Polygon" || layerInfo.geometry_type === "Line")) {
+      let target: Feature<Geometry> | null = null;
+      let orig: Geometry | null = null;
+      let center = [0, 0];
+      let start = 0;
+      let turned = false;
+      const angleAt = (c: number[]) => Math.atan2(c[1] - center[1], c[0] - center[0]);
+      const rotate = new PointerInteraction({
+        handleDownEvent: (e) => {
+          const f = map.forEachFeatureAtPixel(e.pixel, (x) => x as Feature<Geometry>,
+            { layerFilter: (l) => l === editLayerRef.current, hitTolerance: 4 });
+          if (!f?.getGeometry()) return false;
+          target = f;
+          orig = f.getGeometry()!.clone();
+          center = getCenter(orig.getExtent());
+          start = angleAt(e.coordinate);
+          turned = false;
+          return true;
+        },
+        handleDragEvent: (e) => {
+          if (!target || !orig) return;
+          let a = angleAt(e.coordinate) - start;
+          if ((e.originalEvent as PointerEvent).shiftKey) a = Math.round(a / (Math.PI / 12)) * (Math.PI / 12);
+          const g = orig.clone();
+          g.rotate(a, center);
+          target.setGeometry(g);
+          turned = true;
+        },
+        handleUpEvent: () => {
+          if (target && turned) cbRef.current.onGeometryModified(layerInfo.id, String(target.getId()), toGeoJSON(target));
+          target = null;
+          return false;
+        },
+      });
+      interactions.push(rotate);
+    }
+
     if (layerInfo && tool === "modify" && layerInfo.perms.update) {
       const modify = new Modify({ source });
       modify.on("modifyend", (e) => {
@@ -366,7 +506,9 @@ export function MapView(props: Props) {
     }
 
     // Przyciąganie do wierzchołków i krawędzi obiektów warstwy edycyjnej
-    if (layerInfo && (tool === "draw" || tool === "modify" || tool === "split")) interactions.push(new Snap({ source }));
+    if (layerInfo && ["draw", "modify", "split", "ring", "fillring", "addpart", "reshape"].includes(tool)) {
+      interactions.push(new Snap({ source }));
+    }
 
     // Szkic: Esc przerywa, Backspace cofa ostatni wierzchołek (poza polami formularza)
     const draws = interactions.filter((i): i is Draw => i instanceof Draw);
@@ -387,6 +529,13 @@ export function MapView(props: Props) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tool, editLayerId, config.slug, wmsLayers]);
+
+  // --- wyróżnienie obiektów wybranych do połączenia
+  const { marked } = props;
+  useEffect(() => {
+    markedRef.current = new Set(marked);
+    editLayerRef.current?.changed();
+  }, [marked]);
 
   return <div ref={divRef} className="map" />;
 }

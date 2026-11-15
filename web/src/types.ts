@@ -40,6 +40,7 @@ export interface LayerInfo {
   attribution: string | null;        // QGIS Server → Atrybucja (albo Metadane → Prawa)
   attribution_url: string | null;
   geometry_type: "Point" | "Line" | "Polygon" | null;
+  multi: boolean;                    // kolumna Multi* (obiekty wieloczęściowe)
   crs: string | null;
   popup: boolean;
   display_expression: string | null;

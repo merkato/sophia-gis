@@ -62,10 +62,21 @@ wyszarzone.
 | przerywany prostokąt ze strzałką | **Zaznacz obiekt** warstwy edycyjnej | Zaznacz obiekty |
 | zielony punkt / linia / poligon z gwiazdką | **Dodaj obiekt** — ikona zależy od typu geometrii warstwy | Dodaj obiekt punktowy / liniowy / poligonowy |
 | tabela z zielonym plusem | **Dodaj rekord** — dla tabel bez geometrii | Dodaj rekord |
-| poligon z czerwonym węzłem | **Narzędzie wierzchołków** — przeciąganie wierzchołków; zwykłe kliknięcie otwiera obiekt | Narzędzie wierzchołków |
+| poligon z czerwonym węzłem | **Narzędzie wierzchołków** — przeciąganie wierzchołków, klik na krawędzi dodaje wierzchołek, **Alt+klik** usuwa; zwykłe kliknięcie otwiera obiekt | Narzędzie wierzchołków |
+| poligon ze strzałkami | **Przesuń obiekt** — przeciągnij cały obiekt | Przesuń obiekt |
+| poligon i łuk ze strzałką | **Obróć obiekt** — przeciągnij wokół środka, **Shift** = co 15° | Obróć obiekt |
+| dwa poligony, kopia na zielono | **Kopiuj obiekt** — przeciągnij kopię w nowe miejsce | Kopiuj i wklej / Duplikuj obiekt |
+| poligon z czerwoną linią na granicy | **Przekształć obiekt** — linia, która dwa razy przecina granicę | Przekształć obiekty |
 | poligon rozcięty czerwoną linią | **Podziel obiekty** — linia przez obiekt (poligon albo linię); szczegóły niżej | Podziel obiekty |
+| dwa poligony w jednym obrysie | **Połącz obiekty** — kliknij kolejne obiekty, potem „Połącz” | Połącz zaznaczone obiekty |
+| poligon z dziurą i gwiazdką | **Dodaj pierścień** — narysuj dziurę wewnątrz poligonu | Dodaj pierścień |
+| dziura wypełniona na żółto | **Wypełnij pierścień** — dziura i nowy obiekt w niej (formularz) | Wypełnij pierścień |
+| dziura z czerwonym krzyżykiem | **Usuń pierścień** — kliknij w dziurę | Usuń pierścień |
+| dwie części z gwiazdką | **Dodaj część** — narysuj nową część obiektu otwartego w formularzu | Dodaj część |
+| przekreślona część | **Usuń część** — kliknij część obiektu wieloczęściowego | Usuń część |
 | czerwony kosz | **Usuń zaznaczony obiekt** (z potwierdzeniem) | Usuń zaznaczone |
 | tabela z niebieskim nagłówkiem | **Otwórz tabelę atrybutów** warstwy edycyjnej | Otwórz tabelę atrybutów |
+| niebieska strzałka w lewo | **Cofnij ostatnią operację** (też **Ctrl+Z**) — szczegóły niżej | Cofnij |
 | obrys działki / domek z niebieską strzałką | **Pobierz z ULDK** — działka lub budynek z kliknięcia do warstwy ([uldk.md](uldk.md)) | — (wtyczki ULDK) |
 
 ### Wydruk
@@ -118,3 +129,47 @@ z katalogu — na całą Polskę, z możliwością przełączania podkładów i 
     do powierzchni części (dla linii — do długości), także w obiekcie dotychczasowym.
 - Wszystko w jednej operacji: jeśli któraś część wypadłaby poza Twój zakres danych albo linia
   nie dzieli obiektu, nic się nie zmienia.
+
+### Pierścienie, części, łączenie, przesuwanie
+Narzędzia poniżej działają na obiekcie otwartym w formularzu, a bez niego — na obiekcie, który
+wskazuje szkic albo kliknięcie. Każda operacja jest pojedyncza: przy błędzie (szkic poza obiektem,
+wynik poza Twoim zakresem danych) nic się nie zmienia i pojawia się komunikat.
+- **Dodaj pierścień** — narysuj poligon w całości **wewnątrz** obiektu. Nie może przecinać granicy
+  ani istniejącej dziury.
+- **Wypełnij pierścień** — jak wyżej, a potem otwiera się formularz **nowego** obiektu w tej dziurze
+  (obrys widać na niebiesko). Dziura wycina się dopiero przy zapisie formularza; zamknięcie
+  formularza bez zapisu niczego nie zmienia.
+- **Usuń pierścień** — kliknij wewnątrz dziury: obiekt odzyskuje tę powierzchnię. Jeśli dziurę
+  wypełniał inny obiekt, zostaje on bez zmian (obiekty będą na siebie zachodzić).
+- **Usuń część** — dla warstw z obiektami wieloczęściowymi (Multi…): kliknij część, Sophia pyta
+  o potwierdzenie. Ostatniej części nie da się usunąć — wtedy usuń cały obiekt.
+- **Połącz obiekty** — klikaj kolejne obiekty (fioletowe wyróżnienie, ponowne kliknięcie zdejmuje),
+  na górze mapy pasek z listą i przyciskiem **Połącz**. **Pierwszy kliknięty zostaje**: jego klucz
+  i atrybuty, a zdjęcia, dokumenty i rekordy powiązane pozostałych przechodzą do niego; pozostałe
+  obiekty są usuwane. Warstwa z obiektami jednoczęściowymi przyjmie tylko obiekty, które się stykają.
+  Wymaga prawa zmiany i usuwania.
+- **Przesuń obiekt** — przeciągnij obiekt; zapis od razu po puszczeniu, jak przy wierzchołkach.
+- **Obróć obiekt** (linie i poligony) — chwyć obiekt i przeciągnij wokół jego środka; z **Shift**
+  kąt skacze co 15°. Zapis po puszczeniu.
+- **Kopiuj obiekt** — przeciągnij obiekt: oryginał zostaje na miejscu, w nowym miejscu powstaje
+  kopia i otwiera się w formularzu. Atrybuty kopii wynikają z **polityki duplikowania** pól w QGIS
+  (*Duplicate* / *Default value* — wartość domyślna z bazy / *Unset field* — puste). Zdjęcia,
+  dokumenty i rekordy powiązane zostają przy oryginale.
+- **Przekształć obiekt** (linie i poligony) — narysuj linię, która **dwa razy przecina** granicę
+  obiektu. Poligon: linia na zewnątrz dokłada obszar między linią a granicą, linia wewnątrz
+  odcina mniejszą część. Linia: odcinek między przecięciami zastępuje narysowany fragment.
+  Linia, która raz wychodzi, a raz wchodzi, jest odrzucana.
+- **Dodaj część** — warstwy z obiektami wieloczęściowymi. Otwórz obiekt w formularzu (Zaznacz
+  obiekt), potem narysuj część. Nowa część poligonu nie może nachodzić na obiekt ani stykać się
+  z nim krawędzią.
+
+### Cofanie
+- **Cofnij** (strzałka na pasku albo **Ctrl+Z** poza polami formularza) odwraca Twoją **ostatnią
+  operację** w projekcie: zapis formularza, dodanie, usunięcie, zmianę geometrii, podział,
+  połączenie (razem z przeniesionymi zdjęciami), pierścień… Przed cofnięciem Sophia pokazuje, czego
+  dotyczy, i pyta o potwierdzenie. Kolejne cofnięcia sięgają dalej wstecz (do 7 dni).
+- Cofasz tylko własne zmiany. Jeśli ktoś (albo Ty) zmienił obiekt po tej operacji, cofnięcie się nie
+  wykona — nie nadpisze późniejszej pracy.
+- Usunięty obiekt wraca pod tym samym identyfikatorem, z polami widocznymi w formularzu; pola
+  ukryte dostają wartość domyślną z bazy. Pliki zdjęć zostają na serwerze przez 7 dni, więc wraca też
+  zdjęcie z pola „Załącznik”.

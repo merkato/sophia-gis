@@ -41,6 +41,14 @@ MIGRATIONS: list[tuple[str, str]] = [
         ALTER TABLE portal.project_access ADD COLUMN IF NOT EXISTS scope_all boolean NOT NULL DEFAULT true;
         ALTER TABLE portal.project_access ADD COLUMN IF NOT EXISTS scope_codes text[] NOT NULL DEFAULT '{}';
     """),
+    ("audit_undo", """
+        -- Cofanie operacji: wpisy jednego żądania mają wspólne `op`, `srid` = układ geometrii w old/new_data
+        ALTER TABLE portal.audit_log ADD COLUMN IF NOT EXISTS op uuid;
+        ALTER TABLE portal.audit_log ADD COLUMN IF NOT EXISTS srid int;
+        ALTER TABLE portal.audit_log ADD COLUMN IF NOT EXISTS undone_at timestamptz;
+        CREATE INDEX IF NOT EXISTS audit_log_undo_idx ON portal.audit_log (project_id, user_id, id DESC)
+            WHERE op IS NOT NULL AND undone_at IS NULL;
+    """),
 ]
 
 

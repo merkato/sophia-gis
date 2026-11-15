@@ -102,6 +102,102 @@ export const IconSplit = (p: P) => (
   </Svg>
 );
 
+const Hole = ({ fill = "#fff" }: { fill?: string }) => (
+  <path d="M9 10.5l4.5-1.5 2 4-3.5 3-3.5-1.5z" fill={fill} stroke={C.green} strokeWidth="1.2" />
+);
+const Outer = () => <path d="M3 18l2-12 9-3 7 7-3 10z" fill={C.greenFill} fillOpacity=".55" stroke={C.green} strokeWidth="1.4" />;
+
+/** Dodaj pierścień: poligon z dziurą i gwiazdką. */
+export const IconRing = (p: P) => (
+  <Svg {...p}><Outer /><Hole /><Spark /></Svg>
+);
+
+/** Wypełnij pierścień: dziura wypełniona nowym (żółtym) obiektem. */
+export const IconFillRing = (p: P) => (
+  <Svg {...p}><Outer /><Hole fill={C.yellow} /><Spark /></Svg>
+);
+
+/** Usuń pierścień: dziura z czerwonym krzyżykiem. */
+export const IconDeleteRing = (p: P) => (
+  <Svg {...p}>
+    <Outer /><Hole />
+    <path d="M16.5 15.5l5 5M21.5 15.5l-5 5" stroke={C.red} strokeWidth="1.8" />
+  </Svg>
+);
+
+/** Usuń część: dwie części, jedna przekreślona. */
+export const IconDeletePart = (p: P) => (
+  <Svg {...p}>
+    <path d="M2.5 14l3-8 6 2-1 8z" fill={C.greenFill} fillOpacity=".55" stroke={C.green} strokeWidth="1.4" />
+    <path d="M13 12l6-3 3 7-6 4z" fill="none" stroke={C.gray} strokeWidth="1.2" strokeDasharray="2 1.6" />
+    <path d="M14.5 10.5l6 8M20.5 10.5l-6 8" stroke={C.red} strokeWidth="1.8" />
+  </Svg>
+);
+
+/** Przesuń obiekt: poligon i strzałki w cztery strony. */
+export const IconMove = (p: P) => (
+  <Svg {...p}>
+    <path d="M6 15l1.5-7 7-1.5 1.5 6.5-5 4z" fill={C.greenFill} fillOpacity=".55" stroke={C.green} strokeWidth="1.4" />
+    <path d="M12 1.5v6M12 1.5l-2 2M12 1.5l2 2M12 22.5v-4M12 22.5l-2-2M12 22.5l2-2M1.5 12h3.5M1.5 12l2-2M1.5 12l2 2M22.5 12h-5M22.5 12l-2-2M22.5 12l-2 2"
+      stroke={C.line} strokeWidth="1.3" />
+  </Svg>
+);
+
+/** Połącz obiekty: dwa poligony złączone w jeden obrys. */
+export const IconMerge = (p: P) => (
+  <Svg {...p}>
+    <path d="M2.5 17l1.5-10 8-1v12z" fill={C.greenFill} fillOpacity=".55" />
+    <path d="M12 6l7.5 2 1.5 8.5-9 1.5z" fill={C.greenFill} fillOpacity=".55" />
+    <path d="M12 6v12" stroke={C.green} strokeWidth="1" strokeDasharray="1.6 1.4" />
+    <path d="M2.5 17l1.5-10 8-1 7.5 2 1.5 8.5-9 1.5z" fill="none" stroke={C.green} strokeWidth="1.6" />
+    <path d="M9 12h6M13 10l2 2-2 2" stroke={C.blue} strokeWidth="1.4" />
+  </Svg>
+);
+
+/** Dodaj część: dwie części, nowa z gwiazdką. */
+export const IconAddPart = (p: P) => (
+  <Svg {...p}>
+    <path d="M2.5 15l3-8 6 2-1 8z" fill={C.greenFill} fillOpacity=".55" stroke={C.green} strokeWidth="1.4" />
+    <path d="M13 13l5-3 3 7-6 3z" fill={C.greenFill} stroke={C.green} strokeWidth="1.4" />
+    <Spark />
+  </Svg>
+);
+
+/** Przekształć obiekt: poligon z czerwoną linią zmieniającą granicę. */
+export const IconReshape = (p: P) => (
+  <Svg {...p}>
+    <path d="M3 19l2-12 9-3 7 7-4 9z" fill={C.greenFill} fillOpacity=".55" stroke={C.green} strokeWidth="1.4" />
+    <path d="M8.5 5.5c1 4.5 6 6.5 11 6" stroke={C.red} strokeWidth="1.8" />
+    <circle cx="8.5" cy="5.5" r="1.4" fill={C.red} /><circle cx="19.5" cy="11.5" r="1.4" fill={C.red} />
+  </Svg>
+);
+
+/** Obróć obiekt: poligon i łuk ze strzałką. */
+export const IconRotate = (p: P) => (
+  <Svg {...p}>
+    <path d="M8 16l1-6.5 6.5-1 1.5 6z" fill={C.greenFill} fillOpacity=".55" stroke={C.green} strokeWidth="1.4" />
+    <path d="M20 9.5A8.5 8.5 0 1 0 19 17" stroke={C.line} strokeWidth="1.5" />
+    <path d="M20.5 5.5l-.5 4-4-.8" stroke={C.line} strokeWidth="1.5" />
+  </Svg>
+);
+
+/** Kopiuj obiekt: dwa nakładające się poligony. */
+export const IconCopy = (p: P) => (
+  <Svg {...p}>
+    <path d="M2.5 13l2-8 7-1 1 8z" fill="none" stroke={C.gray} strokeWidth="1.3" strokeDasharray="2 1.5" />
+    <path d="M9.5 20l2-8 7-1 2.5 8z" fill={C.greenFill} fillOpacity=".7" stroke={C.green} strokeWidth="1.4" />
+    <path d="M8.5 9.5l3 2.5" stroke={C.blue} strokeWidth="1.4" />
+  </Svg>
+);
+
+/** Cofnij: zakręcona strzałka w lewo. */
+export const IconUndo = (p: P) => (
+  <Svg {...p}>
+    <path d="M8.5 7.5H15a5.5 5.5 0 010 11H8" stroke={C.blue} strokeWidth="1.9" />
+    <path d="M11.5 3.5l-4 4 4 4" stroke={C.blue} strokeWidth="1.9" />
+  </Svg>
+);
+
 /** Usuń zaznaczony obiekt. */
 export const IconDelete = (p: P) => (
   <Svg {...p}>

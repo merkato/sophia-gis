@@ -3,7 +3,7 @@ import type OlMap from "ol/Map";
 import { api, ApiError } from "./api";
 import { ensureProjection } from "./projections";
 import type { Basemap, FetchResult, GeoJSONFeature, ProjectConfig, ProjectSummary, TreeNode, User } from "./types";
-import { MapView, type Tool } from "./components/MapView";
+import { MapView, type PointTool, type Tool } from "./components/MapView";
 import { LayerTree, initialVisibility, nodeKey, visibleWmsNames } from "./components/LayerTree";
 import { FeaturePanel, type FeaturePanelHandle } from "./components/FeaturePanel";
 import { AttributeTable } from "./components/AttributeTable";
@@ -30,6 +30,7 @@ interface Selection {
   layerId: string;
   feature: GeoJSONFeature;
   isNew: boolean;
+  cutFrom?: string;            // pierścień wypełniony: obiekt, w którym zapis wytnie dziurę
 }
 
 /** Niezapisane zmiany w formularzu, a użytkownik otwiera inny obiekt / zamyka okno. */
@@ -326,6 +327,148 @@ export default function App() {
     }
   };
 
+  /** Otwarty w formularzu (zapisany) obiekt warstwy — cel narzędzi, gdy jest; inaczej wskazuje API. */
+  const targetOf = (layerId: string) =>
+    selection && selection.layerId === layerId && !selection.isNew ? String(selection.feature.id) : null;
+
+  /** Po zmianie geometrii przez API: odśwież mapę, formularz pokazuje zmieniony obiekt. */
+  const afterGeometryEdit = (layerId: string, f: GeoJSONFeature, note: string) => {
+    setReloadToken((t) => t + 1);
+    setMessage(note);
+    if (selection && selection.layerId === layerId && !selection.isNew) setSelection({ layerId, feature: f, isNew: false });
+  };
+
+  const ringTool = async (layerId: string, ring: GeoJSONFeature["geometry"], fill: boolean) => {
+    if (!config) return;
+    try {
+      const target = targetOf(layerId);
+      if (!fill) {
+        const f = await api.addRing(config.slug, layerId, ring, config.crs, { pk: target });
+        afterGeometryEdit(layerId, f, `Dodano pierścień w obiekcie #${f.id}.`);
+        return;
+      }
+      // wypełniony: najpierw sprawdzenie, w którym obiekcie leży, potem formularz nowego obiektu
+      const { pk } = await api.addRing(config.slug, layerId, ring, config.crs, { pk: target, dryRun: true });
+      setSelection({ layerId, isNew: true, cutFrom: pk, feature: { type: "Feature", id: "", geometry: ring, properties: {} } });
+    } catch (e) {
+      setMessage((e as Error).message);
+    }
+  };
+
+  const pointTool = async (layerId: string, t: PointTool, coordinate: number[], tolerance: number) => {
+    if (!config) return;
+    const op = t === "delring" ? "delete-ring" : "delete-part";
+    try {
+      const o = { pk: targetOf(layerId) };
+      if (t === "delpart") {
+        const dry = await api.pointEdit(config.slug, layerId, op, coordinate, tolerance, config.crs, { ...o, dryRun: true });
+        if (!confirm(`Usunąć klikniętą część obiektu #${dry.pk} (części: ${dry.parts})?`)) return;
+        o.pk = dry.pk ?? o.pk;
+      }
+      const f = await api.pointEdit(config.slug, layerId, op, coordinate, tolerance, config.crs, o);
+      afterGeometryEdit(layerId, f, t === "delring" ? `Usunięto pierścień w obiekcie #${f.id}.` : `Usunięto część obiektu #${f.id}.`);
+    } catch (e) {
+      setMessage((e as Error).message);
+    }
+  };
+
+  // Połącz obiekty: zestaw klikniętych obiektów; pierwszy zostaje (klucz, atrybuty, zdjęcia)
+  const [mergeSet, setMergeSet] = useState<string[]>([]);
+  useEffect(() => { if (tool !== "merge") setMergeSet([]); }, [tool, editLayerId]);
+  const mergePick = (pk: string) =>
+    setMergeSet((s) => (s.includes(pk) ? s.filter((x) => x !== pk) : [...s, pk]));
+  const doMerge = async () => {
+    if (!config || !editLayer || mergeSet.length < 2) return;
+    const [keep, ...rest] = mergeSet;
+    if (!confirm(`Połączyć ${mergeSet.length} ${objectsWord(mergeSet.length)} warstwy „${editLayer.name}”?\n`
+      + `Zostanie #${keep} z jego atrybutami. Obiekty ${rest.map((p) => `#${p}`).join(", ")} zostaną usunięte, `
+      + "a ich zdjęcia, dokumenty i rekordy powiązane przejdą do #" + keep + ".")) return;
+    try {
+      const f = await api.mergeFeatures(config.slug, editLayer.id, mergeSet, keep, config.crs);
+      setMergeSet([]);
+      setReloadToken((t) => t + 1);
+      setSelection({ layerId: editLayer.id, feature: f, isNew: false });
+      setMessage(`Połączono w obiekt #${f.id}.`);
+    } catch (e) {
+      setMessage((e as Error).message);
+    }
+  };
+
+  const addPart = async (layerId: string, part: GeoJSONFeature["geometry"]) => {
+    if (!config) return;
+    const target = targetOf(layerId);
+    if (!target) {
+      setMessage("Najpierw otwórz obiekt (Zaznacz obiekt), do którego dodajesz część.");
+      setReloadToken((t) => t + 1);
+      return;
+    }
+    try {
+      const f = await api.addPart(config.slug, layerId, target, part, config.crs);
+      afterGeometryEdit(layerId, f, `Dodano część do obiektu #${f.id}.`);
+    } catch (e) {
+      setMessage((e as Error).message);
+    }
+  };
+
+  const reshape = async (layerId: string, line: GeoJSONFeature["geometry"]) => {
+    if (!config) return;
+    try {
+      const f = await api.reshape(config.slug, layerId, line, config.crs, targetOf(layerId));
+      afterGeometryEdit(layerId, f, `Przekształcono obiekt #${f.id}.`);
+    } catch (e) {
+      setMessage((e as Error).message);
+    }
+  };
+
+  const copyFeature = async (layerId: string, pk: string, geometry: GeoJSONFeature["geometry"]) => {
+    if (!config) return;
+    try {
+      const f = await api.copyFeature(config.slug, layerId, pk, geometry, config.crs);
+      setReloadToken((t) => t + 1);
+      setSelection({ layerId, feature: f, isNew: false });
+      setMessage(`Skopiowano #${pk} jako #${f.id} — uzupełnij atrybuty w formularzu.`);
+    } catch (e) {
+      setMessage((e as Error).message);
+      setReloadToken((t) => t + 1);
+    }
+  };
+
+  /** Cofnij ostatnią własną operację edycji (z dziennika zmian), po potwierdzeniu. */
+  const undoLast = async () => {
+    if (!config?.slug || !user) return;
+    try {
+      const last = await api.lastOperation(config.slug);
+      if (!last) {
+        setMessage("Brak operacji do cofnięcia.");
+        return;
+      }
+      const time = new Date(last.at).toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" });
+      if (!confirm(`Cofnąć ostatnią operację (${time})?\n${last.items.map((i) => `• ${i.label}`).join("\n")}`)) return;
+      await api.undo(config.slug, last.op);
+      setReloadToken((t) => t + 1);
+      if (selection && last.items.some((i) => i.layer_id === selection.layerId && i.pk === String(selection.feature.id))) {
+        setSelection(null);
+      }
+      setMessage(`Cofnięto: ${last.items.map((i) => i.label).join(", ")}.`);
+    } catch (e) {
+      setMessage((e as Error).message);
+    }
+  };
+  const undoRef = useRef<() => void>(() => {});
+  undoRef.current = () => guard(() => { void undoLast(); });
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      if (el && (el.isContentEditable || ["INPUT", "TEXTAREA", "SELECT"].includes(el.tagName))) return;
+      if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        undoRef.current();
+      }
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
+
   const canDelete = !!(selection && editLayer && selection.layerId === editLayer.id && !selection.isNew && editLayer.perms.delete);
   const deleteSelected = async () => {
     if (!config || !selection || !canDelete) return;
@@ -361,6 +504,7 @@ export default function App() {
 
       <Toolbar config={config} editLayerId={editLayerId} onEditLayer={chooseEditLayer} tool={tool} onTool={chooseTool}
         canDelete={canDelete} onDelete={deleteSelected} onNewRecord={newRecord}
+        onUndo={user ? () => undoRef.current() : null}
         sidebarOpen={sidebarOpen} onToggleSidebar={() => setSidebarOpen((o) => !o)}
         fetchToolId={fetchToolId} onFetchTool={startFetchTool}
         onOpenTable={() => editLayerId && setTableLayerId(editLayerId)}
@@ -400,13 +544,20 @@ export default function App() {
               basemaps={basemaps} baseId={baseId} overlayIds={overlayIds}
               onIdentify={openFeature}
               onFetchClick={fetchAt}
-              preview={fetchTool ? fetchState.result?.geometry ?? null : null}
+              preview={fetchTool ? fetchState.result?.geometry ?? null : selection?.cutFrom ? selection.feature.geometry : null}
               printFrame={showPrint ? printFrame : null}
               opacity={opacity}
               onSelect={(layerId, feature) => guard(() => setSelection({ layerId, feature, isNew: false }))}
               onDrawn={(layerId, geometry) => guard(() =>
                 setSelection({ layerId, isNew: true, feature: { type: "Feature", id: "", geometry, properties: {} } }))}
               onSplitLine={(layerId, line) => guard(() => { void splitLine(layerId, line); })}
+              onRing={(layerId, ring, fill) => guard(() => { void ringTool(layerId, ring, fill); })}
+              onPointTool={(layerId, t, c, tol) => guard(() => { void pointTool(layerId, t, c, tol); })}
+              onMergePick={(_, pk) => mergePick(pk)}
+              onAddPart={(layerId, part) => guard(() => { void addPart(layerId, part); })}
+              onReshape={(layerId, line) => guard(() => { void reshape(layerId, line); })}
+              onCopy={(layerId, pk, g) => guard(() => { void copyFeature(layerId, pk, g); })}
+              marked={mergeSet}
               onGeometryModified={async (layerId, pk, geometry) => {
                 if (!config) return;
                 try {
@@ -443,14 +594,24 @@ export default function App() {
                 return { extent: view.calculateExtent(map.getSize()), center: view.getCenter() ?? [0, 0] };
               }} />
           )}
+          {tool === "merge" && editLayer && (
+            <div className="merge-bar" role="status">
+              {mergeSet.length === 0 ? "Kliknij obiekty do połączenia — pierwszy kliknięty zostaje (atrybuty, zdjęcia)."
+                : <>Do połączenia: {mergeSet.map((p, i) => <b key={p}>#{p}{i === 0 ? " (zostaje)" : ""}{i < mergeSet.length - 1 ? ", " : ""}</b>)}</>}
+              <button className="primary" disabled={mergeSet.length < 2} onClick={doMerge}>Połącz</button>
+              <button disabled={!mergeSet.length} onClick={() => setMergeSet([])}>Wyczyść</button>
+            </div>
+          )}
           {message && <div className="toast" onClick={() => setMessage(null)}>{message}</div>}
           {config && selection && (
             <FeaturePanel
               ref={panelRef}
               config={config} layerId={selection.layerId} feature={selection.feature} isNew={selection.isNew}
+              cutFrom={selection.cutFrom}
               onSaved={(f) => {
                 // po zapisie nowego obiektu: następne kliknięcie wybiera obiekt, nie zaczyna rysowania
                 if (selection.isNew && tool === "draw") setTool("select");
+                if (selection.cutFrom) setMessage(`Dodano obiekt #${f.id} i wycięto go z #${selection.cutFrom}.`);
                 setSelection({ layerId: selection.layerId, feature: f, isNew: false });
                 setReloadToken((t) => t + 1);
               }}

@@ -103,12 +103,17 @@ Potrzebny do projektów z podziałem danych na jednostki terenowe (centrala widz
 - Zrobione: `AttributeTable.tsx`, wspólne okno `FloatingWindow.tsx`, API listy z `offset/sort/desc/q/
   geometry/total`; `RecordList` usunięty; opis w `docs/user/README.md`.
 
-### 10. Narzędzia edycji poligonów: podział, pierścień, pierścień wypełniony
+### 10. Narzędzia edycji geometrii
 
 - [x] **Podział** (12.11): `POST …/features/split`, narzędzie na pasku, Esc/Backspace w szkicach,
       polityki podziału z projektu, opis w `docs/user/README.md`.
-- [ ] Pierścień.
-- [ ] Pierścień wypełniony.
+- [x] **Pierścień**, **pierścień wypełniony** (`POST …/ring`, `POST …?cut_from=`), **usuń pierścień**,
+      **usuń część** (`…/delete-ring`, `…/delete-part`), **połącz obiekty** (`…/merge`, dzieci relacji
+      przechodzą do obiektu, który zostaje), **przesuń obiekt** (OL Translate) (14.11).
+- [x] **Dodaj część** (`…/add-part`), **przekształć** (`…/reshape`, poligony i linie), **obróć**
+      (w przeglądarce, zapis jak przy wierzchołkach), **kopiuj** (`…/{pk}/copy`, polityki duplikowania),
+      **cofnij** (`/api/projects/{slug}/undo`, Ctrl+Z; dziennik zmian z `op`/`srid`, migracja
+      `audit_undo`) (15.11).
 
 Odpowiedniki QGIS: *Podziel obiekty*, *Dodaj pierścień*, *Wypełnij pierścień*. Na pasku przy narzędziu
 wierzchołków: podział dla poligonów i linii, oba pierścienie tylko dla poligonów. Szkic rysowany

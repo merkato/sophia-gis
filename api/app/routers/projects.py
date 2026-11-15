@@ -65,6 +65,7 @@ async def project_config(slug: str, user: CurrentUser | None = Depends(optional_
             "attribution": lyr.attribution,
             "attribution_url": lyr.attribution_url,
             "geometry_type": lyr.geometry_type,
+            "multi": bool(lyr.pg and (lyr.pg.geometry_type or "").upper().startswith("MULTI")),
             "crs": lyr.crs,
             "popup": lyr.popup,
             "display_expression": lyr.display_expression,

@@ -3,7 +3,8 @@ import type { LayerInfo, ProjectConfig } from "../types";
 import type { Tool } from "./MapView";
 import {
   GEOMETRY_ICON, IconAddPolygon, IconAddRecord, IconDelete, IconEdit, IconFetchBuilding, IconFetchParcel, IconIdentify,
-  IconLayers, IconPrint, IconSelect, IconSplit, IconTable, IconVertex,
+  IconDeletePart, IconDeleteRing, IconFillRing, IconLayers, IconMerge, IconMove, IconPrint, IconRing, IconSelect, IconSplit,
+  IconAddPart, IconCopy, IconReshape, IconRotate, IconTable, IconUndo, IconVertex,
 } from "./Icons";
 
 const DRAW_LABEL = { Point: "Dodaj obiekt punktowy", Line: "Dodaj obiekt liniowy", Polygon: "Dodaj obiekt poligonowy" };
@@ -23,7 +24,7 @@ function ToolButton({ icon: Icon, label, active, disabled, onClick }: {
  * Pasek narzędzi pod paskiem tytułu (jak paski „Digitalizacja” i „Atrybuty” w QGIS).
  * Narzędzia edycji są zawsze widoczne; bez aktywnej warstwy edycyjnej są wyszarzone.
  */
-export function Toolbar({ config, editLayerId, onEditLayer, tool, onTool, canDelete, onDelete, onNewRecord,
+export function Toolbar({ config, editLayerId, onEditLayer, tool, onTool, canDelete, onDelete, onNewRecord, onUndo,
   sidebarOpen, onToggleSidebar, fetchToolId, onFetchTool, onOpenTable, onPrint }: {
   config: ProjectConfig | null;
   editLayerId: string | null;
@@ -33,6 +34,7 @@ export function Toolbar({ config, editLayerId, onEditLayer, tool, onTool, canDel
   canDelete: boolean;              // zaznaczony (zapisany) obiekt warstwy edycyjnej i prawo usuwania
   onDelete: () => void;
   onNewRecord: () => void;
+  onUndo: (() => void) | null;     // cofnij ostatnią własną operację (null = niezalogowany)
   sidebarOpen: boolean;
   onToggleSidebar: () => void;
   fetchToolId: string | null;      // aktywne narzędzie pobierania (ULDK…)
@@ -46,6 +48,8 @@ export function Toolbar({ config, editLayerId, onEditLayer, tool, onTool, canDel
   const layer = editLayerId ? config?.layers[editLayerId] ?? null : null;
   const geom = layer?.geometry_type ?? null;
   const DrawIcon = geom ? GEOMETRY_ICON[geom] : IconAddPolygon;
+  const poly = geom === "Polygon";
+  const lineOrPoly = geom === "Polygon" || geom === "Line";
 
   return (
     <div className="toolbar" role="toolbar" aria-label="Narzędzia">
@@ -77,12 +81,35 @@ export function Toolbar({ config, editLayerId, onEditLayer, tool, onTool, canDel
           )}
           <ToolButton icon={IconVertex} label="Narzędzie wierzchołków (zmiana geometrii)" active={tool === "modify"}
             disabled={!geom || !layer?.perms.update} onClick={() => onTool("modify")} />
+          <ToolButton icon={IconMove} label="Przesuń obiekt (przeciągnij)" active={tool === "move"}
+            disabled={!geom || !layer?.perms.update} onClick={() => onTool("move")} />
+          <ToolButton icon={IconRotate} label="Obróć obiekt (przeciągnij wokół środka; Shift = co 15°)" active={tool === "rotate"}
+            disabled={!lineOrPoly || !layer?.perms.update} onClick={() => onTool("rotate")} />
+          <ToolButton icon={IconCopy} label="Kopiuj obiekt (przeciągnij kopię w nowe miejsce)" active={tool === "copy"}
+            disabled={!geom || !layer?.perms.insert} onClick={() => onTool("copy")} />
+          <ToolButton icon={IconReshape} label="Przekształć obiekt (linia przecinająca granicę dwa razy)" active={tool === "reshape"}
+            disabled={!lineOrPoly || !layer?.perms.update} onClick={() => onTool("reshape")} />
           <ToolButton icon={IconSplit} label="Podziel obiekty (linią; zaznaczony obiekt albo wszystkie przecięte)"
             active={tool === "split"} onClick={() => onTool("split")}
             disabled={!(geom === "Polygon" || geom === "Line") || !layer?.perms.update || !layer?.perms.insert} />
+          <ToolButton icon={IconMerge} label="Połącz obiekty (kliknij kolejne; pierwszy zostaje)" active={tool === "merge"}
+            disabled={!geom || !layer?.perms.update || !layer?.perms.delete} onClick={() => onTool("merge")} />
+          <ToolButton icon={IconRing} label="Dodaj pierścień (dziura w poligonie)" active={tool === "ring"}
+            disabled={!poly || !layer?.perms.update} onClick={() => onTool("ring")} />
+          <ToolButton icon={IconFillRing} label="Wypełnij pierścień (dziura z nowym obiektem)" active={tool === "fillring"}
+            disabled={!poly || !layer?.perms.update || !layer?.perms.insert} onClick={() => onTool("fillring")} />
+          <ToolButton icon={IconDeleteRing} label="Usuń pierścień (kliknij w dziurę)" active={tool === "delring"}
+            disabled={!poly || !layer?.perms.update} onClick={() => onTool("delring")} />
+          <ToolButton icon={IconAddPart} label={layer && geom && !layer.multi
+            ? "Dodaj część — warstwa nie ma obiektów wieloczęściowych" : "Dodaj część do obiektu otwartego w formularzu"}
+            active={tool === "addpart"} disabled={!geom || !layer?.multi || !layer?.perms.update} onClick={() => onTool("addpart")} />
+          <ToolButton icon={IconDeletePart} label={layer && geom && !layer.multi
+            ? "Usuń część — warstwa nie ma obiektów wieloczęściowych" : "Usuń część obiektu wieloczęściowego (kliknij część)"}
+            active={tool === "delpart"} disabled={!geom || !layer?.multi || !layer?.perms.update} onClick={() => onTool("delpart")} />
           <ToolButton icon={IconDelete} label="Usuń zaznaczony obiekt" disabled={!canDelete} onClick={onDelete} />
           <ToolButton icon={IconTable} label={layer ? `Otwórz tabelę atrybutów: ${layer.name}` : "Otwórz tabelę atrybutów"}
             disabled={!layer} onClick={onOpenTable} />
+          <ToolButton icon={IconUndo} label="Cofnij ostatnią operację (Ctrl+Z)" disabled={!onUndo} onClick={() => onUndo?.()} />
         </>
       )}
 

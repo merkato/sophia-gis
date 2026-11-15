@@ -30,7 +30,16 @@ from ..permissions import ProjectContext, load_project_context
 from ..qgsproject import FieldDef, LayerDef
 from ..scope import T, col, row_filter
 from ..security import CurrentUser, optional_user, require_user
-from .features import _audit, _fetch_one, _geom_sql, _row_to_feature, _scope_error, _table, in_scope
+from .features import (
+    AUDIT_SRID,
+    _audit,
+    _fetch_one,
+    _geom_sql,
+    _row_to_feature,
+    _scope_error,
+    _table,
+    in_scope,
+)
 
 log = logging.getLogger("sophia.photos")
 
@@ -140,6 +149,7 @@ async def _insert_child(ctx: ProjectContext, user: CurrentUser, lyr: LayerDef, f
     if relation is None or not parent.pg or parent.pg.conninfo != lyr.pg.conninfo:
         raise HTTPException(status.HTTP_400_BAD_REQUEST, "Brak relacji między warstwami w projekcie QGIS")
     srid = int(crs.split(":")[1]) if crs.upper().startswith("EPSG:") else 2180
+    AUDIT_SRID.set(srid)
 
     async with layer_conn(lyr.pg.conninfo) as conn, conn.transaction():
         pg = col(T, parent.pg.geometry_column) if parent.pg.geometry_column else None

@@ -1,6 +1,9 @@
-"""Podział obiektów (POST …/features/split): które kolumny trafiają do nowych części i jak."""
+"""Narzędzia edycji geometrii: podział (polityki pól), pierścienie (walidacja szkicu)."""
+import pytest
+from fastapi import HTTPException
+
 from app.qgsproject import FieldDef, LayerDef, PgSource
-from app.routers.features import split_plan
+from app.routers.features import _is_multi, _ring_sql, split_plan
 
 
 def _parcels() -> LayerDef:
@@ -23,3 +26,29 @@ def test_split_plan():
         ("opis", "Duplicate"),          # proporcja tylko dla liczb
         ("oddzial", "Duplicate"),       # kolumna spoza formularza QGIS — kopiowana
     ]
+
+
+def test_ring_sketch_must_be_polygon():
+    lyr = _parcels()
+    assert _is_multi(lyr)
+    with pytest.raises(HTTPException) as e:
+        _ring_sql(lyr, {"type": "LineString", "coordinates": [[0, 0], [1, 1]]}, 2180)
+    assert e.value.status_code == 422
+    with pytest.raises(HTTPException):
+        _ring_sql(lyr, {"type": "Polygon", "coordinates": [[[0, 0], [1, 1], [0, 0]]]}, 2180)
+    _ring_sql(lyr, {"type": "Polygon", "coordinates": [[[0, 0], [1, 0], [1, 1], [0, 0]]]}, 2180)
+
+
+def test_reshape_mode():
+    from app.routers.features import reshape_mode
+    assert reshape_mode(10.0, 0.0) == "outside"
+    assert reshape_mode(10.0, 10.0) == "inside"
+    assert reshape_mode(10.0, 4.0) == "mixed"
+
+
+def test_copy_plan_uses_duplicate_policy():
+    lyr = _parcels()
+    lyr.fields[1].duplicate_policy = "UnsetField"          # nr_decyzji
+    lyr.fields[2].duplicate_policy = "DefaultValue"        # pow_ha
+    assert split_plan(lyr, [("nr_decyzji", "S"), ("pow_ha", "N"), ("uwagi", "S")], "duplicate_policy") == [
+        ("nr_decyzji", "UnsetField"), ("uwagi", "Duplicate")]

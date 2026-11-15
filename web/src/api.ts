@@ -28,6 +28,13 @@ const enc = encodeURIComponent;
 const featuresUrl = (slug: string, layerId: string) =>
   `/api/projects/${enc(slug)}/layers/${enc(layerId)}/features`;
 
+/** Operacja z dziennika zmian do cofnięcia (GET /undo). */
+export interface UndoInfo {
+  op: string;
+  at: string;
+  items: { layer_id: string; layer: string; pk: string; action: "insert" | "update" | "delete"; label: string }[];
+}
+
 export const api = {
   me: () => request<User>("/api/auth/me"),
   login: (login: string, password: string) =>
@@ -51,8 +58,9 @@ export const api = {
       })}`),
   feature: (slug: string, layerId: string, pk: string, crs: string) =>
     request<GeoJSONFeature>(`${featuresUrl(slug, layerId)}/${enc(pk)}?crs=${enc(crs)}`),
-  createFeature: (slug: string, layerId: string, f: Partial<GeoJSONFeature>, crs: string) =>
-    request<GeoJSONFeature>(`${featuresUrl(slug, layerId)}?crs=${enc(crs)}`,
+  /** cutFrom — pierścień wypełniony: nowy obiekt wycina dziurę w tym obiekcie (jedna transakcja). */
+  createFeature: (slug: string, layerId: string, f: Partial<GeoJSONFeature>, crs: string, cutFrom?: string | null) =>
+    request<GeoJSONFeature>(`${featuresUrl(slug, layerId)}?crs=${enc(crs)}${cutFrom ? `&cut_from=${enc(cutFrom)}` : ""}`,
       { method: "POST", body: JSON.stringify(f) }),
   updateFeature: (slug: string, layerId: string, pk: string, f: Partial<GeoJSONFeature>, crs: string) =>
     request<GeoJSONFeature>(`${featuresUrl(slug, layerId)}/${enc(pk)}?crs=${enc(crs)}`,
@@ -63,6 +71,33 @@ export const api = {
     request<{ pks?: string[]; updated?: GeoJSONFeature[]; created?: GeoJSONFeature[] }>(
       `${featuresUrl(slug, layerId)}/split?crs=${enc(crs)}`,
       { method: "POST", body: JSON.stringify({ line, pks: o.pks ?? null, dry_run: !!o.dryRun }) }),
+  /** Pierścień (dziura) w obiekcie, w którym leży; dryRun — tylko klucz obiektu docelowego. */
+  addRing: (slug: string, layerId: string, ring: GeoJSONFeature["geometry"], crs: string,
+    o: { pk?: string | null; dryRun?: boolean } = {}) =>
+    request<GeoJSONFeature & { pk?: string }>(`${featuresUrl(slug, layerId)}/ring?crs=${enc(crs)}`,
+      { method: "POST", body: JSON.stringify({ ring, pk: o.pk ?? null, dry_run: !!o.dryRun }) }),
+  /** Usuń pierścień / część w klikniętym miejscu. */
+  pointEdit: (slug: string, layerId: string, op: "delete-ring" | "delete-part", point: number[], tolerance: number,
+    crs: string, o: { pk?: string | null; dryRun?: boolean } = {}) =>
+    request<GeoJSONFeature & { pk?: string; parts?: number }>(`${featuresUrl(slug, layerId)}/${op}?crs=${enc(crs)}`,
+      { method: "POST", body: JSON.stringify({ point, tolerance, pk: o.pk ?? null, dry_run: !!o.dryRun }) }),
+  /** Połącz obiekty: zostaje `keep` (atrybuty, zdjęcia), pozostałe są usuwane. */
+  mergeFeatures: (slug: string, layerId: string, pks: string[], keep: string, crs: string) =>
+    request<GeoJSONFeature>(`${featuresUrl(slug, layerId)}/merge?crs=${enc(crs)}`,
+      { method: "POST", body: JSON.stringify({ pks, keep }) }),
+  addPart: (slug: string, layerId: string, pk: string, part: GeoJSONFeature["geometry"], crs: string) =>
+    request<GeoJSONFeature>(`${featuresUrl(slug, layerId)}/add-part?crs=${enc(crs)}`,
+      { method: "POST", body: JSON.stringify({ part, pk }) }),
+  reshape: (slug: string, layerId: string, line: GeoJSONFeature["geometry"], crs: string, pk?: string | null) =>
+    request<GeoJSONFeature>(`${featuresUrl(slug, layerId)}/reshape?crs=${enc(crs)}`,
+      { method: "POST", body: JSON.stringify({ line, pk: pk ?? null }) }),
+  copyFeature: (slug: string, layerId: string, pk: string, geometry: GeoJSONFeature["geometry"], crs: string) =>
+    request<GeoJSONFeature>(`${featuresUrl(slug, layerId)}/${enc(pk)}/copy?crs=${enc(crs)}`,
+      { method: "POST", body: JSON.stringify({ geometry }) }),
+  /** Ostatnia własna operacja edycji w projekcie (null = nic do cofnięcia). */
+  lastOperation: (slug: string) => request<UndoInfo | null>(`/api/projects/${enc(slug)}/undo`),
+  undo: (slug: string, op: string) =>
+    request<{ undone: UndoInfo["items"] }>(`/api/projects/${enc(slug)}/undo`, { method: "POST", body: JSON.stringify({ op }) }),
   deleteFeature: (slug: string, layerId: string, pk: string) =>
     request<void>(`${featuresUrl(slug, layerId)}/${enc(pk)}`, { method: "DELETE" }),
   related: (slug: string, layerId: string, pk: string, crs: string) =>

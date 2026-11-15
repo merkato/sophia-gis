@@ -33,6 +33,9 @@ class FieldDef:
     # Polityka podziału pola (QGIS: Właściwości warstwy → Atrybuty → Polityka podziału) — narzędzie
     # „Podziel obiekty”: Duplicate | DefaultValue | UnsetField | GeometryRatio. Brak w projekcie = Duplicate.
     split_policy: str = "Duplicate"
+    # Polityka duplikowania (QGIS: … → Polityka duplikowania) — narzędzie „Kopiuj obiekt”:
+    # Duplicate | DefaultValue | UnsetField. Brak w projekcie = Duplicate.
+    duplicate_policy: str = "Duplicate"
 
 
 @dataclass
@@ -335,6 +338,9 @@ def _parse_fields(ml: etree._Element) -> list[FieldDef]:
     for p in ml.findall("./splitPolicies/policy"):
         if p.get("field") in fields and p.get("policy") in SPLIT_POLICIES:
             fields[p.get("field")].split_policy = p.get("policy")
+    for p in ml.findall("./duplicatePolicies/policy"):
+        if p.get("field") in fields and p.get("policy") in ("Duplicate", "DefaultValue", "UnsetField"):
+            fields[p.get("field")].duplicate_policy = p.get("policy")
     return list(fields.values())
 
 

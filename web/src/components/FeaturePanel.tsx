@@ -11,6 +11,7 @@ interface Props {
   layerId: string;
   feature: GeoJSONFeature | null;          // null id => nowy obiekt (po narysowaniu)
   isNew: boolean;
+  cutFrom?: string | null;                 // pierścień wypełniony: zapis wycina dziurę w tym obiekcie
   onSaved: (f: GeoJSONFeature) => void;
   onDeleted: () => void;
   onClose: () => void;
@@ -29,7 +30,7 @@ export interface FeaturePanelHandle {
 const norm = (v: unknown) => (v === null || v === undefined ? "" : String(v));
 
 export const FeaturePanel = forwardRef<FeaturePanelHandle, Props>(function FeaturePanel(
-  { config, layerId, feature, isNew, onSaved, onDeleted, onClose, onOpenRelated }, ref) {
+  { config, layerId, feature, isNew, cutFrom, onSaved, onDeleted, onClose, onOpenRelated }, ref) {
   const layer = config.layers[layerId];
   const [values, setValues] = useState<Record<string, unknown>>({});
   const [tab, setTab] = useState<Tab>("attrs");
@@ -93,7 +94,7 @@ export const FeaturePanel = forwardRef<FeaturePanelHandle, Props>(function Featu
     setError(null);
     try {
       const saved = isNew
-        ? await api.createFeature(config.slug, layerId, { type: "Feature", geometry: feature?.geometry ?? null, properties: props }, config.crs)
+        ? await api.createFeature(config.slug, layerId, { type: "Feature", geometry: feature?.geometry ?? null, properties: props }, config.crs, cutFrom)
         : await api.updateFeature(config.slug, layerId, pk!, { properties: props }, config.crs);
       onSaved(saved);
       return true;
