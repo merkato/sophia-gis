@@ -14,8 +14,6 @@ Oznaczenia: ✅ zrobione · ✔️ zrobione częściowo (co zostało — w plani
 - ⬜ Obrót wydruku (`map0:ROTATION`).
 
 ### ⬜ 2. Do przetestowania (zrobione, nieprzetestowane w pełni)
-- ⬜ Postęp wydruku w układzie Sophii na dużym rastrze (Schmettau, A3, 200 dpi) — test 15.11 w schowanym
-  panelu przeglądarki przerwał się (karta nie rysowała klatek); powtórzyć w widocznym oknie.
 - ⬜ Etykiety `zrodla`/`autor` na szablonie, który je ma (szablon projektu kolejowego ma tylko `title`).
 - ⬜ Zakładki Fii w QGIS: „Zakres danych”, „Narzędzia pobierania”, zapamiętane poświadczenia.
 - ⬜ Narzędzia edycji geometrii w przeglądarce na prawdziwych danych, cofanie (Ctrl+Z).
@@ -102,7 +100,8 @@ danych, wpis do dziennika zmian. Opis: `docs/user/README.md`.
   (`OPACITIES` w GetPrint), panel podaje, co wpisze do szablonu (15.11, 6c84653). Krycie z panelu
   dociera do QGIS Server (sprawdzone w przeglądarce).
 - ✅ Układ Sophii przy dużych rastrach: licznik postępu kafli, najwyżej 6 zapytań naraz, limit od
-  ostatniego postępu (45 s) zamiast stałych 60 s, najwyżej 5 min (15.11).
+  ostatniego postępu (45 s) zamiast stałych 60 s, najwyżej 5 min; w karcie w tle limit stoi (15.11,
+  cfde0c1). Sprawdzone w przeglądarce: Schmettau A3, 200 dpi, 1:25 000 — 98 kafli w 5 s, z licznikiem.
 - ✅ Dokumentacja `docs/user/wydruki.md`: etykiety, legenda, mapa przeglądowa, postęp i limity.
 - ⬜ Podkład bez warstwy w projekcie, obrót → plan, punkt 1.
 
