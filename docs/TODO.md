@@ -23,8 +23,50 @@ Oznaczenia: ✅ zrobione · ✔️ zrobione częściowo (co zostało — w plani
 - ⬜ **Limit wielkości plików per warstwa** (zdjęcia, dokumenty) — dziś globalne limity w konfiguracji API.
 - ⬜ Kolejne źródła narzędzi pobierania: PRG adresy, BDOT10k (nowy wpis w `SOURCES` i w `fia/tools.py`).
 
-### ⬜ 4. Edytor schematu bazy w WebUI
-Tabele, kolumny, relacje, słowniki — patrz `docs/ARCHITECTURE.md`.
+### ⬜ 4. Graficzny edytor schematu bazy (WebUI) — plan z 15.11
+Diagram tabel jak w narzędziach ERD: karty tabel przeciągane po płótnie, relacja = „sznurek”
+przeciągnięty z pola na pole. Działa na istniejących schematach danych (dziś `dane`, `rdlp`,
+`straznicy`) i na nowych. Panel administratora → **Baza danych**.
+
+**Zasady**
+- Schematy danych z bazy Sophii, bez `portal`, `public` i schematów systemowych (lista wykluczeń
+  w konfiguracji API). Nazwy tabel i pól: małe litery, cyfry, `_` (bez polskich znaków — QGIS, SQL,
+  eksporty); polska nazwa jako **komentarz** kolumny/tabeli, który Fia przenosi na alias w QGIS.
+- Zmiany rysuje się na płótnie jako szkic, potem **„Podgląd zmian”** pokazuje SQL, a **„Zastosuj”**
+  wykonuje wszystko w jednej transakcji. Każda zmiana schematu trafia do dziennika (kto, kiedy, SQL).
+- Operacje niszczące (usuń tabelę/pole, zmiana typu z danymi) — osobne potwierdzenie z liczbą wierszy
+  i listą projektów, które używają tabeli/pola (z opublikowanych projektów QGIS). Kopia nocna jest.
+- Uprawnienia: **tylko administrator** (decyzja 15.11) — API sprawdza `is_admin` przy każdej zmianie,
+  pozostali nie widzą zakładki.
+
+**Model w edytorze**
+- **Tabela**: nazwa, komentarz, rodzaj — *atrybutowa* albo *geometryczna* (punkt / linia / poligon,
+  „wieloczęściowa”, układ — domyślnie EPSG:2180). Klucz główny `fid` (identity) i indeks przestrzenny
+  zakładane same.
+- **Pole**: nazwa, typ z prostej listy (tekst, liczba całkowita, liczba dziesiętna, data, data i czas,
+  tak/nie, uuid), wymagane, wartość domyślna, unikalne, komentarz. Szablony pól: „data utworzenia”
+  (`now()`), „autor”.
+- **Relacja** (sznurek z pola tabeli podrzędnej na klucz tabeli nadrzędnej; upuszczenie na nagłówek
+  tabeli zakłada nowe pole `<tabela>_fid`): klucz obcy z indeksem; *Kompozycja* (usuń z rodzicem,
+  `ON DELETE CASCADE`) albo *Powiązanie* (`SET NULL` / `RESTRICT`). Kontrola zgodności typów.
+- **Słownik**: gotowy szablon tabeli `kod` + `opis` z wartościami wpisanymi od razu; pole podpięte
+  sznurkiem do słownika → w QGIS lista wartości (ValueRelation).
+
+**Etapy**
+1. ⬜ **Odczyt**: API odczytuje schemat z katalogu bazy (tabele, kolumny, klucze, relacje, geometrie,
+   komentarze, liczba wierszy, użycie w projektach); diagram tylko do oglądania, układ kart zapamiętany
+   w bazie (`portal`, per schemat). Biblioteka diagramu: React Flow (`@xyflow/react`, MIT) — uchwyty na
+   poziomie wierszy pól dają „sznurki z pola na pole”.
+2. ⬜ **Tworzenie**: nowy schemat, nowa tabela (atrybutowa / geometryczna), nowe pola; podgląd SQL,
+   zastosowanie w transakcji, dziennik zmian (migracja w `portal`).
+3. ⬜ **Relacje i słowniki**: sznurki, okno relacji, usuwanie relacji, słownik z wartościami.
+4. ⬜ **Zmiany i usuwanie**: zmiana nazwy, typu (z `USING`), usuwanie pól i tabel — z potwierdzeniami
+   i ostrzeżeniem o projektach, które przestaną działać.
+5. ⬜ **Fia**: „Dodaj warstwy z bazy Sophii” — warstwy przez `service=sophia`, relacje QGIS z kluczy
+   obcych (Sophia czyta relacje z projektu, nie z bazy), ValueRelation dla słowników, aliasy
+   z komentarzy, pola wymagane; Diagnostyka ostrzega o kluczu obcym bez relacji w projekcie.
+6. ⬜ Testy (generator SQL — jednostkowe; próba na tymczasowym schemacie na serwerze), dokumentacja
+   `docs/user/baza.md`. Na telefonie diagram tylko do podglądu.
 
 ### ⬜ 5. Raporty po stronie Sophii (na sam koniec)
 Zamiast raportów z menedżera wydruków QGIS — np. raporty z oględzin terenowych do PDF, z filtrem zakresu
