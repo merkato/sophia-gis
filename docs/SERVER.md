@@ -62,6 +62,7 @@ cp .env.example .env && nano .env          # SITE_ADDRESS=webgis.giswgorach.pl, 
 echo 'COMPOSE_FILE=docker-compose.yml:docker-compose.small.yml' >> .env
 cp config/pg_service.conf.example config/pg_service.conf
 nano config/pg_service.conf                # to samo hasło co POSTGRES_PASSWORD (plik poza gitem)
+chmod 644 config/pg_service.conf           # QGIS Server czyta go jako www-data — przy 600 warstwy PostGIS są „nieprawidłowe”
 
 docker compose up -d --build
 docker compose ps
