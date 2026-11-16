@@ -271,3 +271,13 @@ ul.plain li { padding: 4px 0; }
   .preview { height: 360px; }
   table.grid { display: block; overflow-x: auto; }
 }
+
+/* Panel → Wtyczki */
+.plugins table { width: 100%; border-collapse: collapse; }
+.plugins th, .plugins td { text-align: left; vertical-align: top; padding: 6px 8px; border-bottom: 1px solid var(--line); }
+.plugins tr.selected td { background: color-mix(in srgb, var(--accent) 8%, transparent); }
+.plugins td.actions { white-space: nowrap; }
+.plugins td .error { margin-top: 4px; }
+.plugin-access { margin-top: 14px; max-width: 900px; }
+.plugin-access fieldset { border: 1px solid var(--line); border-radius: 8px; margin: 8px 0; padding: 6px 10px; }
+.plugin-access .checks { display: flex; flex-wrap: wrap; gap: 4px 14px; align-items: center; margin: 4px 0; }

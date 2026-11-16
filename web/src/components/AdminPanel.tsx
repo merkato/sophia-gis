@@ -4,13 +4,29 @@ import type { AdminProject, AdminUser, Basemap, Group, ProjectAccess } from "../
 import { AccessEditor } from "./AccessEditor";
 import { UploadsTab } from "./UploadsTab";
 import { BasemapEditor } from "./BasemapEditor";
+import { PluginPageView, PluginsTab } from "./PluginsTab";
+import type { PluginInfo } from "../plugins";
+import type { User } from "../types";
 
-type Tab = "users" | "groups" | "projects" | "basemaps" | "uploads";
-const TABS: [Tab, string][] = [["users", "Użytkownicy"], ["groups", "Grupy"], ["projects", "Projekty"], ["basemaps", "Podkłady"], ["uploads", "Pliki"]];
+type CoreTab = "users" | "groups" | "projects" | "basemaps" | "uploads" | "plugins";
+const TABS: [CoreTab, string][] = [["users", "Użytkownicy"], ["groups", "Grupy"], ["projects", "Projekty"], ["basemaps", "Podkłady"],
+  ["uploads", "Pliki"], ["plugins", "Wtyczki"]];
 
-/** Panel administratora: pełnoekranowa nakładka nad mapą. onChanged = odśwież menu projektów/podkłady. */
-export function AdminPanel({ onClose, onChanged }: { onClose: () => void; onChanged: () => void }) {
-  const [tab, setTab] = useState<Tab>("users");
+/**
+ * Panel administracji: pełnoekranowa nakładka nad mapą. Administrator widzi zakładki rdzenia i strony
+ * wtyczek; pozostali — tylko strony wtyczek, do których dostali uprawnienie (panel → Wtyczki).
+ * onChanged = odśwież menu projektów, podkłady i listę wtyczek.
+ */
+export function AdminPanel({ onClose, onChanged, user, plugins, notify }: {
+  onClose: () => void; onChanged: () => void; user: User; plugins: PluginInfo[]; notify: (m: string) => void;
+}) {
+  const pluginTabs = plugins.flatMap((p) => p.pages.map((pg) => ({ key: `p:${p.id}:${pg.id}`, label: pg.title, plugin: p, page: pg })));
+  const tabs: { key: string; label: string }[] = [
+    ...(user.is_admin ? TABS.map(([key, label]) => ({ key, label })) : []),
+    ...pluginTabs,
+  ];
+  const [tab, setTab] = useState<string>(tabs[0]?.key ?? "");
+  const pluginTab = pluginTabs.find((t) => t.key === tab);
   const [error, setError] = useState<string | null>(null);
   const run = useCallback(async (fn: () => Promise<unknown>) => {
     setError(null);
@@ -22,8 +38,8 @@ export function AdminPanel({ onClose, onChanged }: { onClose: () => void; onChan
       <header className="admin-head">
         <h2>Administracja</h2>
         <nav className="tabs">
-          {TABS.map(([t, label]) => (
-            <button key={t} className={tab === t ? "active" : ""} onClick={() => { setTab(t); setError(null); }}>{label}</button>
+          {tabs.map(({ key, label }) => (
+            <button key={key} className={tab === key ? "active" : ""} onClick={() => { setTab(key); setError(null); }}>{label}</button>
           ))}
         </nav>
         <div className="spacer" />
@@ -36,6 +52,8 @@ export function AdminPanel({ onClose, onChanged }: { onClose: () => void; onChan
         {tab === "projects" && <ProjectsTab run={run} onChanged={onChanged} />}
         {tab === "basemaps" && <BasemapsTab run={run} onChanged={onChanged} />}
         {tab === "uploads" && <UploadsTab run={run} />}
+        {tab === "plugins" && <PluginsTab run={run} onChanged={onChanged} />}
+        {pluginTab && <PluginPageView key={pluginTab.key} plugin={pluginTab.plugin} page={pluginTab.page} user={user} notify={notify} />}
       </div>
     </div>
   );

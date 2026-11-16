@@ -1,3 +1,4 @@
+import type { PluginInfo } from "./plugins";
 import type {
   AdminProject, AdminUser, Basemap, FetchResult, FileMeta, GeoJSONFeature, Group, PhotoMeta, ProjectAccess, ProjectConfig, ProjectScopeInfo,
   ProjectSummary, RelatedGroup, User, WmtsCapabilities,
@@ -9,7 +10,7 @@ export class ApiError extends Error {
   }
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
   if (init.body && !(init.body instanceof FormData)) headers.set("Content-Type", "application/json");
   const res = await fetch(path, { ...init, headers, credentials: "same-origin" });
@@ -37,6 +38,8 @@ export interface UndoInfo {
 
 export const api = {
   me: () => request<User>("/api/auth/me"),
+  /** Włączone wtyczki z uprawnieniami zalogowanego (moduł web, strony w administracji). */
+  plugins: () => request<PluginInfo[]>("/api/plugins"),
   login: (login: string, password: string) =>
     request<{ token: string }>("/api/auth/login", { method: "POST", body: JSON.stringify({ login, password }) }),
   logout: () => request("/api/auth/logout", { method: "POST" }),
@@ -150,11 +153,28 @@ export const api = {
 const json = (method: string, body: unknown): RequestInit => ({ method, body: JSON.stringify(body) });
 
 /** Panel administratora (wymaga konta z is_admin). */
+/** Wtyczka w panelu administratora (GET /api/admin/plugins). */
+export interface AdminPlugin {
+  id: string; name: string; version: string; description: string; sophia: string;
+  requires: Record<string, string>; capabilities: { id: string; title?: string }[];
+  pages: { id: string; title: string; capability?: string }[];
+  error: string | null; enabled: boolean; settings: Record<string, unknown>;
+  migrations: { applied: string[]; pending: string[] };
+  access: (PluginAccessEntry & { group_name: string | null; login: string | null })[];
+}
+export interface PluginAccessEntry { capability: string; group_id?: number | null; user_id?: number | null }
+
 export const adminApi = {
   users: () => request<AdminUser[]>("/api/admin/users"),
   createUser: (u: UserInput) => request<{ id: number }>("/api/admin/users", json("POST", u)),
   updateUser: (id: number, u: UserInput) => request(`/api/admin/users/${id}`, json("PUT", u)),
   deleteUser: (id: number) => request<void>(`/api/admin/users/${id}`, { method: "DELETE" }),
+
+  plugins: () => request<AdminPlugin[]>("/api/admin/plugins"),
+  updatePlugin: (id: string, body: { enabled: boolean; settings?: Record<string, unknown> }) =>
+    request(`/api/admin/plugins/${encodeURIComponent(id)}`, json("PUT", body)),
+  setPluginAccess: (id: string, entries: PluginAccessEntry[]) =>
+    request(`/api/admin/plugins/${encodeURIComponent(id)}/access`, json("PUT", entries)),
 
   groups: () => request<Group[]>("/api/admin/groups"),
   createGroup: (g: Omit<Group, "id">) => request<{ id: number }>("/api/admin/groups", json("POST", g)),

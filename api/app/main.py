@@ -3,10 +3,12 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 
+from . import __version__, plugins
 from .config import get_settings
 from .db import close_pools, portal_conn
 from .migrations import run_migrations
 from .routers import admin, auth, basemaps, features, fetch, fields, history, ows, photos, projects, reports
+from .routers import plugins as plugins_router
 from .security import hash_password
 
 log = logging.getLogger("sophia")
@@ -29,12 +31,13 @@ async def _bootstrap_admin() -> None:
 @asynccontextmanager
 async def lifespan(_: FastAPI):
     await run_migrations()
+    await plugins.startup()
     await _bootstrap_admin()
     yield
     await close_pools()
 
 
-app = FastAPI(title="Sophia API", version="0.1.0", lifespan=lifespan,
+app = FastAPI(title="Sophia API", version=__version__, lifespan=lifespan,
               docs_url="/api/docs", openapi_url="/api/openapi.json")
 
 for r in (auth, projects, features, history, fields, photos, fetch, reports, ows, admin, basemaps):
@@ -42,6 +45,10 @@ for r in (auth, projects, features, history, fields, photos, fetch, reports, ows
 app.include_router(basemaps.admin)
 app.include_router(admin.publish_router)
 app.include_router(photos.projects_router)
+# wtyczki: najpierw endpointy rdzenia (/api/plugins, moduły web, administracja), potem routery wtyczek
+app.include_router(plugins_router.router)
+app.include_router(plugins_router.admin)
+plugins.load_into(app)
 
 
 @app.get("/api/health")

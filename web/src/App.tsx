@@ -12,6 +12,7 @@ import GeoJSON from "ol/format/GeoJSON";
 import { Toolbar } from "./components/Toolbar";
 import { FetchCard } from "./components/FetchCard";
 import { AdminPanel } from "./components/AdminPanel";
+import type { PluginInfo } from "./plugins";
 import { BasemapSwitcher, initialBasemapChoice, saveBasemapChoice } from "./components/BasemapSwitcher";
 import { loadOpacity, saveOpacity, useOpenSliders } from "./components/OpacitySlider";
 
@@ -138,8 +139,14 @@ export default function App() {
     }
   };
 
+  // wtyczki z uprawnieniami zalogowanego (strony w administracji)
+  const [plugins, setPlugins] = useState<PluginInfo[]>([]);
+  const pluginPages = plugins.some((p) => p.pages.length > 0);
+
   const refreshSession = useCallback(async () => {
-    setUser(await api.me().catch(() => null));
+    const me = await api.me().catch(() => null);
+    setUser(me);
+    setPlugins(me ? await api.plugins().catch(() => []) : []);
     const [list, bms] = await Promise.all([api.projects().catch(() => []), api.basemaps().catch(() => [])]);
     setProjects(list);
     setSlug((s) => (s && list.some((p) => p.slug === s) ? s : list[0]?.slug ?? null));
@@ -501,7 +508,7 @@ export default function App() {
         {user ? (
           <>
             <span className="muted">{user.full_name ?? user.login}</span>
-            {user.is_admin && <button onClick={() => setShowAdmin(true)}>Administracja</button>}
+            {(user.is_admin || pluginPages) && <button onClick={() => setShowAdmin(true)}>Administracja</button>}
             <button onClick={async () => { await api.logout(); await refreshSession(); }}>Wyloguj</button>
           </>
         ) : (
@@ -635,8 +642,9 @@ export default function App() {
           onCancel={() => resolvePending("cancel")} />
       )}
 
-      {showAdmin && user?.is_admin && (
-        <AdminPanel onClose={() => setShowAdmin(false)} onChanged={refreshSession} />
+      {showAdmin && user && (user.is_admin || pluginPages) && (
+        <AdminPanel onClose={() => setShowAdmin(false)} onChanged={refreshSession} user={user} plugins={plugins}
+          notify={setMessage} />
       )}
 
       {showLogin && !user && (

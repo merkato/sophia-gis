@@ -7,6 +7,8 @@ __pycache__/
 .ruff_cache/
 node_modules/
 web/dist/
+plugins/*
+!plugins/README.md
 data/projects/*
 data/rasters/*
 data/uploads/*

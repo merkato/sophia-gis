@@ -49,6 +49,31 @@ MIGRATIONS: list[tuple[str, str]] = [
         CREATE INDEX IF NOT EXISTS audit_log_undo_idx ON portal.audit_log (project_id, user_id, id DESC)
             WHERE op IS NOT NULL AND undone_at IS NULL;
     """),
+    ("plugins", """
+        -- Wtyczki (api/app/plugins.py): stan, migracje i uprawnienia (grupy albo użytkownicy)
+        CREATE TABLE IF NOT EXISTS portal.plugins (
+            id          text PRIMARY KEY,
+            enabled     boolean NOT NULL DEFAULT false,
+            settings    jsonb NOT NULL DEFAULT '{}',
+            updated_at  timestamptz NOT NULL DEFAULT now()
+        );
+        CREATE TABLE IF NOT EXISTS portal.plugin_migrations (
+            plugin_id   text NOT NULL,
+            name        text NOT NULL,
+            applied_at  timestamptz NOT NULL DEFAULT now(),
+            PRIMARY KEY (plugin_id, name)
+        );
+        CREATE TABLE IF NOT EXISTS portal.plugin_access (
+            id          serial PRIMARY KEY,
+            plugin_id   text NOT NULL,
+            capability  text NOT NULL,
+            group_id    int REFERENCES portal.groups(id) ON DELETE CASCADE,
+            user_id     int REFERENCES portal.users(id) ON DELETE CASCADE,
+            CHECK (num_nonnulls(group_id, user_id) = 1)
+        );
+        CREATE UNIQUE INDEX IF NOT EXISTS plugin_access_uniq
+            ON portal.plugin_access (plugin_id, capability, coalesce(group_id, 0), coalesce(user_id, 0));
+    """),
 ]
 
 

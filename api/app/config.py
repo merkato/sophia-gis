@@ -24,6 +24,9 @@ class Settings(BaseSettings):
 
     qgis_server_url: str = "http://qgis:80/"
 
+    # Wtyczki: <plugins_dir>/<id>/sophia-plugin.json (data/… na hoście: plugins/, scripts/server/plugin.sh)
+    plugins_dir: Path = Path("/plugins")
+
 
 
 @lru_cache

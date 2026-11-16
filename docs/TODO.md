@@ -68,46 +68,7 @@ przeciągnięty z pola na pole. Działa na istniejących schematach danych (dzi�
 6. ⬜ Testy (generator SQL — jednostkowe; próba na tymczasowym schemacie na serwerze), dokumentacja
    `docs/user/baza.md`. Na telefonie diagram tylko do podglądu.
 
-### ⬜ 5. Wtyczki Sophii (rozszerzenia) — plan z 16.11
-Funkcje potrzebne tylko części wdrożeń jako **wtyczki**: osobny kod, własny schemat w bazie, instalowane
-przez administratora serwera, widoczne tylko dla wskazanych grup/użytkowników. Pierwsza: **EGiB**
-(import GML z wersjonowaniem, rejestr działek/użytków/punktów — schemat `egib`). Wtyczki branżowe (np.
-dla nadleśnictw) zależą od niej i żyją w osobnych, także prywatnych, repozytoriach.
-
-**Pakiet wtyczki** (katalog z manifestem `sophia-plugin.json`):
-- `id`, nazwa, wersja, zgodna wersja Sophii, zależności (np. `egib >= 1.0`);
-- `api/` — pakiet Pythona z routerem FastAPI (`/api/plugins/<id>/…`) i zadaniami w tle;
-- `migrations/` — SQL we **własnym schemacie** wtyczki, wykonywany przy starcie API jak migracje
-  `portal` (blokada doradcza, rejestr wykonanych migracji per wtyczka);
-- `web/` — zbudowany moduł ES (strona w panelu administracji, narzędzie na pasku, panel boczny),
-  ładowany dynamicznie; Sophia udostępnia mu React, klienta API i mapę przez małe, wersjonowane API
-  wtyczek (bez dublowania Reacta w paczce);
-- `capabilities` — lista uprawnień, które wtyczka deklaruje (np. `egib.podglad`, `egib.import`).
-
-**Instalacja i włączanie**
-- Instalacja = krok administratora serwera (kod wykonuje się w API z pełnym dostępem do bazy — tylko
-  zaufane źródła): `scripts/server/plugin.sh install <repo git>@<tag>` → katalog `plugins/<id>`
-  (wolumen kontenera API, gotowy moduł web serwowany przez proxy) → restart API.
-- Panel administratora → **Wtyczki**: lista zainstalowanych (wersja, zgodność, zależności, migracje),
-  włącz/wyłącz, ustawienia wtyczki. Wyłączenie nie usuwa danych; usunięcie schematu — osobne,
-  potwierdzane działanie.
-- **Repozytorium ogólnych wtyczek: `sophia-plugins`** (publiczne, decyzja 16.11) — jedna wtyczka =
-  jeden katalog (`egib/`, `przyklad/`…), wspólne narzędzia budowania i testów; tag wersji per wtyczka
-  (`egib-v1.0.0`). Wtyczki branżowe/klienckie — osobne repozytoria prywatne z tym samym układem.
-- Katalog dostępnych wtyczek w panelu — później; na start instalacja z adresu repozytorium i tagu.
-
-**Uprawnienia — jednakowo dla każdej wtyczki**
-- `portal.plugin_access (plugin_id, capability, group_id | user_id)`: dla każdej zdolności wtyczki
-  administrator wskazuje **grupy lub pojedynczych użytkowników**; administrator ma wszystko.
-- API: zależność `require_plugin("<id>", "<capability>")` na każdym endpoincie wtyczki;
-  `/api/plugins` zwraca tylko wtyczki i zdolności widoczne dla zalogowanego — WebUI ładuje tylko je
-  (reszta nie widzi nawet pozycji w menu).
-- Zakres danych (nadleśnictwo, oddział) — wtyczka korzysta z istniejącego mechanizmu zakresu danych.
-
-**Etapy**: 1. szkielet (manifest, ładowanie, migracje, `plugin_access`, panel „Wtyczki”, ładowanie
-modułu web) z wtyczką-przykładem; 2. wtyczka EGiB (import, rejestr, raport zmian); 3. wtyczki branżowe.
-
-### ⬜ 6. Raporty po stronie Sophii (na sam koniec)
+### ⬜ 5. Raporty po stronie Sophii (na sam koniec)
 Zamiast raportów z menedżera wydruków QGIS — np. raporty z oględzin terenowych do PDF, z filtrem zakresu
 użytkownika. Najpierw analiza dotychczasowego rozwiązania raportów w projekcie, który będzie przenoszony.
 
@@ -185,6 +146,21 @@ danych, wpis do dziennika zmian. Opis: `docs/user/README.md`.
   cfde0c1). Sprawdzone w przeglądarce: Schmettau A3, 200 dpi, 1:25 000 — 98 kafli w 5 s, z licznikiem.
 - ✅ Dokumentacja `docs/user/wydruki.md`: etykiety, legenda, mapa przeglądowa, postęp i limity.
 - ⬜ Podkład bez warstwy w projekcie, obrót → plan, punkt 1.
+
+### ✔️ Wtyczki
+- ✅ System wtyczek (16.11): manifest `sophia-plugin.json`, ładowanie z `plugins/` (wolumen `/plugins`),
+  zgodność wersji i zależności, migracje we własnym schemacie przy włączeniu, `startup()` wtyczki,
+  `portal.plugins` / `plugin_migrations` / `plugin_access`, `require_plugin(id, uprawnienie)`, strażnik
+  wyłączonej wtyczki (404), moduły web ładowane dynamicznie (React od Sophii), panel → **Wtyczki**
+  (włącz/wyłącz, uprawnienia dla grup i użytkowników), strony wtyczek w panelu także dla
+  nie-administratorów, `scripts/server/plugin.sh` (install / list / remove), `docs/WTYCZKI.md`.
+- ✅ Repozytorium `sophia-plugins`: wtyczka wzorcowa `przyklad` i **`egib`** — import GML (profil EGiB 2021,
+  wysyłka w częściach, klauzula z sumą kontrolną, podgląd zmian, zakres: pełne obręby / lista działek,
+  scalanie w jednej transakcji), rejestr: stan bieżący + historia, `dzialka_uzytek`, `dzialka_punkt`,
+  zmiany EGiB, raport zmian dla listy działek. Próba na kopii bazy (plik powiatu żyrardowskiego,
+  136 tys. obiektów): wczytanie ~1,5 min, scalanie ~1,5 min, ponowny import bez zmian 4 s, wykrycie
+  zmienionej i usuniętej działki, ~93 MB w bazie (z punktami granicznymi).
+- ⬜ Wtyczki branżowe (np. wyłączenia z produkcji — osobne repozytorium prywatne) — etap 3.
 
 ### ✅ Serwer i wdrożenie
 - ✅ `config/pg_service.conf` poza gitem, w repo `pg_service.conf.example` (d5478d1). Plik musi być

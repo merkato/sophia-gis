@@ -109,6 +109,16 @@ ich konfiguracja w `docker-compose.yml`:
 
 Pliki zmienione w ostatniej aktualizacji pokazuje `git diff --stat HEAD@{1} HEAD`.
 
+### Wtyczki
+
+Dodatkowe moduły (np. import EGiB) instaluje administrator serwera z repozytorium wtyczek:
+```bash
+scripts/server/plugin.sh install https://github.com/merkato/sophia-plugins egib egib-v1.0.0
+scripts/server/plugin.sh list
+```
+Katalog `plugins/` (wolumen `/plugins` API, poza gitem). Włączanie i uprawnienia — panel administratora →
+**Wtyczki**. Szczegóły i zasady bezpieczeństwa: [WTYCZKI.md](WTYCZKI.md).
+
 ## 4. Rastry historyczne
 
 Przygotuj je **lokalnie** (QGIS → OSGeo4W Shell), zanim trafią na serwer:

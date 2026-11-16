@@ -174,3 +174,9 @@ wynik poza Twoim zakresem danych) nic się nie zmienia i pojawia się komunikat.
 - Usunięty obiekt wraca pod tym samym identyfikatorem, z polami widocznymi w formularzu; pola
   ukryte dostają wartość domyślną z bazy. Pliki zdjęć zostają na serwerze przez 7 dni, więc wraca też
   zdjęcie z pola „Załącznik”.
+
+### Wtyczki
+Część funkcji to wtyczki instalowane na serwerze (np. **EGiB** — import plików GML od starostw i rejestr
+działek z historią). Administrator włącza je w panelu **Administracja → Wtyczki** i wskazuje, które grupy
+albo osoby mogą z nich korzystać. Kto ma uprawnienie do strony wtyczki, widzi przycisk **Administracja**,
+a w nim tylko strony swoich wtyczek. Opis techniczny: [WTYCZKI.md](../WTYCZKI.md).

@@ -65,6 +65,7 @@ services:
       - ./data/projects:/projects        # rw: publikacja projektów z wtyczki QGIS
       - ./data/uploads:/uploads          # zdjęcia z WebUI: data/uploads/<slug>/zdjecia/...
       - ./config/pg_service.conf:/etc/sophia/pg_service.conf:ro
+      - ./plugins:/plugins:ro            # wtyczki (scripts/server/plugin.sh, docs/WTYCZKI.md)
     depends_on:
       db:
         condition: service_healthy
