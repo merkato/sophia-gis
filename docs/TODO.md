@@ -157,7 +157,7 @@ danych, wpis do dziennika zmian. Opis: `docs/user/README.md`.
 - ✅ Repozytorium `sophia-plugins`: wtyczka wzorcowa `przyklad` i **`egib`** — import GML (profil EGiB 2021,
   wysyłka w częściach, klauzula z sumą kontrolną, podgląd zmian, zakres: pełne obręby / lista działek,
   scalanie w jednej transakcji), rejestr: stan bieżący + historia, `dzialka_uzytek`, `dzialka_punkt`,
-  zmiany EGiB, raport zmian dla listy działek. Próba na kopii bazy (plik powiatu żyrardowskiego,
+  zmiany EGiB, raport zmian dla listy działek. Próba na kopii bazy (plik całego powiatu,
   136 tys. obiektów): wczytanie ~1,5 min, scalanie ~1,5 min, ponowny import bez zmian 4 s, wykrycie
   zmienionej i usuniętej działki, ~93 MB w bazie (z punktami granicznymi).
 - ⬜ Wtyczki branżowe (np. wyłączenia z produkcji — osobne repozytorium prywatne) — etap 3.
