@@ -130,6 +130,12 @@ przybliża mapę i włącza rysowanie w warstwie z tej tabeli; po narysowaniu fo
 `newTab: true` otwiera mapę w nowej karcie (panel administracji zostaje na miejscu; obiekt przekazywany przez
 pamięć przeglądarki, więc geometria może być duża).
 
+**Akcje w formularzu obiektu** (Sophia ≥ 0.6): `register` może zwrócić
+`featureActions: { "schemat.tabela": (obiekt) => [{ label, title?, run }] }` — przyciski nad atrybutami w formularzu
+obiektów warstw z tej tabeli (np. „Decyzja (PDF)” przy konturze). `obiekt` = `{ table, pk, layerId, project,
+properties }`. Moduły wtyczek z interfejsem ładują się w tle po zalogowaniu, więc akcje są od razu.
+`host.currentProject()` (Sophia ≥ 0.6) — slug projektu otwartego w oknie mapy albo `null`.
+
 **Okna nad mapą** (Sophia ≥ 0.3): `web.windows: [{"id": "decyzje", "title": "Decyzje", "capability": "…"}]` —
 przycisk w górnym pasku otwiera okno (przeciągane, ze zmianą rozmiaru); `"toolbar": false` = okno bez przycisku,
 otwierane z kodu: `host.openWindow("drzewo", { props: { id: 7 }, title: "Decyzja …" })`, `host.closeWindow(id)`.

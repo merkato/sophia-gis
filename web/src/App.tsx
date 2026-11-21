@@ -12,7 +12,7 @@ import GeoJSON from "ol/format/GeoJSON";
 import { Toolbar } from "./components/Toolbar";
 import { FetchCard } from "./components/FetchCard";
 import { AdminPanel } from "./components/AdminPanel";
-import { setMapFocusHandler, setWindowHandler, takeMapFocus, type MapFocus, type PluginInfo } from "./plugins";
+import { setCurrentProjectGetter, setMapFocusHandler, setWindowHandler, takeMapFocus, type MapFocus, type PluginInfo, preloadPlugins } from "./plugins";
 import { PluginWindows, type OpenWindow } from "./components/PluginWindows";
 import { BasemapSwitcher, initialBasemapChoice, saveBasemapChoice } from "./components/BasemapSwitcher";
 import { loadOpacity, saveOpacity, useOpenSliders } from "./components/OpacitySlider";
@@ -178,11 +178,15 @@ export default function App() {
     return () => setWindowHandler(null);
   }, [plugins, openWindow]);
   useEffect(() => { if (!user) setOpenWindows([]); }, [user]);
+  // wtyczki pytają o projekt otwarty w mapie (np. wyszukiwarka)
+  useEffect(() => { setCurrentProjectGetter(() => slug); return () => setCurrentProjectGetter(null); }, [slug]);
 
   const refreshSession = useCallback(async () => {
     const me = await api.me().catch(() => null);
     setUser(me);
-    setPlugins(me ? await api.plugins().catch(() => []) : []);
+    const pl = me ? await api.plugins().catch(() => []) : [];
+    setPlugins(pl);
+    if (me) preloadPlugins(pl, me, setMessage);    // akcje wtyczek w formularzach obiektów
     const [list, bms] = await Promise.all([api.projects().catch(() => []), api.basemaps().catch(() => [])]);
     setProjects(list);
     setSlug((s) => (s && list.some((p) => p.slug === s) ? s : list[0]?.slug ?? null));

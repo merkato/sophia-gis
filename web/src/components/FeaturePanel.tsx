@@ -5,6 +5,7 @@ import { FieldInput } from "./FieldInput";
 import { useFloatingWindow } from "./FloatingWindow";
 import { DocumentList, fileFieldOf } from "./Files";
 import { PhotoGallery, photoFieldOf } from "./Photos";
+import { featureActions, usePluginsVersion } from "../plugins";
 
 interface Props {
   config: ProjectConfig;
@@ -74,6 +75,11 @@ export const FeaturePanel = forwardRef<FeaturePanelHandle, Props>(function Featu
     if ((tab === "photos" && !photoGroups.length) || (tab === "docs" && !docGroups.length)) setTab("attrs");
   }, [tab, related.length, otherGroups.length, photoGroups.length, docGroups.length]);
 
+  // akcje wtyczek dla obiektu (np. dokument decyzji przy konturze) — po załadowaniu wtyczek
+  usePluginsVersion();
+  const pluginActions = !isNew && layer.source_table && pk !== null
+    ? featureActions({ table: layer.source_table, pk: String(pk), layerId, project: config.slug, properties: feature?.properties ?? {} })
+    : [];
   const visibleFields = layer.fields.filter((f) => f.widget !== "Hidden" && f.name !== layer.primary_key);
 
   const editableFields = visibleFields.filter((f) => f.editable);
@@ -136,6 +142,13 @@ export const FeaturePanel = forwardRef<FeaturePanelHandle, Props>(function Featu
       </header>
 
       <div className="fw-body">
+      {!isNew && pluginActions.length > 0 && (
+        <div className="feature-actions">
+          {pluginActions.map((a, i) => (
+            <button key={i} className="link" title={a.title} onClick={a.run}>{a.label}</button>
+          ))}
+        </div>
+      )}
 
       {!isNew && (
         <nav className="tabs">

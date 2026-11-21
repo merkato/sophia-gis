@@ -310,3 +310,6 @@ ul.plain li { padding: 4px 0; }
 .related-inline h4 { margin: 0 0 6px; }
 .related-table { max-height: 220px; overflow: auto; border: 1px solid var(--line); border-radius: 6px; }
 .related-table table { width: 100%; font-size: 0.92em; }
+
+/* akcje wtyczek w formularzu obiektu */
+.feature-actions { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 4px 0 8px; border-bottom: 1px solid var(--line); margin-bottom: 8px; }

@@ -2,7 +2,7 @@
 // Kontrakt (wersja 1, docs/WTYCZKI.md): moduł eksportuje `register(host)` i zwraca
 // `{ pages: { <idStrony>: KomponentReact } }`. Sophia daje wtyczce Reacta (bez dublowania go w paczce),
 // zapytania do jej API, dane użytkownika i powiadomienia.
-import React from "react";
+import React, { useSyncExternalStore } from "react";
 import { request } from "./api";
 import type { User } from "./types";
 
@@ -38,6 +38,8 @@ export interface SophiaHost {
    *  `geometry` (EPSG:4326) — gdzie przybliżyć mapę. Warstwa bez geometrii: od razu formularz. */
   startDraw: (opts: { project?: string; table: string; defaults?: Record<string, unknown>; geometry?: MapFocus["geometry"]; label?: string }) => void;
   closeWindow: (windowId: string) => void;
+  /** Slug projektu otwartego w oknie mapy (null — bez projektu). Sophia ≥ 0.6. */
+  currentProject: () => string | null;
 }
 
 export interface PluginWindowProps { host: SophiaHost; props: Record<string, unknown>; close: () => void }
@@ -56,22 +58,61 @@ export interface MapFocus {
 }
 
 let mapFocusHandler: ((f: MapFocus) => void) | null = null;
+let projectGetter: (() => string | null) | null = null;
+/** App rejestruje tu odczyt bieżącego projektu mapy (`host.currentProject`). */
+export function setCurrentProjectGetter(fn: (() => string | null) | null) { projectGetter = fn; }
 /** App rejestruje tu obsługę `host.showOnMap`. */
 export function setMapFocusHandler(fn: ((f: MapFocus) => void) | null) { mapFocusHandler = fn; }
+
+/** Przycisk wtyczki w formularzu obiektu (np. „Decyzja (PDF)” przy konturze). */
+export interface FeatureAction { label: string; title?: string; run: () => void }
+/** Obiekt, dla którego wtyczka podaje akcje: tabela źródłowa warstwy („schemat.tabela”), klucz i atrybuty. */
+export interface FeatureRef { table: string; pk: string; layerId: string; project: string; properties: Record<string, unknown> }
+export type FeatureActionsFn = (f: FeatureRef) => FeatureAction[];
 
 export interface PluginModule {
   register: (host: SophiaHost) => {
     pages?: Record<string, React.ComponentType<{ host: SophiaHost }>>;
     windows?: Record<string, React.ComponentType<PluginWindowProps>>;
+    /** Akcje w formularzu obiektów warstw z danej tabeli: { "schemat.tabela": (obiekt) => [akcje] }. */
+    featureActions?: Record<string, FeatureActionsFn>;
   };
 }
 
 export interface LoadedPlugin {
   pages: Record<string, React.ComponentType<{ host: SophiaHost }>>;
   windows: Record<string, React.ComponentType<PluginWindowProps>>;
+  featureActions: Record<string, FeatureActionsFn>;
   host: SophiaHost;
 }
 const modules = new Map<string, Promise<LoadedPlugin>>();
+
+// wtyczki załadowane w tej sesji — źródło akcji formularza (wersja zmienia się po każdym załadowaniu)
+const loaded = new Map<string, LoadedPlugin>();
+let loadedVersion = 0;
+const listeners = new Set<() => void>();
+const subscribe = (fn: () => void) => { listeners.add(fn); return () => { listeners.delete(fn); }; };
+
+/** Akcje wtyczek dla obiektu (błąd jednej wtyczki nie psuje formularza). */
+export function featureActions(f: FeatureRef): FeatureAction[] {
+  const out: FeatureAction[] = [];
+  for (const p of loaded.values()) {
+    const fn = p.featureActions[f.table];
+    if (!fn) continue;
+    try { out.push(...(fn(f) ?? [])); } catch (e) { console.error(`Akcje wtyczki ${p.host.pluginId}:`, e); }
+  }
+  return out;
+}
+
+/** Odświeża komponent, gdy załadowano kolejną wtyczkę (np. formularz otwarty przed załadowaniem). */
+export function usePluginsVersion(): number {
+  return useSyncExternalStore(subscribe, () => loadedVersion);
+}
+
+/** Ładuje w tle moduły wszystkich wtyczek z interfejsem — akcje w formularzach obiektów są dostępne od razu. */
+export function preloadPlugins(list: PluginInfo[], user: User, notify: (m: string) => void) {
+  for (const p of list) if (p.web) loadPlugin(p, user, notify).catch((e) => console.error(`Wtyczka ${p.id}:`, e));
+}
 
 /**
  * Nowa karta z mapą: obiekt do pokazania przekazany przez localStorage (geometria bywa za duża na adres),
@@ -123,9 +164,17 @@ export function loadPlugin(p: PluginInfo, user: User, notify: (m: string) => voi
         else notify("Mapa nie jest dostępna");
       },
       closeWindow: (id) => { if (windowHandler) windowHandler(p.id, id, null); },
+      currentProject: () => (projectGetter ? projectGetter() : null),
     };
     m = (import(/* @vite-ignore */ p.web!) as Promise<PluginModule>)
-      .then((mod) => { const r = mod.register(host); return { pages: r.pages ?? {}, windows: r.windows ?? {}, host }; });
+      .then((mod) => {
+        const r = mod.register(host);
+        const lp: LoadedPlugin = { pages: r.pages ?? {}, windows: r.windows ?? {}, featureActions: r.featureActions ?? {}, host };
+        loaded.set(p.id, lp);
+        loadedVersion += 1;
+        listeners.forEach((fn) => fn());
+        return lp;
+      });
     modules.set(key, m);
     m.catch(() => modules.delete(key));
   }
