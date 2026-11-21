@@ -342,7 +342,26 @@ def _parse_fields(ml: etree._Element) -> list[FieldDef]:
     for p in ml.findall("./duplicatePolicies/policy"):
         if p.get("field") in fields and p.get("policy") in ("Duplicate", "DefaultValue", "UnsetField"):
             fields[p.get("field")].duplicate_policy = p.get("policy")
-    return list(fields.values())
+    return _apply_form_layout(ml, list(fields.values()))
+
+
+def _apply_form_layout(ml: etree._Element, fields: list[FieldDef]) -> list[FieldDef]:
+    """Formularz z projektanta „przeciągnij i upuść” (QGIS: Atrybuty → Układ formularza): kolejność pól
+    jak w projektancie, pola nieumieszczone w formularzu ukryte — tak jak w QGIS."""
+    if (ml.findtext("editorlayout") or "") != "tablayout":
+        return fields
+    order: list[str] = []
+    for el in ml.iterfind("./attributeEditorForm//attributeEditorField"):
+        name = el.get("name")
+        if name and name not in order:
+            order.append(name)
+    if not order:
+        return fields
+    pos = {n: i for i, n in enumerate(order)}
+    for f in fields:
+        if f.name not in pos:
+            f.widget = "Hidden"
+    return sorted(fields, key=lambda f: pos.get(f.name, len(pos)))
 
 
 def _parse_tree(group_el: etree._Element, raster_groups: set[str]) -> TreeNode:

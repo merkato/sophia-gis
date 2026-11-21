@@ -19,7 +19,13 @@ Zasady ogólne, wspólne dla wszystkich tematów:
 - formularz w WebUI powstaje z ustawień *Właściwości warstwy → Formularz atrybutów*: aliasy,
   widżety (lista wartości, odwołanie do relacji, data, pole wyboru, załącznik…), pola ukryte
   i tylko do odczytu, pola wymagane,
-- relacje (*Projekt → Właściwości → Relacje*) dają w formularzu zakładki **Powiązane**, **Zdjęcia** i **Dokumenty**,
+- **układ pól**: krótkie pola (liczby, daty, kody, krótkie teksty) stoją obok siebie, długie teksty
+  i JSON — na całą szerokość; w wąskim oknie wszystko jedno pod drugim. Szerokość wynika z typu
+  kolumny w bazie (`varchar(n)`, a dla `text` — typowej długości wartości). Kolejność pól to kolejność
+  kolumn w tabeli, chyba że w *Formularzu atrybutów* wybierzesz **projektanta „przeciągnij i upuść”** —
+  wtedy kolejność jest z projektanta, a pól nieumieszczonych w nim Sophia nie pokazuje (jak QGIS),
+- relacje (*Projekt → Właściwości → Relacje*) dają w formularzu tabelkę rekordów powiązanych (z „+ Dodaj”)
+  oraz zakładki **Zdjęcia** i **Dokumenty**,
 - **atrybucja** (źródło danych, np. „Biblioteka Przykładowa, domena publiczna”): *Właściwości warstwy
   → QGIS Server → Atrybucja* (tytuł i opcjonalny URL), a bez niej — *Metadane → Prawa*. Pokazuje się
   w prawym dolnym rogu mapy (ⓘ), gdy warstwa jest włączona, i w „Źródła” na wydruku w układzie Sophii.

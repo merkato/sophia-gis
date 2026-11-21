@@ -40,3 +40,26 @@ def test_empty_widget_config_is_dict():
     fields = {f.name: f for f in _parse_fields(ml)}
     assert fields["gmina"].widget_config == {}
     assert fields["obreb"].widget_config == {"IsMultiline": False}
+
+
+def test_drag_and_drop_form_order():
+    """Projektant formularza QGIS: kolejność pól z projektanta, pola spoza formularza ukryte."""
+    from lxml import etree
+
+    from app.qgsproject import _parse_fields
+    fc = "".join(f'<field name="{n}"><editWidget type="TextEdit"><config><Option/></config></editWidget></field>'
+                 for n in ("id", "teryt", "nr", "utworzono", "zmieniono", "opis"))
+    form = ('<attributeEditorForm><attributeEditorContainer name="Kontur" columnCount="2">'
+            '<attributeEditorField name="teryt" index="1"/><attributeEditorField name="nr" index="2"/>'
+            '</attributeEditorContainer><attributeEditorContainer name="Metryka" columnCount="2">'
+            '<attributeEditorField name="utworzono" index="3"/><attributeEditorField name="zmieniono" index="4"/>'
+            '</attributeEditorContainer></attributeEditorForm>')
+    ml = etree.fromstring(f'<maplayer><fieldConfiguration>{fc}</fieldConfiguration>'
+                          f'<editorlayout>tablayout</editorlayout>{form}</maplayer>')
+    fields = _parse_fields(ml)
+    assert [f.name for f in fields][:4] == ["teryt", "nr", "utworzono", "zmieniono"]
+    assert {f.name for f in fields if f.widget == "Hidden"} == {"id", "opis"}
+    # układ generowany automatycznie — bez zmian
+    ml = etree.fromstring(f'<maplayer><fieldConfiguration>{fc}</fieldConfiguration>'
+                          f'<editorlayout>generatedlayout</editorlayout>{form}</maplayer>')
+    assert next(f.name for f in _parse_fields(ml)) == "id"

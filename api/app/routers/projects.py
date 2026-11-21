@@ -3,6 +3,7 @@ from dataclasses import asdict
 
 from fastapi import APIRouter, Depends
 
+from ..columns import column_info
 from ..db import portal_conn
 from ..fetchers import SOURCES
 from ..permissions import load_project_context
@@ -52,10 +53,13 @@ async def project_config(slug: str, user: CurrentUser | None = Depends(optional_
     ctx = await load_project_context(slug, user)
     p = ctx.project
     layers = {}
+    visible_defs = [lyr for lid, lyr in p.layers.items() if ctx.perms(lid).view]
+    columns = await column_info(visible_defs)
     for lid, lyr in p.layers.items():
         perms = ctx.perms(lid)
         if not perms.view:
             continue
+        cols = columns.get((lyr.pg.conninfo, lyr.pg.schema, lyr.pg.table), {}) if lyr.pg else {}
         layers[lid] = {
             "id": lid,
             "name": lyr.name,
@@ -72,7 +76,9 @@ async def project_config(slug: str, user: CurrentUser | None = Depends(optional_
             "primary_key": lyr.pg.key if lyr.pg else None,
             # „schemat.tabela” źródła PostGIS — linki do obiektów (?p=…&obiekt=schemat.tabela:klucz, wtyczki)
             "source_table": f"{lyr.pg.schema}.{lyr.pg.table}" if lyr.pg else None,
-            "fields": [asdict(f) for f in lyr.fields],
+            # typ kolumny z bazy i typowa szerokość wartości — układ formularza (krótkie pola obok siebie)
+            "fields": [{**asdict(f), "type": f.type or cols.get(f.name, {}).get("type"),
+                        "avg_width": cols.get(f.name, {}).get("avg_width")} for f in lyr.fields],
             "perms": asdict(perms),
         }
     visible = set(layers)

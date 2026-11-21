@@ -18,6 +18,19 @@ type Option = { value: string; label: string };
 // Listy wartości dzielone między formularzami (klucz: projekt/warstwa/pole/wersja projektu)
 const optionsCache = new Map<string, Promise<Option[]>>();
 
+/** Typ liczbowy kolumny (format_type z bazy albo nazwa typu z QGIS). */
+export function isNumericType(type: string | null | undefined): boolean {
+  return /^(smallint|integer|bigint|int\d?|real|double|numeric|decimal|float)/i.test(type ?? "");
+}
+
+/** Znacznik czasu z bazy (ISO) do wyświetlenia: „23.03.2026 09:00” w czasie lokalnym. */
+function localTimestamp(v: string): string {
+  const d = new Date(v);
+  if (Number.isNaN(d.getTime())) return v;
+  const p = (n: number) => String(n).padStart(2, "0");
+  return `${p(d.getDate())}.${p(d.getMonth() + 1)}.${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
 /** RelationReference (klucz obcy -> rekord warstwy nadrzędnej) i ValueRelation (słownik z innej warstwy). */
 function RelationSelect({ field, value, onChange, disabled, source }: {
   field: FieldDef; value: unknown; onChange: (v: unknown) => void; disabled: boolean; source: Source;
@@ -39,7 +52,7 @@ function RelationSelect({ field, value, onChange, disabled, source }: {
 
   const cfg = (field.widget_config ?? {}) as Record<string, unknown>;
   const allowNull = cfg.AllowNULL !== false && cfg.AllowNull !== false && !field.not_null;
-  const numeric = /int|double|real|numeric|decimal/i.test(field.type ?? "");
+  const numeric = isNumericType(field.type);
   const str = value === null || value === undefined ? "" : String(value);
   if (error) return <input value={str} disabled title={error} />;
   const known = !str || (options ?? []).some((o) => o.value === str);
@@ -125,7 +138,8 @@ export function FieldInput({ field, value, onChange, readOnly, source, saved }: 
       }
     // fallthrough
     default: {
-      const numeric = /int|double|real|numeric|decimal/i.test(field.type ?? "");
+      if (disabled && str && /^timestamp/i.test(field.type ?? "")) return <input value={localTimestamp(str)} disabled />;
+      const numeric = isNumericType(field.type);
       return (
         <input type={numeric ? "number" : "text"} value={str} disabled={disabled}
           onChange={(e) => onChange(numeric ? (e.target.value === "" ? null : Number(e.target.value)) : e.target.value)} />

@@ -1,6 +1,6 @@
 import { forwardRef, useCallback, useEffect, useImperativeHandle, useState } from "react";
 import { api } from "../api";
-import type { GeoJSONFeature, ProjectConfig, RelatedGroup } from "../types";
+import type { FieldDef, GeoJSONFeature, ProjectConfig, RelatedGroup } from "../types";
 import { FieldInput } from "./FieldInput";
 import { useFloatingWindow } from "./FloatingWindow";
 import { DocumentList, fileFieldOf } from "./Files";
@@ -148,8 +148,10 @@ export const FeaturePanel = forwardRef<FeaturePanelHandle, Props>(function Featu
 
       {tab === "attrs" && (
         <div className="form">
-          {visibleFields.map((f) => (
-            <label key={f.name} className="field">
+          {formRows(visibleFields).map((row) => (
+            <div key={row[0][0].name} className="field-row">
+            {row.map(([f, span]) => (
+            <label key={f.name} className="field" style={{ flex: `${span} 1 0` }}>
               <span>{f.alias ?? f.name}{f.not_null && f.editable ? " *" : ""}</span>
               <FieldInput field={f} value={values[f.name]} readOnly={!canEdit}
                 source={{ slug: config.slug, layerId, version: config.version, pk: pk === null ? null : String(pk), crs: config.crs,
@@ -157,6 +159,8 @@ export const FeaturePanel = forwardRef<FeaturePanelHandle, Props>(function Featu
                 saved={isNew ? undefined : feature?.properties[f.name]}
                 onChange={(v) => setValues((s) => ({ ...s, [f.name]: v }))} />
             </label>
+            ))}
+            </div>
           ))}
           {canEdit && (
             <div className="actions">
@@ -244,4 +248,40 @@ function RelatedTable({ config, group, parentValues, onOpen, onNew }: {
       )}
     </section>
   );
+}
+
+/** Szerokość pola w formularzu (z 6 kolumn): krótkie pola (liczby, daty, kody) obok siebie, długie teksty na całą szerokość.
+ *  Typ i typowa długość wartości pochodzą z bazy (varchar(n) albo średnia z pg_stats dla text). */
+export function fieldSpan(f: FieldDef): number {
+  const t = (f.type ?? "").toLowerCase();
+  const cfg = (f.widget_config ?? {}) as Record<string, unknown>;
+  if (f.widget === "ExternalResource" || (f.widget === "TextEdit" && cfg.IsMultiline) || cfg.AllowMulti
+      || /json|\[\]|geometry|geography/.test(t)) return 6;
+  let span = 6;
+  if (f.widget === "CheckBox" || /^(smallint|integer|bigint|boolean|date|timestamp)/.test(t)) span = 2;
+  else if (["DateTime", "ValueMap", "ValueRelation", "RelationReference", "Range"].includes(f.widget)
+      || /^(numeric|decimal|real|double|time|uuid)/.test(t)) span = 3;
+  else if (/char|text/.test(t)) {
+    const declared = /char[^(]*\((\d+)\)/.exec(t);
+    const len = declared ? Number(declared[1]) : f.avg_width ?? null;
+    if (len !== null) span = len <= 10 ? 2 : len <= 32 ? 3 : 6;
+  }
+  // długa etykieta nie mieści się w wąskiej kolumnie
+  if (span === 2 && (f.alias ?? f.name).length > 22) span = 3;
+  return span;
+}
+
+/** Kolejne pola łączone w wiersze do 6 kolumn (kolejność z projektu zostaje); wiersz rozciąga się na całą szerokość. */
+export function formRows(fields: FieldDef[]): [FieldDef, number][][] {
+  const rows: [FieldDef, number][][] = [];
+  let cur: [FieldDef, number][] = [];
+  let sum = 0;
+  for (const f of fields) {
+    const s = fieldSpan(f);
+    if (cur.length && sum + s > 6) { rows.push(cur); cur = []; sum = 0; }
+    cur.push([f, s]);
+    sum += s;
+  }
+  if (cur.length) rows.push(cur);
+  return rows;
 }

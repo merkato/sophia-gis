@@ -22,6 +22,7 @@ export interface FieldDef {
   editable: boolean;
   not_null: boolean;
   default_expression: string | null;
+  avg_width?: number | null;          // średnia szerokość wartości (pg_stats) — układ formularza
 }
 
 export interface LayerPerms {
