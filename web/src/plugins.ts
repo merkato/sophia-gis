@@ -34,6 +34,9 @@ export interface SophiaHost {
   showOnMap: (focus: MapFocus) => void;
   /** Otwiera (albo odświeża) okno wtyczki nad mapą; `props` trafiają do komponentu okna. */
   openWindow: (windowId: string, opts?: { props?: Record<string, unknown>; title?: string }) => void;
+  /** Rysowanie nowego obiektu w warstwie projektu z tabeli `table` z wypełnionymi polami (np. klucz rodzica);
+   *  `geometry` (EPSG:4326) — gdzie przybliżyć mapę. Warstwa bez geometrii: od razu formularz. */
+  startDraw: (opts: { project?: string; table: string; defaults?: Record<string, unknown>; geometry?: MapFocus["geometry"]; label?: string }) => void;
   closeWindow: (windowId: string) => void;
 }
 
@@ -45,6 +48,7 @@ export function setWindowHandler(fn: WindowHandler | null) { windowHandler = fn;
 
 export interface MapFocus {
   newTab?: boolean;                                 // otwórz mapę w nowej karcie (panel zostaje na miejscu)
+  draw?: { table: string; defaults?: Record<string, unknown> };   // po przybliżeniu: rysowanie nowego obiektu w warstwie
   project?: string;                                 // slug projektu; brak = bieżący
   targets?: { table: string; pk: string }[];        // „schemat.tabela” + klucz główny obiektu
   geometry?: { type: string; coordinates: unknown } | null;   // EPSG:4326
@@ -114,6 +118,10 @@ export function loadPlugin(p: PluginInfo, user: User, notify: (m: string) => voi
         if (mapFocusHandler) mapFocusHandler(f); else notify("Mapa nie jest dostępna");
       },
       openWindow: (id, opts) => { if (windowHandler) windowHandler(p.id, id, opts ?? {}); },
+      startDraw: (o) => {
+        if (mapFocusHandler) mapFocusHandler({ project: o.project, geometry: o.geometry, label: o.label, draw: { table: o.table, defaults: o.defaults } });
+        else notify("Mapa nie jest dostępna");
+      },
       closeWindow: (id) => { if (windowHandler) windowHandler(p.id, id, null); },
     };
     m = (import(/* @vite-ignore */ p.web!) as Promise<PluginModule>)

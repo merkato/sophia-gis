@@ -313,6 +313,13 @@ export default function App() {
       });
       return;
     }
+    if (f.draw) {   // host.startDraw: przybliż (jeśli podano miejsce) i rysuj w warstwie z tabeli
+      const target = Object.values(config.layers).find((l) => l.source_table === f.draw!.table);
+      if (f.geometry) fit(new GeoJSON().readGeometry(f.geometry, { dataProjection: "EPSG:4326", featureProjection: config.crs }));
+      if (!target) { setMessage(`W projekcie nie ma warstwy z tabeli ${f.draw.table}`); return; }
+      startDrawing(target.id, f.draw.defaults ?? {}, f.label);
+      return;
+    }
     if (f.geometry) {
       const fmt = new GeoJSON();
       const g = fmt.readGeometry(f.geometry, { dataProjection: "EPSG:4326", featureProjection: config.crs });
@@ -356,6 +363,25 @@ export default function App() {
     chooseTool(geom ? "select" : "identify");
     if (id && !geom) setTableLayerId(id);
     setSelection(null);
+  });
+
+  // nowy obiekt z wypełnionymi polami (rekord powiązany, „Dodaj kontur” z wtyczki): rysowanie albo od razu formularz
+  const drawDefaults = useRef<{ layerId: string; props: Record<string, unknown> } | null>(null);
+  const startDrawing = (layerId: string, props: Record<string, unknown>, label?: string) => guard(() => {
+    const lyr = config?.layers[layerId];
+    if (!lyr) return;
+    if (!lyr.perms.insert) { setMessage(`Brak prawa dodawania obiektów do warstwy „${lyr.name}”`); return; }
+    setTableLayerId(null);
+    if (!lyr.geometry_type) {
+      drawDefaults.current = null;
+      setSelection({ layerId, isNew: true, feature: { type: "Feature", id: "", geometry: null, properties: { ...props } } });
+      return;
+    }
+    drawDefaults.current = { layerId, props };
+    setEditLayerId(layerId);
+    setSelection(null);
+    setTool("draw");
+    setMessage(label ?? `Narysuj obiekt warstwy „${lyr.name}” na mapie`);
   });
 
   const newRecord = () => editLayer && guard(() =>
@@ -658,8 +684,11 @@ export default function App() {
               printFrame={showPrint ? printFrame : null}
               opacity={opacity}
               onSelect={(layerId, feature) => guard(() => setSelection({ layerId, feature, isNew: false }))}
-              onDrawn={(layerId, geometry) => guard(() =>
-                setSelection({ layerId, isNew: true, feature: { type: "Feature", id: "", geometry, properties: {} } }))}
+              onDrawn={(layerId, geometry) => guard(() => {
+                const props = drawDefaults.current?.layerId === layerId ? { ...drawDefaults.current.props } : {};
+                drawDefaults.current = null;
+                setSelection({ layerId, isNew: true, feature: { type: "Feature", id: "", geometry, properties: props } });
+              })}
               onSplitLine={(layerId, line) => guard(() => { void splitLine(layerId, line); })}
               onRing={(layerId, ring, fill) => guard(() => { void ringTool(layerId, ring, fill); })}
               onPointTool={(layerId, t, c, tol) => guard(() => { void pointTool(layerId, t, c, tol); })}
@@ -728,6 +757,7 @@ export default function App() {
               onDeleted={() => { setSelection(null); setReloadToken((t) => t + 1); }}
               onClose={() => guard(() => { if (selection.isNew) setReloadToken((t) => t + 1); setSelection(null); })}
               onOpenRelated={openFeature}
+              onNewRelated={(layerId, props) => startDrawing(layerId, props)}
             />
           )}
         </main>

@@ -184,3 +184,8 @@ a w nim tylko strony swoich wtyczek. Opis techniczny: [WTYCZKI.md](../WTYCZKI.md
 Link do obiektu na mapie: `?p=<projekt>&obiekt=<schemat.tabela>:<klucz>` otwiera projekt, przybliża obiekt
 i otwiera jego formularz (np. z wtyczki: „Pokaż na mapie”). Adres w przeglądarce po takim przejściu można
 skopiować i wysłać.
+
+Rekordy powiązane (relacje z projektu QGIS) są widoczne w formularzu obiektu jako tabelka pod atrybutami:
+kliknięcie wiersza otwiera rekord, „+ Dodaj” tworzy rekord podrzędny z wypełnionym powiązaniem (warstwa z geometrią:
+najpierw rysowanie na mapie).
+

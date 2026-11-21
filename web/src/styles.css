@@ -297,3 +297,9 @@ ul.plain li { padding: 4px 0; }
 .plugin-window > header b { flex: 1; }
 .plugin-window > header button { border: none; background: none; padding: 2px 6px; }
 .plugin-window-body { flex: 1; overflow: auto; padding: 8px 10px; }
+
+/* rekordy powiązane w formularzu obiektu */
+.related-inline { margin-top: 12px; border-top: 1px solid var(--line); padding-top: 8px; }
+.related-inline h4 { margin: 0 0 6px; }
+.related-table { max-height: 220px; overflow: auto; border: 1px solid var(--line); border-radius: 6px; }
+.related-table table { width: 100%; font-size: 0.92em; }

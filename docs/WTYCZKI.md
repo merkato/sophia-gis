@@ -112,6 +112,10 @@ host.showOnMap({
 });
 ```
 Ten sam obiekt można podać w adresie: `?p=<slug>&obiekt=<schemat.tabela>:<klucz>` (link do wysłania).
+`host.startDraw({ project, table: "schemat.tabela", defaults: { pole: wartość }, geometry, label })` (Sophia ≥ 0.3) —
+przybliża mapę i włącza rysowanie w warstwie z tej tabeli; po narysowaniu formularz ma wypełnione `defaults`
+(warstwa bez geometrii: od razu formularz).
+
 `newTab: true` otwiera mapę w nowej karcie (panel administracji zostaje na miejscu; obiekt przekazywany przez
 pamięć przeglądarki, więc geometria może być duża).
 

@@ -16,9 +16,10 @@ interface Props {
   onDeleted: () => void;
   onClose: () => void;
   onOpenRelated: (layerId: string, pk: string) => void;
+  onNewRelated?: (layerId: string, props: Record<string, unknown>) => void;   // nowy rekord podrzędny (klucz rodzica wypełniony)
 }
 
-type Tab = "attrs" | "photos" | "related" | "docs" | "reports";
+type Tab = "attrs" | "photos" | "docs" | "reports";
 
 /** Dla App: czy formularz ma niezapisane zmiany i zapis „z zewnątrz” (okno zapisz/odrzuć/anuluj). */
 export interface FeaturePanelHandle {
@@ -30,7 +31,7 @@ export interface FeaturePanelHandle {
 const norm = (v: unknown) => (v === null || v === undefined ? "" : String(v));
 
 export const FeaturePanel = forwardRef<FeaturePanelHandle, Props>(function FeaturePanel(
-  { config, layerId, feature, isNew, cutFrom, onSaved, onDeleted, onClose, onOpenRelated }, ref) {
+  { config, layerId, feature, isNew, cutFrom, onSaved, onDeleted, onClose, onOpenRelated, onNewRelated }, ref) {
   const layer = config.layers[layerId];
   const [values, setValues] = useState<Record<string, unknown>>({});
   const [tab, setTab] = useState<Tab>("attrs");
@@ -68,8 +69,7 @@ export const FeaturePanel = forwardRef<FeaturePanelHandle, Props>(function Featu
   const docCount = docGroups.reduce((n, g) => n + g.features.length, 0);
   useEffect(() => {
     if (!related.length) return;
-    if ((tab === "related" && !otherGroups.length) || (tab === "photos" && !photoGroups.length)
-      || (tab === "docs" && !docGroups.length)) setTab("attrs");
+    if ((tab === "photos" && !photoGroups.length) || (tab === "docs" && !docGroups.length)) setTab("attrs");
   }, [tab, related.length, otherGroups.length, photoGroups.length, docGroups.length]);
 
   const visibleFields = layer.fields.filter((f) => f.widget !== "Hidden" && f.name !== layer.primary_key);
@@ -139,7 +139,6 @@ export const FeaturePanel = forwardRef<FeaturePanelHandle, Props>(function Featu
         <nav className="tabs">
           <button className={tab === "attrs" ? "active" : ""} onClick={() => setTab("attrs")}>Atrybuty</button>
           {photoGroups.length > 0 && <button className={tab === "photos" ? "active" : ""} onClick={() => setTab("photos")}>Zdjęcia ({photoCount})</button>}
-          {otherGroups.length > 0 && <button className={tab === "related" ? "active" : ""} onClick={() => setTab("related")}>Powiązane</button>}
           {docGroups.length > 0 && <button className={tab === "docs" ? "active" : ""} onClick={() => setTab("docs")}>Dokumenty ({docCount})</button>}
           {reports.length > 0 && <button className={tab === "reports" ? "active" : ""} onClick={() => setTab("reports")}>Raporty</button>}
         </nav>
@@ -165,27 +164,19 @@ export const FeaturePanel = forwardRef<FeaturePanelHandle, Props>(function Featu
               {!isNew && layer.perms.delete && <button className="danger" onClick={remove}>Usuń</button>}
             </div>
           )}
+          {!isNew && otherGroups.map((g) => (
+            <RelatedTable key={g.relation} config={config} group={g} parentValues={values}
+              onOpen={(id) => onOpenRelated(g.layer_id, id)}
+              onNew={g.direction === "child" && onNewRelated && config.layers[g.layer_id]?.perms.insert
+                ? () => onNewRelated(g.layer_id, Object.fromEntries(g.pairs.map(([pf, cf]) => [cf, values[pf]])))
+                : undefined} />
+          ))}
         </div>
       )}
 
       {tab === "photos" && pk && photoGroups.map((g) => (
         <PhotoGallery key={g.relation} config={config} group={g} parentLayerId={layerId} parentPk={String(pk)}
           onChanged={loadRelated} onOpenRecord={onOpenRelated} />
-      ))}
-
-      {tab === "related" && otherGroups.map((g) => (
-        <section key={g.relation} className="related">
-          <h4>{g.name} <span className="muted">({g.features.length})</span></h4>
-          <ul>
-            {g.features.map((f) => (
-              <li key={f.id}>
-                <button className="link" onClick={() => onOpenRelated(g.layer_id, f.id)}>
-                  {config.layers[g.layer_id]?.name} #{f.id}
-                </button>
-              </li>
-            ))}
-          </ul>
-        </section>
       ))}
 
       {tab === "docs" && pk && docGroups.map((g) => (
@@ -205,3 +196,52 @@ export const FeaturePanel = forwardRef<FeaturePanelHandle, Props>(function Featu
     </aside>
   );
 });
+
+/** Wartość pola do tabelki rekordów powiązanych: etykieta z mapy wartości, data bez godziny. */
+function shown(field: { widget: string; widget_config: Record<string, unknown> | null }, v: unknown): string {
+  if (v === null || v === undefined || v === "") return "—";
+  const cfg = (field.widget_config ?? {}) as Record<string, unknown>;
+  if (field.widget === "ValueMap") {
+    const raw = cfg.map;
+    const entries: [string, string][] = Array.isArray(raw)
+      ? raw.flatMap((o) => Object.entries(o as Record<string, string>))
+      : Object.entries((raw ?? {}) as Record<string, string>);
+    const hit = entries.find(([, val]) => String(val) === String(v));
+    if (hit) return hit[0];
+  }
+  if (field.widget === "CheckBox") return v === true || v === "true" || v === 1 ? "tak" : "nie";
+  if (field.widget === "DateTime" && typeof v === "string") return v.slice(0, 10).split("-").reverse().join(".");
+  return String(v);
+}
+
+/** Rekordy powiązane w formularzu (okno w oknie): kilka kolumn, kliknięcie otwiera rekord, „+ Dodaj” — nowy podrzędny. */
+function RelatedTable({ config, group, parentValues, onOpen, onNew }: {
+  config: ProjectConfig; group: RelatedGroup; parentValues: Record<string, unknown>;
+  onOpen: (id: string) => void; onNew?: () => void;
+}) {
+  const lyr = config.layers[group.layer_id];
+  if (!lyr) return null;
+  void parentValues;
+  const keys = new Set([lyr.primary_key, ...group.pairs.map(([p, c]) => (group.direction === "child" ? c : p))]);
+  const cols = lyr.fields.filter((f) => f.widget !== "Hidden" && !keys.has(f.name)).slice(0, 5);
+  return (
+    <section className="related related-inline">
+      <h4>{group.name || lyr.name} <span className="muted">({group.features.length})</span>
+        {onNew && <button className="link" style={{ marginLeft: 8 }} onClick={onNew}>+ Dodaj</button>}</h4>
+      {group.features.length > 0 && (
+        <div className="related-table">
+          <table className="grid">
+            <thead><tr>{cols.map((c) => <th key={c.name}>{c.alias ?? c.name}</th>)}</tr></thead>
+            <tbody>
+              {group.features.map((f) => (
+                <tr key={f.id} onClick={() => onOpen(String(f.id))} style={{ cursor: "pointer" }} title="Otwórz rekord">
+                  {cols.map((c) => <td key={c.name}>{shown(c, f.properties[c.name])}</td>)}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </section>
+  );
+}
