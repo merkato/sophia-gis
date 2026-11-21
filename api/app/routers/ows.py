@@ -1,5 +1,5 @@
 """Autoryzacja żądań OWS (forward_auth z Caddy) przed przekazaniem do QGIS Server."""
-from urllib.parse import parse_qsl, urlsplit
+from urllib.parse import parse_qsl, quote, urlsplit
 
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 
@@ -62,8 +62,9 @@ async def authorize(request: Request, user: CurrentUser | None = Depends(optiona
 
     return Response(status_code=200, headers={
         "X-Portal-Map": str(ctx.path),
-        "X-Portal-User": user.login if user else "",
-        "X-Portal-Groups": ",".join(user.group_names) if user else "",
+        # nagłówki HTTP tylko w ASCII — login i nazwy grup („Przeglądający nadleśnictwo”) kodowane procentowo
+        "X-Portal-User": quote(user.login, safe="") if user else "",
+        "X-Portal-Groups": ",".join(quote(g, safe="") for g in user.group_names) if user else "",
         # zakres danych użytkownika — QGIS Server filtruje nim obraz mapy i identyfikację
         FILTER_HEADER: wms_filter_header(ctx),
     })
