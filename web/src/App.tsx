@@ -12,7 +12,8 @@ import GeoJSON from "ol/format/GeoJSON";
 import { Toolbar } from "./components/Toolbar";
 import { FetchCard } from "./components/FetchCard";
 import { AdminPanel } from "./components/AdminPanel";
-import { setMapFocusHandler, takeMapFocus, type MapFocus, type PluginInfo } from "./plugins";
+import { setMapFocusHandler, setWindowHandler, takeMapFocus, type MapFocus, type PluginInfo } from "./plugins";
+import { PluginWindows, type OpenWindow } from "./components/PluginWindows";
 import { BasemapSwitcher, initialBasemapChoice, saveBasemapChoice } from "./components/BasemapSwitcher";
 import { loadOpacity, saveOpacity, useOpenSliders } from "./components/OpacitySlider";
 
@@ -155,6 +156,28 @@ export default function App() {
   // wtyczki z uprawnieniami zalogowanego (strony w administracji)
   const [plugins, setPlugins] = useState<PluginInfo[]>([]);
   const pluginPages = plugins.some((p) => p.pages.length > 0);
+  const pluginWindows = plugins.flatMap((p) => (p.windows ?? []).filter((w) => w.toolbar !== false).map((w) => ({ plugin: p, w })));
+  const [openWindows, setOpenWindows] = useState<OpenWindow[]>([]);
+  const zTop = useRef(0);
+  const openWindow = useCallback((plugin: PluginInfo, windowId: string, opts?: { props?: Record<string, unknown>; title?: string } | null) => {
+    const key = `${plugin.id}:${windowId}`;
+    setOpenWindows((list) => {
+      if (opts === null) return list.filter((x) => x.key !== key);
+      zTop.current += 1;
+      const def = (plugin.windows ?? []).find((x) => x.id === windowId);
+      const prev = list.find((x) => x.key === key);
+      const next: OpenWindow = {
+        key, plugin, windowId, title: opts?.title ?? prev?.title ?? def?.title ?? windowId, props: opts?.props ?? prev?.props ?? {},
+        z: zTop.current, pos: prev?.pos ?? { x: 70 + 40 * (list.length % 6), y: 60 + 30 * (list.length % 6) },
+      };
+      return prev ? list.map((x) => (x.key === key ? next : x)) : [...list, next];
+    });
+  }, []);
+  useEffect(() => {
+    setWindowHandler((pid, wid, opts) => { const p = plugins.find((x) => x.id === pid); if (p) openWindow(p, wid, opts); });
+    return () => setWindowHandler(null);
+  }, [plugins, openWindow]);
+  useEffect(() => { if (!user) setOpenWindows([]); }, [user]);
 
   const refreshSession = useCallback(async () => {
     const me = await api.me().catch(() => null);
@@ -578,6 +601,9 @@ export default function App() {
         {user ? (
           <>
             <span className="muted">{user.full_name ?? user.login}</span>
+            {pluginWindows.map(({ plugin, w }) => (
+              <button key={`${plugin.id}:${w.id}`} onClick={() => openWindow(plugin, w.id, {})}>{w.title}</button>
+            ))}
             {(user.is_admin || pluginPages) && <button onClick={() => setShowAdmin(true)}>Administracja</button>}
             <button onClick={async () => { await api.logout(); await refreshSession(); }}>Wyloguj</button>
           </>
@@ -706,6 +732,13 @@ export default function App() {
           )}
         </main>
       </div>
+
+      {user && openWindows.length > 0 && (
+        <PluginWindows windows={openWindows} user={user} notify={setMessage}
+          onClose={(key) => setOpenWindows((l) => l.filter((x) => x.key !== key))}
+          onFocus={(key) => { zTop.current += 1; const z = zTop.current; setOpenWindows((l) => l.map((x) => (x.key === key && x.z !== z - 1 ? { ...x, z } : x))); }}
+          onMove={(key, pos) => setOpenWindows((l) => l.map((x) => (x.key === key ? { ...x, pos } : x)))} />
+      )}
 
       {pending && (
         <UnsavedDialog onSave={() => resolvePending("save")} onDiscard={() => resolvePending("discard")}

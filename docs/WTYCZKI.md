@@ -115,6 +115,11 @@ Ten sam obiekt można podać w adresie: `?p=<slug>&obiekt=<schemat.tabela>:<kluc
 `newTab: true` otwiera mapę w nowej karcie (panel administracji zostaje na miejscu; obiekt przekazywany przez
 pamięć przeglądarki, więc geometria może być duża).
 
+**Okna nad mapą** (Sophia ≥ 0.3): `web.windows: [{"id": "decyzje", "title": "Decyzje", "capability": "…"}]` —
+przycisk w górnym pasku otwiera okno (przeciągane, ze zmianą rozmiaru); `"toolbar": false` = okno bez przycisku,
+otwierane z kodu: `host.openWindow("drzewo", { props: { id: 7 }, title: "Decyzja …" })`, `host.closeWindow(id)`.
+`register` zwraca `{ pages, windows: { decyzje: Komponent } }`; komponent okna dostaje `{ host, props, close }`.
+
 Menu panelu: wtyczka z kilkoma stronami ma jedną pozycję rozwijaną (`web.menu`, domyślnie nazwa wtyczki do „ — ”),
 a strony — krótkie tytuły (np. „Rejestr”, „Import”).
 Strony z `web.pages` pojawiają się jako zakładki panelu administracji u użytkowników z uprawnieniem

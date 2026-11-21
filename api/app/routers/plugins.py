@@ -31,6 +31,7 @@ async def my_plugins(user: CurrentUser | None = Depends(optional_user)):
             "capabilities": sorted(caps),
             "web": f"/api/plugins/{p.id}/web/{p.web_entry}?v={p.version}" if p.web_entry else None,
             "pages": [pg for pg in p.pages if not pg.get("capability") or pg["capability"] in caps],
+            "windows": [w for w in p.windows if not w.get("capability") or w["capability"] in caps],
         })
     return out
 

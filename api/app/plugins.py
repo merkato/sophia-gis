@@ -47,6 +47,7 @@ class Plugin:
     web_entry: str | None = None                       # ścieżka względem katalogu wtyczki
     menu: str | None = None                            # krótka nazwa menu wtyczki w panelu (web.menu)
     pages: list[dict] = field(default_factory=list)    # [{"id", "title", "capability"}]
+    windows: list[dict] = field(default_factory=list)  # okna z górnego paska: [{"id", "title", "capability"}]
     settings: list[dict] = field(default_factory=list)  # [{"id", "title", "type": "text"|"project", "description"}]
     error: str | None = None                           # wtyczka nie załadowana (manifest, zgodność, import)
     module: object | None = None                       # zaimportowany pakiet API (opcjonalnie `async def startup()`)
@@ -114,6 +115,7 @@ def read_manifest(path: Path) -> Plugin:
     plugin.web_entry = web.get("entry")
     plugin.menu = (web.get("menu") or "").strip() or None
     plugin.pages = [p for p in web.get("pages") or [] if isinstance(p, dict) and p.get("id")]
+    plugin.windows = [w for w in web.get("windows") or [] if isinstance(w, dict) and w.get("id")]
     plugin.settings = [s for s in m.get("settings") or [] if isinstance(s, dict) and s.get("id")
                        and s.get("type", "text") in ("text", "project")]
     if not version_ok(plugin.sophia, SOPHIA_VERSION):

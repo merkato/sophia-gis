@@ -146,7 +146,7 @@ export function PluginPageView({ plugin, page, user, notify }: { plugin: PluginI
   return <PluginBoundary name={plugin.name}><loaded.C host={loaded.host} /></PluginBoundary>;
 }
 
-class PluginBoundary extends Component<{ name: string; children: ReactNode }, { error: string | null }> {
+export class PluginBoundary extends Component<{ name: string; children: ReactNode }, { error: string | null }> {
   state = { error: null as string | null };
   static getDerivedStateFromError(e: Error) { return { error: e.message }; }
   render() {

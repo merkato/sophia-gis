@@ -6,11 +6,12 @@ import React from "react";
 import { request } from "./api";
 import type { User } from "./types";
 
-export interface PluginPage { id: string; title: string; capability?: string }
+export interface PluginPage { id: string; title: string; capability?: string; toolbar?: boolean }
 export interface PluginInfo {
   id: string; name: string; menu?: string; version: string; capabilities: string[];
   web: string | null;           // adres modułu ES (null = wtyczka bez interfejsu)
   pages: PluginPage[];          // strony w panelu administracji, które użytkownik może otworzyć
+  windows?: PluginPage[];       // okna otwierane z górnego paska (nad mapą)
 }
 
 export interface SophiaHost {
@@ -31,7 +32,16 @@ export interface SophiaHost {
    * inaczej przybliża i podświetla `geometry` (GeoJSON w EPSG:4326).
    */
   showOnMap: (focus: MapFocus) => void;
+  /** Otwiera (albo odświeża) okno wtyczki nad mapą; `props` trafiają do komponentu okna. */
+  openWindow: (windowId: string, opts?: { props?: Record<string, unknown>; title?: string }) => void;
+  closeWindow: (windowId: string) => void;
 }
+
+export interface PluginWindowProps { host: SophiaHost; props: Record<string, unknown>; close: () => void }
+type WindowHandler = (pluginId: string, windowId: string, opts?: { props?: Record<string, unknown>; title?: string } | null) => void;
+let windowHandler: WindowHandler | null = null;
+/** App rejestruje tu obsługę okien wtyczek (null w opts = zamknij). */
+export function setWindowHandler(fn: WindowHandler | null) { windowHandler = fn; }
 
 export interface MapFocus {
   newTab?: boolean;                                 // otwórz mapę w nowej karcie (panel zostaje na miejscu)
@@ -46,10 +56,17 @@ let mapFocusHandler: ((f: MapFocus) => void) | null = null;
 export function setMapFocusHandler(fn: ((f: MapFocus) => void) | null) { mapFocusHandler = fn; }
 
 export interface PluginModule {
-  register: (host: SophiaHost) => { pages?: Record<string, React.ComponentType<{ host: SophiaHost }>> };
+  register: (host: SophiaHost) => {
+    pages?: Record<string, React.ComponentType<{ host: SophiaHost }>>;
+    windows?: Record<string, React.ComponentType<PluginWindowProps>>;
+  };
 }
 
-export interface LoadedPlugin { pages: Record<string, React.ComponentType<{ host: SophiaHost }>>; host: SophiaHost }
+export interface LoadedPlugin {
+  pages: Record<string, React.ComponentType<{ host: SophiaHost }>>;
+  windows: Record<string, React.ComponentType<PluginWindowProps>>;
+  host: SophiaHost;
+}
 const modules = new Map<string, Promise<LoadedPlugin>>();
 
 /**
@@ -96,9 +113,11 @@ export function loadPlugin(p: PluginInfo, user: User, notify: (m: string) => voi
         if (f.newTab) { openMapTab(f); return; }
         if (mapFocusHandler) mapFocusHandler(f); else notify("Mapa nie jest dostępna");
       },
+      openWindow: (id, opts) => { if (windowHandler) windowHandler(p.id, id, opts ?? {}); },
+      closeWindow: (id) => { if (windowHandler) windowHandler(p.id, id, null); },
     };
     m = (import(/* @vite-ignore */ p.web!) as Promise<PluginModule>)
-      .then((mod) => ({ pages: mod.register(host).pages ?? {}, host }));
+      .then((mod) => { const r = mod.register(host); return { pages: r.pages ?? {}, windows: r.windows ?? {}, host }; });
     modules.set(key, m);
     m.catch(() => modules.delete(key));
   }
