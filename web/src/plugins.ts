@@ -40,6 +40,8 @@ export interface SophiaHost {
   closeWindow: (windowId: string) => void;
   /** Slug projektu otwartego w oknie mapy (null — bez projektu). Sophia ≥ 0.6. */
   currentProject: () => string | null;
+  /** Zasięg bieżącego widoku mapy: [minX, minY, maxX, maxY] w układzie projektu (`crs`), null bez mapy. Sophia ≥ 0.7. */
+  currentExtent: () => { bbox: [number, number, number, number]; crs: string } | null;
 }
 
 export interface PluginWindowProps { host: SophiaHost; props: Record<string, unknown>; close: () => void }
@@ -61,6 +63,10 @@ let mapFocusHandler: ((f: MapFocus) => void) | null = null;
 let projectGetter: (() => string | null) | null = null;
 /** App rejestruje tu odczyt bieżącego projektu mapy (`host.currentProject`). */
 export function setCurrentProjectGetter(fn: (() => string | null) | null) { projectGetter = fn; }
+type Extent = { bbox: [number, number, number, number]; crs: string };
+let extentGetter: (() => Extent | null) | null = null;
+/** App rejestruje tu odczyt zasięgu widoku mapy (`host.currentExtent`). */
+export function setCurrentExtentGetter(fn: (() => Extent | null) | null) { extentGetter = fn; }
 /** App rejestruje tu obsługę `host.showOnMap`. */
 export function setMapFocusHandler(fn: ((f: MapFocus) => void) | null) { mapFocusHandler = fn; }
 
@@ -165,6 +171,7 @@ export function loadPlugin(p: PluginInfo, user: User, notify: (m: string) => voi
       },
       closeWindow: (id) => { if (windowHandler) windowHandler(p.id, id, null); },
       currentProject: () => (projectGetter ? projectGetter() : null),
+      currentExtent: () => (extentGetter ? extentGetter() : null),
     };
     m = (import(/* @vite-ignore */ p.web!) as Promise<PluginModule>)
       .then((mod) => {

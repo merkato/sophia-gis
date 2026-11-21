@@ -94,7 +94,7 @@ async def notatki(user: CurrentUser = Depends(require_plugin("przyklad", "przykl
   Grupy nadal decydują o roli (przeglądanie / edycja); administrator i właściciel projektu widzą wszystko.
   Filtr działa jak zakres z grup: lista obiektów, formularze, edycja, powiązane, zdjęcia i mapa (QGIS Server).
   Funkcja jest wołana przy każdym żądaniu do projektu — trzymaj wynik w krótkiej pamięci podręcznej.
-- Zależności Pythona: tylko biblioteki obecne w obrazie API Sophii (FastAPI, psycopg, lxml, pyproj, Pillow, WeasyPrint…).
+- Zależności Pythona: tylko biblioteki obecne w obrazie API Sophii (FastAPI, psycopg, lxml, pyproj, Pillow, WeasyPrint, pyogrio…).
 - **PDF**: `app.pdf.html_to_pdf(html, title=…, author=…)` — dokument z HTML i CSS jako **PDF/A-2b** (czcionki
   osadzone, gotowy do podpisu elektronicznego). Strona, nagłówki, stopki i „Strona X z Y” w CSS (`@page`,
   `counter(page)` / `counter(pages)`), `<thead>` powtarza się na każdej stronie. Obrazy jako `data:` URI —
@@ -135,6 +135,7 @@ pamięć przeglądarki, więc geometria może być duża).
 obiektów warstw z tej tabeli (np. „Decyzja (PDF)” przy konturze). `obiekt` = `{ table, pk, layerId, project,
 properties }`. Moduły wtyczek z interfejsem ładują się w tle po zalogowaniu, więc akcje są od razu.
 `host.currentProject()` (Sophia ≥ 0.6) — slug projektu otwartego w oknie mapy albo `null`.
+`host.currentExtent()` (Sophia ≥ 0.7) — zasięg widoku mapy `{ bbox: [minX, minY, maxX, maxY], crs }` w układzie projektu.
 
 **Okna nad mapą** (Sophia ≥ 0.3): `web.windows: [{"id": "decyzje", "title": "Decyzje", "capability": "…"}]` —
 przycisk w górnym pasku otwiera okno (przeciągane, ze zmianą rozmiaru); `"toolbar": false` = okno bez przycisku,

@@ -12,7 +12,7 @@ import GeoJSON from "ol/format/GeoJSON";
 import { Toolbar } from "./components/Toolbar";
 import { FetchCard } from "./components/FetchCard";
 import { AdminPanel } from "./components/AdminPanel";
-import { setCurrentProjectGetter, setMapFocusHandler, setWindowHandler, takeMapFocus, type MapFocus, type PluginInfo, preloadPlugins } from "./plugins";
+import { setCurrentExtentGetter, setCurrentProjectGetter, setMapFocusHandler, setWindowHandler, takeMapFocus, type MapFocus, type PluginInfo, preloadPlugins } from "./plugins";
 import { PluginWindows, type OpenWindow } from "./components/PluginWindows";
 import { BasemapSwitcher, initialBasemapChoice, saveBasemapChoice } from "./components/BasemapSwitcher";
 import { loadOpacity, saveOpacity, useOpenSliders } from "./components/OpacitySlider";
@@ -180,6 +180,16 @@ export default function App() {
   useEffect(() => { if (!user) setOpenWindows([]); }, [user]);
   // wtyczki pytają o projekt otwarty w mapie (np. wyszukiwarka)
   useEffect(() => { setCurrentProjectGetter(() => slug); return () => setCurrentProjectGetter(null); }, [slug]);
+  // …i o zasięg bieżącego widoku mapy (np. eksport „bieżący widok”)
+  useEffect(() => {
+    setCurrentExtentGetter(() => {
+      const map = mapRef.current;
+      if (!map || !config) return null;
+      const e = map.getView().calculateExtent(map.getSize());
+      return { bbox: [e[0], e[1], e[2], e[3]], crs: config.crs };
+    });
+    return () => setCurrentExtentGetter(null);
+  }, [config]);
 
   const refreshSession = useCallback(async () => {
     const me = await api.me().catch(() => null);
