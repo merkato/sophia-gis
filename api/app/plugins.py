@@ -289,6 +289,29 @@ def data_dir(plugin_id: str) -> Path:
     return d
 
 
+ALL_CODES = "*"
+
+
+async def plugin_scope(user: CurrentUser, project_slug: str) -> tuple[bool, list[str] | None]:
+    """Zakres danych użytkownika w projekcie podany przez wtyczkę — zamiast kodów z grup (project_access).
+
+    Pakiet API wtyczki może mieć `async def scope_codes(user, project_slug)`, zwracające None (wtyczka nie dotyczy
+    projektu), `"*"` (cały obszar) albo listę kodów wymiaru zakresu (pusta = nic). Pierwsza odpowiedź wygrywa;
+    liczą się tylko włączone, działające wtyczki. Wynik: (czy wtyczka rozstrzygnęła, kody | None = bez ograniczeń)."""
+    providers = [p for p in REGISTRY.values() if p.module is not None and not p.error and hasattr(p.module, "scope_codes")]
+    if not providers:
+        return False, None
+    active = await enabled_ids()
+    for p in providers:
+        if p.id not in active:
+            continue
+        codes = await p.module.scope_codes(user, project_slug)
+        if codes is None:
+            continue
+        return True, (None if codes == ALL_CODES else sorted({str(c) for c in codes}))
+    return False, None
+
+
 async def get_settings_for(plugin_id: str) -> dict:
     async with portal_conn() as conn:
         row = await (await conn.execute("SELECT settings FROM portal.plugins WHERE id = %s", (plugin_id,))).fetchone()

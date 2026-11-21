@@ -62,3 +62,31 @@ def test_load_mounts_router_under_plugin_prefix(tmp_path):
     assert plugins.REGISTRY["demo_ladowania"].error is None
     assert "Błąd ładowania" in plugins.REGISTRY["zepsuta"].error
     assert plugins.REGISTRY["demo_ladowania"].web_entry == "web/index.js"
+
+
+def test_plugin_scope_provider(monkeypatch):
+    """Wtyczka podaje zakres użytkownika w projekcie: None — nie dotyczy, "*" — całość, lista — kody."""
+    import asyncio
+    import types
+
+    from app.security import CurrentUser
+
+    async def scope_codes(user, slug):
+        return {"lasy": ["n1620", "n1620", "n1601"], "caly": "*"}.get(slug)
+
+    mod = types.SimpleNamespace(scope_codes=scope_codes)
+    monkeypatch.setattr(plugins, "REGISTRY", {"zakres": plugins.Plugin(id="zakres", path=Path("."), module=mod)})
+
+    async def enabled():
+        return {"zakres"}
+    monkeypatch.setattr(plugins, "enabled_ids", enabled)
+    user = CurrentUser(id=5, login="jan", full_name=None, is_admin=False, group_ids=[], group_names=[])
+    run = lambda slug: asyncio.run(plugins.plugin_scope(user, slug))
+    assert run("lasy") == (True, ["n1601", "n1620"])
+    assert run("caly") == (True, None)
+    assert run("inny") == (False, None)
+
+    async def disabled():
+        return set()
+    monkeypatch.setattr(plugins, "enabled_ids", disabled)
+    assert run("lasy") == (False, None)

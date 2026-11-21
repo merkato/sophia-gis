@@ -88,6 +88,12 @@ async def notatki(user: CurrentUser = Depends(require_plugin("przyklad", "przykl
 - Długie zadania (import plików) — w wątku na osobnym połączeniu, stan w tabeli wtyczki.
 - Opcjonalnie `async def startup()` w pakiecie API — Sophia wywołuje ją przy starcie API (po migracjach,
   tylko dla włączonej wtyczki), np. żeby oznaczyć zadania przerwane restartem.
+- Opcjonalnie `async def scope_codes(user, project_slug)` — **zakres danych użytkownika** w projekcie
+  podany przez wtyczkę zamiast kodów z grup (Administracja → Projekty → Dostęp). Zwraca `None` (wtyczka nie
+  dotyczy projektu), `"*"` (cały obszar) albo listę kodów wymiaru zakresu z Fii (pusta lista = nic).
+  Grupy nadal decydują o roli (przeglądanie / edycja); administrator i właściciel projektu widzą wszystko.
+  Filtr działa jak zakres z grup: lista obiektów, formularze, edycja, powiązane, zdjęcia i mapa (QGIS Server).
+  Funkcja jest wołana przy każdym żądaniu do projektu — trzymaj wynik w krótkiej pamięci podręcznej.
 - Zależności Pythona: tylko biblioteki obecne w obrazie API Sophii (FastAPI, psycopg, lxml, pyproj…).
 
 ### WebUI

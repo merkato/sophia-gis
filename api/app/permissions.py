@@ -86,7 +86,8 @@ async def load_project_context(slug: str, user: CurrentUser | None) -> ProjectCo
         overrides: dict[str, LayerPerms] = {}
         scope_codes: list[str] | None = None
         can_photos = can_files = False
-        if user and (user.is_admin or proj["owner_id"] == user.id):
+        unrestricted = bool(user and (user.is_admin or proj["owner_id"] == user.id))
+        if unrestricted:
             role = "manager"
             can_photos = can_files = True
         elif user and user.group_ids:
@@ -114,6 +115,13 @@ async def load_project_context(slug: str, user: CurrentUser | None) -> ProjectCo
                     )
                 ).fetchall():
                     overrides[r["layer_id"]] = LayerPerms(r["v"], r["i"], r["u"], r["d"])
+
+    if user and role and not unrestricted:
+        # wtyczka może podać zakres użytkownika w projekcie (np. przypisane nadleśnictwo) zamiast kodów grup
+        from .plugins import plugin_scope
+        handled, codes = await plugin_scope(user, proj["slug"])
+        if handled:
+            scope_codes = codes
 
     if role is None and not proj["is_public"]:
         raise HTTPException(
