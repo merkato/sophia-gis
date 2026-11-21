@@ -94,7 +94,12 @@ async def notatki(user: CurrentUser = Depends(require_plugin("przyklad", "przykl
   Grupy nadal decydują o roli (przeglądanie / edycja); administrator i właściciel projektu widzą wszystko.
   Filtr działa jak zakres z grup: lista obiektów, formularze, edycja, powiązane, zdjęcia i mapa (QGIS Server).
   Funkcja jest wołana przy każdym żądaniu do projektu — trzymaj wynik w krótkiej pamięci podręcznej.
-- Zależności Pythona: tylko biblioteki obecne w obrazie API Sophii (FastAPI, psycopg, lxml, pyproj…).
+- Zależności Pythona: tylko biblioteki obecne w obrazie API Sophii (FastAPI, psycopg, lxml, pyproj, Pillow, WeasyPrint…).
+- **PDF**: `app.pdf.html_to_pdf(html, title=…, author=…)` — dokument z HTML i CSS jako **PDF/A-2b** (czcionki
+  osadzone, gotowy do podpisu elektronicznego). Strona, nagłówki, stopki i „Strona X z Y” w CSS (`@page`,
+  `counter(page)` / `counter(pages)`), `<thead>` powtarza się na każdej stronie. Obrazy jako `data:` URI —
+  zasoby z sieci i dysku są blokowane. Czcionki w obrazie: DejaVu Sans/Serif, Liberation Sans/Serif/Mono.
+  Wołaj w wątku (`asyncio.to_thread`).
 
 ### WebUI
 Moduł ES bez budowania (albo zbudowany do jednego pliku), ładowany dynamicznie. Sophia przekazuje
