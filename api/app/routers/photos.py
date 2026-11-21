@@ -245,7 +245,7 @@ def visible_condition(ctx: ProjectContext, lyr: LayerDef, _extent=None) -> sql.C
     return row_filter(ctx, lyr, T, "view")
 
 
-@router.get("/features/{pk}/files/{field}")
+@router.get("/features/{pk:path}/files/{field}")
 async def feature_file(slug: str, layer_id: str, pk: str, field: str, thumb: bool = False,
                        user: CurrentUser | None = Depends(optional_user)):
     """Plik z pola „Załącznik” obiektu (thumb=1: miniatura JPEG)."""

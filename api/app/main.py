@@ -40,7 +40,10 @@ async def lifespan(_: FastAPI):
 app = FastAPI(title="Sophia API", version=__version__, lifespan=lifespan,
               docs_url="/api/docs", openapi_url="/api/openapi.json")
 
-for r in (auth, projects, features, history, fields, photos, fetch, reports, ows, admin, basemaps):
+# photos przed features: klucz obiektu może zawierać „/” ({pk:path}), więc ogólna trasa obiektu
+# przechwyciłaby …/features/{pk}/files/{field}, gdyby była sprawdzana wcześniej
+ROUTERS = (auth, projects, photos, features, history, fields, fetch, reports, ows, admin, basemaps)
+for r in ROUTERS:
     app.include_router(r.router)
 app.include_router(basemaps.admin)
 app.include_router(admin.publish_router)

@@ -225,7 +225,7 @@ async def list_features(
     return out
 
 
-@router.get("/{pk}")
+@router.get("/{pk:path}")
 async def get_feature(slug: str, layer_id: str, pk: str, crs: str = "EPSG:3857",
                       user: CurrentUser | None = Depends(optional_user)):
     ctx = await load_project_context(slug, user)
@@ -284,7 +284,7 @@ async def create_feature(slug: str, layer_id: str, body: FeatureIn, crs: str = "
     return feature
 
 
-@router.patch("/{pk}")
+@router.patch("/{pk:path}")
 async def update_feature(slug: str, layer_id: str, pk: str, body: FeatureIn, crs: str = "EPSG:3857",
                          user: CurrentUser = Depends(require_user)):
     ctx = await load_project_context(slug, user)
@@ -312,7 +312,7 @@ async def update_feature(slug: str, layer_id: str, pk: str, body: FeatureIn, crs
     return _row_to_feature(new)
 
 
-@router.delete("/{pk}", status_code=204)
+@router.delete("/{pk:path}", status_code=204)
 async def delete_feature(slug: str, layer_id: str, pk: str, user: CurrentUser = Depends(require_user)):
     ctx = await load_project_context(slug, user)
     lyr = ctx.require(layer_id, "delete")
@@ -339,7 +339,7 @@ async def delete_feature(slug: str, layer_id: str, pk: str, user: CurrentUser = 
     await _audit(ctx, layer_id, pk, "delete", _row_to_feature(old), None)
 
 
-@router.get("/{pk}/related")
+@router.get("/{pk:path}/related")
 async def related_features(slug: str, layer_id: str, pk: str, crs: str = "EPSG:3857",
                            user: CurrentUser | None = Depends(optional_user)):
     """Obiekty powiązane relacjami z projektu QGIS (dzieci i rodzice) — do formularza z zakładkami."""
@@ -945,7 +945,7 @@ async def reshape_feature(slug: str, layer_id: str, body: ReshapeIn, crs: str = 
     return new
 
 
-@router.post("/{pk}/copy", status_code=201)
+@router.post("/{pk:path}/copy", status_code=201)
 async def copy_feature(slug: str, layer_id: str, pk: str, body: CopyIn, crs: str = "EPSG:3857",
                        user: CurrentUser = Depends(require_user)):
     """Kopia obiektu w nowym miejscu: atrybuty według polityk duplikowania pól z projektu QGIS
@@ -969,3 +969,8 @@ async def copy_feature(slug: str, layer_id: str, pk: str, body: CopyIn, crs: str
         feature = _row_to_feature(await _fetch_one(conn, None, lyr, new_pk, srid, None))
     await _audit(ctx, layer_id, new_pk, "insert", None, feature)
     return feature
+
+
+# Klucz obiektu może zawierać „/” (np. identyfikator działki 999901_1.0001.12/1) — serwer dekoduje %2F, więc
+# ścieżki używają {pk:path}. Trasy z przyrostkiem (…/related, …/copy) muszą być sprawdzane przed ogólnymi.
+router.routes.sort(key=lambda r: getattr(r, "path", "").endswith("{pk:path}"))
