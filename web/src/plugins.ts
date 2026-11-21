@@ -8,7 +8,7 @@ import type { User } from "./types";
 
 export interface PluginPage { id: string; title: string; capability?: string }
 export interface PluginInfo {
-  id: string; name: string; version: string; capabilities: string[];
+  id: string; name: string; menu?: string; version: string; capabilities: string[];
   web: string | null;           // adres modułu ES (null = wtyczka bez interfejsu)
   pages: PluginPage[];          // strony w panelu administracji, które użytkownik może otworzyć
 }
@@ -34,6 +34,7 @@ export interface SophiaHost {
 }
 
 export interface MapFocus {
+  newTab?: boolean;                                 // otwórz mapę w nowej karcie (panel zostaje na miejscu)
   project?: string;                                 // slug projektu; brak = bieżący
   targets?: { table: string; pk: string }[];        // „schemat.tabela” + klucz główny obiektu
   geometry?: { type: string; coordinates: unknown } | null;   // EPSG:4326
@@ -51,6 +52,33 @@ export interface PluginModule {
 export interface LoadedPlugin { pages: Record<string, React.ComponentType<{ host: SophiaHost }>>; host: SophiaHost }
 const modules = new Map<string, Promise<LoadedPlugin>>();
 
+/**
+ * Nowa karta z mapą: obiekt do pokazania przekazany przez localStorage (geometria bywa za duża na adres),
+ * nowa karta odczytuje go z parametru ?fokus=<klucz> i usuwa (takeMapFocus).
+ */
+function openMapTab(f: MapFocus) {
+  const key = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`;
+  try { localStorage.setItem(`sophia-fokus-${key}`, JSON.stringify({ ...f, newTab: false })); } catch { /* bez pamięci: tylko projekt */ }
+  const q = new URLSearchParams({ ...(f.project ? { p: f.project } : {}), fokus: key });
+  window.open(`${location.pathname}?${q}`, "_blank");
+}
+
+export function takeMapFocus(key: string): MapFocus | null {
+  try {
+    const k = `sophia-fokus-${key}`;
+    const v = localStorage.getItem(k);
+    localStorage.removeItem(k);
+    // przy okazji: porzucone wpisy starsze niż doba
+    for (let i = localStorage.length - 1; i >= 0; i--) {
+      const n = localStorage.key(i);
+      if (n?.startsWith("sophia-fokus-") && Date.now() - parseInt(n.slice(13, 21), 36) > 86400000) localStorage.removeItem(n);
+    }
+    return v ? (JSON.parse(v) as MapFocus) : null;
+  } catch {
+    return null;
+  }
+}
+
 /** Ładuje moduł wtyczki raz na sesję i wywołuje `register`. */
 export function loadPlugin(p: PluginInfo, user: User, notify: (m: string) => void): Promise<LoadedPlugin> {
   const key = `${p.id}@${p.version}`;
@@ -64,7 +92,10 @@ export function loadPlugin(p: PluginInfo, user: User, notify: (m: string) => voi
       api: (path, init) => request(`/api/plugins/${p.id}${path}`, init),
       request: (path, init) => request(path, init),
       notify,
-      showOnMap: (f) => { if (mapFocusHandler) mapFocusHandler(f); else notify("Mapa nie jest dostępna"); },
+      showOnMap: (f) => {
+        if (f.newTab) { openMapTab(f); return; }
+        if (mapFocusHandler) mapFocusHandler(f); else notify("Mapa nie jest dostępna");
+      },
     };
     m = (import(/* @vite-ignore */ p.web!) as Promise<PluginModule>)
       .then((mod) => ({ pages: mod.register(host).pages ?? {}, host }));

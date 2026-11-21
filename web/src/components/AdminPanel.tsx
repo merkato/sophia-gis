@@ -21,12 +21,18 @@ export function AdminPanel({ onClose, onChanged, user, plugins, notify }: {
   onClose: () => void; onChanged: () => void; user: User; plugins: PluginInfo[]; notify: (m: string) => void;
 }) {
   const pluginTabs = plugins.flatMap((p) => p.pages.map((pg) => ({ key: `p:${p.id}:${pg.id}`, label: pg.title, plugin: p, page: pg })));
-  const tabs: { key: string; label: string }[] = [
-    ...(user.is_admin ? TABS.map(([key, label]) => ({ key, label })) : []),
-    ...pluginTabs,
-  ];
+  const coreTabs = user.is_admin ? TABS.map(([key, label]) => ({ key, label })) : [];
+  const tabs: { key: string; label: string }[] = [...coreTabs, ...pluginTabs];
   const [tab, setTab] = useState<string>(tabs[0]?.key ?? "");
   const pluginTab = pluginTabs.find((t) => t.key === tab);
+  const [openMenu, setOpenMenu] = useState<string | null>(null);
+  useEffect(() => {   // menu wtyczki zamyka kliknięcie poza nim
+    if (!openMenu) return undefined;
+    const close = () => setOpenMenu(null);
+    document.addEventListener("click", close);
+    return () => document.removeEventListener("click", close);
+  }, [openMenu]);
+  const go = (key: string) => { setTab(key); setError(null); setOpenMenu(null); };
   const [error, setError] = useState<string | null>(null);
   const run = useCallback(async (fn: () => Promise<unknown>) => {
     setError(null);
@@ -38,9 +44,33 @@ export function AdminPanel({ onClose, onChanged, user, plugins, notify }: {
       <header className="admin-head">
         <h2>Administracja</h2>
         <nav className="tabs">
-          {tabs.map(({ key, label }) => (
-            <button key={key} className={tab === key ? "active" : ""} onClick={() => { setTab(key); setError(null); }}>{label}</button>
+          {coreTabs.map(({ key, label }) => (
+            <button key={key} className={tab === key ? "active" : ""} onClick={() => go(key)}>{label}</button>
           ))}
+          {plugins.filter((p) => p.pages.length > 0).map((p) => {
+            const label = p.menu ?? p.name;
+            if (p.pages.length === 1) {
+              const key = `p:${p.id}:${p.pages[0].id}`;
+              return <button key={key} className={tab === key ? "active" : ""} onClick={() => go(key)}>{label}</button>;
+            }
+            const active = tab.startsWith(`p:${p.id}:`);
+            return (
+              <span key={p.id} className="tab-menu">
+                <button className={active ? "active" : ""} aria-haspopup="menu" aria-expanded={openMenu === p.id}
+                  onClick={(e) => { e.stopPropagation(); setOpenMenu(openMenu === p.id ? null : p.id); }}>
+                  {label}{active && pluginTab ? `: ${pluginTab.label}` : ""} ▾
+                </button>
+                {openMenu === p.id && (
+                  <div className="tab-menu-list" role="menu">
+                    {p.pages.map((pg) => {
+                      const key = `p:${p.id}:${pg.id}`;
+                      return <button key={key} role="menuitem" className={tab === key ? "active" : ""} onClick={() => go(key)}>{pg.title}</button>;
+                    })}
+                  </div>
+                )}
+              </span>
+            );
+          })}
         </nav>
         <div className="spacer" />
         <button onClick={onClose}>Zamknij</button>

@@ -57,6 +57,7 @@ przyciskiem w przeglądarce.
   "capabilities": [{"id": "przyklad.podglad", "title": "Czytanie"}, {"id": "przyklad.zapis", "title": "Zapis"}],
   "api": {"package": "sophia_plugin_przyklad"},
   "web": {"entry": "web/index.js",
+          "menu": "Przykład",
           "pages": [{"id": "notatki", "title": "Notatki", "capability": "przyklad.podglad"}]}
 }
 ```
@@ -111,6 +112,11 @@ host.showOnMap({
 });
 ```
 Ten sam obiekt można podać w adresie: `?p=<slug>&obiekt=<schemat.tabela>:<klucz>` (link do wysłania).
+`newTab: true` otwiera mapę w nowej karcie (panel administracji zostaje na miejscu; obiekt przekazywany przez
+pamięć przeglądarki, więc geometria może być duża).
+
+Menu panelu: wtyczka z kilkoma stronami ma jedną pozycję rozwijaną (`web.menu`, domyślnie nazwa wtyczki do „ — ”),
+a strony — krótkie tytuły (np. „Rejestr”, „Import”).
 Strony z `web.pages` pojawiają się jako zakładki panelu administracji u użytkowników z uprawnieniem
 `capability`. Błąd w komponencie wtyczki nie wywraca panelu (izolacja błędów).
 

@@ -27,7 +27,8 @@ async def my_plugins(user: CurrentUser | None = Depends(optional_user)):
     for pid, caps in sorted((await plugins.user_capabilities(user)).items()):
         p = plugins.REGISTRY[pid]
         out.append({
-            "id": p.id, "name": p.name, "version": p.version, "capabilities": sorted(caps),
+            "id": p.id, "name": p.name, "menu": p.menu or p.name.split(" — ")[0], "version": p.version,
+            "capabilities": sorted(caps),
             "web": f"/api/plugins/{p.id}/web/{p.web_entry}?v={p.version}" if p.web_entry else None,
             "pages": [pg for pg in p.pages if not pg.get("capability") or pg["capability"] in caps],
         })

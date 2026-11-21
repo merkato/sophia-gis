@@ -12,7 +12,7 @@ import GeoJSON from "ol/format/GeoJSON";
 import { Toolbar } from "./components/Toolbar";
 import { FetchCard } from "./components/FetchCard";
 import { AdminPanel } from "./components/AdminPanel";
-import { setMapFocusHandler, type MapFocus, type PluginInfo } from "./plugins";
+import { setMapFocusHandler, takeMapFocus, type MapFocus, type PluginInfo } from "./plugins";
 import { BasemapSwitcher, initialBasemapChoice, saveBasemapChoice } from "./components/BasemapSwitcher";
 import { loadOpacity, saveOpacity, useOpenSliders } from "./components/OpacitySlider";
 
@@ -117,6 +117,11 @@ export default function App() {
   // obiekt do pokazania po wczytaniu projektu: z adresu (?p=…&obiekt=schemat.tabela:klucz) albo z wtyczki
   const [focus, setFocus] = useState<MapFocus | null>(() => {
     const q = new URLSearchParams(location.search);
+    const fk = q.get("fokus");
+    if (fk) {   // nowa karta otwarta z panelu (host.showOnMap({ newTab: true }))
+      const f = takeMapFocus(fk);
+      if (f) return { ...f, project: f.project ?? q.get("p") ?? undefined };
+    }
     const o = q.get("obiekt");
     const i = o ? o.indexOf(":") : -1;
     return o && i > 0 ? { project: q.get("p") ?? undefined, targets: [{ table: o.slice(0, i), pk: o.slice(i + 1) }] } : null;

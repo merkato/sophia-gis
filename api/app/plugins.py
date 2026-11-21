@@ -45,6 +45,7 @@ class Plugin:
     capabilities: list[dict] = field(default_factory=list)   # [{"id": "egib.import", "title": "…"}]
     api_package: str | None = None
     web_entry: str | None = None                       # ścieżka względem katalogu wtyczki
+    menu: str | None = None                            # krótka nazwa menu wtyczki w panelu (web.menu)
     pages: list[dict] = field(default_factory=list)    # [{"id", "title", "capability"}]
     settings: list[dict] = field(default_factory=list)  # [{"id", "title", "type": "text"|"project", "description"}]
     error: str | None = None                           # wtyczka nie załadowana (manifest, zgodność, import)
@@ -111,6 +112,7 @@ def read_manifest(path: Path) -> Plugin:
     plugin.api_package = api.get("package")
     web = m.get("web") or {}
     plugin.web_entry = web.get("entry")
+    plugin.menu = (web.get("menu") or "").strip() or None
     plugin.pages = [p for p in web.get("pages") or [] if isinstance(p, dict) and p.get("id")]
     plugin.settings = [s for s in m.get("settings") or [] if isinstance(s, dict) and s.get("id")
                        and s.get("type", "text") in ("text", "project")]
