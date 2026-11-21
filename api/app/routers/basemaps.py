@@ -31,7 +31,7 @@ COLUMNS = "id, name, kind, is_overlay, opacity, visible_default, enabled, sort_o
 
 class BasemapIn(BaseModel):
     name: str = Field(min_length=1, max_length=120)
-    kind: Literal["wmts", "xyz", "sophia"]
+    kind: Literal["wmts", "xyz", "sophia", "wms"]
     is_overlay: bool = False
     opacity: float = Field(1.0, ge=0, le=1)
     visible_default: bool = False
@@ -47,11 +47,12 @@ class BasemapIn(BaseModel):
             "wmts": ("url", "layer", "matrix_set", "format", "tile_grid"),
             "xyz": ("url",),
             "sophia": ("project", "layers"),
+            "wms": ("url", "layers"),
         }[self.kind]
         missing = [k for k in required if not c.get(k)]
         if missing:
             raise ValueError(f"Brak w konfiguracji: {', '.join(missing)}")
-        if self.kind in ("wmts", "xyz") and not str(c["url"]).startswith("https://"):
+        if self.kind in ("wmts", "xyz", "wms") and not str(c["url"]).startswith("https://"):
             raise ValueError("Adres kafli musi zaczynać się od https:// (strona Sophii działa po HTTPS)")
         if self.kind == "wmts":
             g = c["tile_grid"]

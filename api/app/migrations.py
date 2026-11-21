@@ -49,6 +49,22 @@ MIGRATIONS: list[tuple[str, str]] = [
         CREATE INDEX IF NOT EXISTS audit_log_undo_idx ON portal.audit_log (project_id, user_id, id DESC)
             WHERE op IS NOT NULL AND undone_at IS NULL;
     """),
+    ("basemaps_wms", """
+        -- Zewnętrzne usługi WMS jako podkład/nakładka (np. krajowe integracje GUGiK)
+        ALTER TABLE portal.basemaps DROP CONSTRAINT IF EXISTS basemaps_kind_check;
+        ALTER TABLE portal.basemaps ADD CONSTRAINT basemaps_kind_check CHECK (kind IN ('wmts', 'xyz', 'sophia', 'wms'));
+        INSERT INTO portal.basemaps (name, kind, is_overlay, opacity, visible_default, sort_order, attribution, config)
+        SELECT 'Użytki gruntowe (KIUG)', 'wms', true, 0.85, false, 60, '© GUGiK, starostwa (KIUG)',
+               '{"url": "https://integracja.gugik.gov.pl/cgi-bin/KrajowaIntegracjaUzytkowGruntowych",
+                 "layers": "uzytki,kontury", "format": "image/png", "version": "1.1.1"}'::jsonb
+        WHERE NOT EXISTS (SELECT 1 FROM portal.basemaps WHERE config->>'url' LIKE '%KrajowaIntegracjaUzytkowGruntowych%');
+        INSERT INTO portal.basemaps (name, kind, is_overlay, opacity, visible_default, sort_order, attribution, config)
+        SELECT 'Plany miejscowe (KIMPZP)', 'wms', true, 0.7, false, 70, '© GUGiK, gminy (KIMPZP)',
+               '{"url": "https://mapy.geoportal.gov.pl/wss/ext/KrajowaIntegracjaMiejscowychPlanowZagospodarowaniaPrzestrzennego",
+                 "layers": "raster,wektor-str,wektor-pow,wektor-lin,wektor-lzb,wektor-pkt,granice,plany_granice",
+                 "format": "image/png", "version": "1.1.1"}'::jsonb
+        WHERE NOT EXISTS (SELECT 1 FROM portal.basemaps WHERE config->>'url' LIKE '%KrajowaIntegracjaMiejscowychPlanow%');
+    """),
     ("plugins", """
         -- Wtyczki (api/app/plugins.py): stan, migracje i uprawnienia (grupy albo użytkownicy)
         CREATE TABLE IF NOT EXISTS portal.plugins (

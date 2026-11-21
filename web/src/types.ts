@@ -166,7 +166,7 @@ export interface WmtsTileGrid {
 export interface Basemap {
   id: number;
   name: string;
-  kind: "wmts" | "xyz" | "sophia";
+  kind: "wmts" | "xyz" | "sophia" | "wms";
   is_overlay: boolean;
   opacity: number;
   visible_default: boolean;
@@ -174,7 +174,7 @@ export interface Basemap {
   sort_order: number;
   attribution: string | null;
   // wmts: url, request_encoding, layer, style, format, matrix_set, tile_grid, capabilities_url
-  // xyz: url, max_zoom   sophia: project, layers, format
+  // xyz: url, max_zoom   sophia: project, layers, format   wms: url, layers, format, version
   config: Record<string, any>;
   version: number;
 }

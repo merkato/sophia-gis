@@ -117,6 +117,7 @@ export function BasemapEditor({ basemap, nextSortOrder, onSaved, onCancel }: Pro
     const c = draft.config;
     if (draft.kind === "wmts") return !!(c.url && c.layer && c.tile_grid);
     if (draft.kind === "xyz") return !!c.url;
+    if (draft.kind === "wms") return !!(c.url && c.layers);
     return !!(c.project && c.layers);
   }, [draft]);
 
@@ -165,6 +166,7 @@ export function BasemapEditor({ basemap, nextSortOrder, onSaved, onCancel }: Pro
             <option value="wmts">WMTS (z GetCapabilities)</option>
             <option value="xyz">XYZ / TMS (szablon {"{z}/{x}/{y}"})</option>
             <option value="sophia">Warstwa projektu Sophii (np. biblioteka rastrów)</option>
+            <option value="wms">WMS (zewnętrzna usługa, np. krajowe integracje GUGiK)</option>
           </select>
         </label>
 
@@ -224,6 +226,24 @@ export function BasemapEditor({ basemap, nextSortOrder, onSaved, onCancel }: Pro
               <input placeholder="https://tile.openstreetmap.org/{z}/{x}/{y}.png" value={draft.config.url ?? ""} onChange={(e) => setConfig({ url: e.target.value })} /></label>
             <label className="field"><span>Maksymalny poziom</span>
               <input type="number" className="num" value={draft.config.max_zoom ?? 19} onChange={(e) => setConfig({ max_zoom: Number(e.target.value) })} /></label>
+          </fieldset>
+        )}
+
+        {draft.kind === "wms" && (
+          <fieldset>
+            <legend>Usługa WMS</legend>
+            <label className="field"><span>Adres usługi (bez parametrów)</span>
+              <input placeholder="https://integracja.gugik.gov.pl/cgi-bin/KrajowaIntegracjaUzytkowGruntowych" value={draft.config.url ?? ""}
+                onChange={(e) => setConfig({ url: e.target.value.trim().replace(/\?.*$/, "") })} /></label>
+            <label className="field"><span>Warstwy (nazwy WMS po przecinku, w kolejności rysowania)</span>
+              <input placeholder="uzytki,kontury" value={draft.config.layers ?? ""} onChange={(e) => setConfig({ layers: e.target.value.replace(/\s+/g, "") })} /></label>
+            <label className="field"><span>Format</span>
+              <select value={draft.config.format ?? "image/png"} onChange={(e) => setConfig({ format: e.target.value })}>
+                <option value="image/png">PNG (przezroczystość)</option>
+                <option value="image/jpeg">JPEG (bez przezroczystości)</option>
+              </select></label>
+            <p className="muted">Kafle pobiera przeglądarka prosto z usługi, w układzie mapy (WMS 1.1.1). Wydruk wymaga, by usługa
+              zezwalała na CORS. Usługi z ograniczeniem skali (np. 1:5000) pokazują dane dopiero po przybliżeniu.</p>
           </fieldset>
         )}
 

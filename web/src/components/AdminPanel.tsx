@@ -281,7 +281,7 @@ function ProjectsTab({ run, onChanged }: { run: Run; onChanged: () => void }) {
 
 // ------------------------------------------------------------------------------ podkłady
 
-const KIND_LABEL = { wmts: "WMTS", xyz: "XYZ", sophia: "warstwa Sophii" } as const;
+const KIND_LABEL = { wmts: "WMTS", xyz: "XYZ", sophia: "warstwa Sophii", wms: "WMS" } as const;
 
 function BasemapsTab({ run, onChanged }: { run: Run; onChanged: () => void }) {
   const [items, setItems] = useState<Basemap[]>([]);

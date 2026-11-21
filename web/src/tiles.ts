@@ -50,6 +50,7 @@ const wmtsProjection = (crs: string) => (crs === "OGC:CRS84" ? "EPSG:4326" : crs
  * Warstwa OpenLayers dla podkładu z katalogu.
  * wmts/xyz: kafle prosto z serwisu (inny układ niż mapa = przeliczenie w przeglądarce).
  * sophia: kafle WMS z projektu Sophii przez /ows (autoryzacja + wspólny cache nginx).
+ * wms: zewnętrzna usługa WMS kaflowana w układzie mapy (np. krajowe integracje GUGiK).
  */
 /** crossOrigin: wydruk w przeglądarce składa obraz z kafli — wymaga CORS (ekranowa mapa go nie wymaga). */
 export function basemapLayer(b: Basemap, mapCrs: string, crossOrigin = false): TileLayer {
@@ -72,6 +73,16 @@ export function basemapLayer(b: Basemap, mapCrs: string, crossOrigin = false): T
     });
   } else if (b.kind === "xyz") {
     source = new XYZ({ url: c.url, maxZoom: c.max_zoom ?? 19, attributions, transition: 0, crossOrigin: co });
+  } else if (b.kind === "wms") {
+    const format: string = c.format ?? "image/png";
+    source = new TileWMS({
+      url: c.url,
+      params: {
+        VERSION: c.version ?? "1.1.1", LAYERS: c.layers, STYLES: c.styles ?? "", FORMAT: format,
+        TRANSPARENT: format === "image/jpeg" ? "false" : "true",
+      },
+      tileGrid: tileGridFor(mapCrs), projection: mapCrs, hidpi: false, transition: 0, attributions, crossOrigin: co,
+    });
   } else {
     const format: string = c.format ?? PNG8;
     source = new TileWMS({
