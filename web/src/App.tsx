@@ -12,7 +12,7 @@ import GeoJSON from "ol/format/GeoJSON";
 import { Toolbar } from "./components/Toolbar";
 import { FetchCard } from "./components/FetchCard";
 import { AdminPanel } from "./components/AdminPanel";
-import type { PluginInfo } from "./plugins";
+import { setMapFocusHandler, type MapFocus, type PluginInfo } from "./plugins";
 import { BasemapSwitcher, initialBasemapChoice, saveBasemapChoice } from "./components/BasemapSwitcher";
 import { loadOpacity, saveOpacity, useOpenSliders } from "./components/OpacitySlider";
 
@@ -114,6 +114,14 @@ export default function App() {
     { loading: false, error: null, result: null });
   const fetchSeq = useRef(0);
   const [pending, setPending] = useState<(() => void) | null>(null);
+  // obiekt do pokazania po wczytaniu projektu: z adresu (?p=…&obiekt=schemat.tabela:klucz) albo z wtyczki
+  const [focus, setFocus] = useState<MapFocus | null>(() => {
+    const q = new URLSearchParams(location.search);
+    const o = q.get("obiekt");
+    const i = o ? o.indexOf(":") : -1;
+    return o && i > 0 ? { project: q.get("p") ?? undefined, targets: [{ table: o.slice(0, i), pk: o.slice(i + 1) }] } : null;
+  });
+  const [focusGeom, setFocusGeom] = useState<GeoJSONFeature["geometry"] | null>(null);
 
   /**
    * Każda zmiana obiektu w formularzu (kliknięcie na mapie, lista rekordów, powiązane,
@@ -175,8 +183,9 @@ export default function App() {
       if (location.search) history.replaceState(null, "", location.pathname);
       return;
     }
-    history.replaceState(null, "", `?p=${encodeURIComponent(slug)}`);
+    history.replaceState(null, "", `?p=${encodeURIComponent(slug)}${location.search.match(/[?&](obiekt=[^&]*)/)?.[0].replace("?", "&") ?? ""}`);
     setSelection(null);
+    setFocusGeom(null);
     setEditLayerId(null);
     setTool("identify");
     api.project(slug)
@@ -232,6 +241,62 @@ export default function App() {
       setMessage((e as Error).message);
     }
   });
+
+  // host.showOnMap wtyczek: zamknij administrację, przełącz projekt, resztę zrobi efekt poniżej
+  useEffect(() => {
+    setMapFocusHandler((f) => {
+      if (f.project && !projects.some((p) => p.slug === f.project)) {
+        setMessage(`Brak dostępu do projektu „${f.project}”`);
+        return;
+      }
+      setShowAdmin(false);
+      if (f.project && f.project !== slug) setSlug(f.project);
+      setFocus({ ...f, project: f.project ?? slug ?? undefined });
+    });
+    return () => setMapFocusHandler(null);
+  }, [projects, slug]);
+
+  useEffect(() => {
+    if (!focus || !config || (focus.project && focus.project !== config.slug)) return;
+    if (!mapRef.current) {   // mapa jeszcze się montuje — spróbuj za chwilę
+      const t = setTimeout(() => setFocus((x) => (x ? { ...x } : x)), 200);
+      return () => clearTimeout(t);
+    }
+    const f = focus;
+    const map = mapRef.current;
+    setFocus(null);
+    const fit = (g: ReturnType<GeoJSON["readGeometry"]>) => {
+      if (g) map.getView().fit(g.getExtent(), { padding: [80, 80, 80, 80], maxZoom: 17, duration: 300 });
+    };
+    const lyr = (f.targets ?? []).map((t) => ({ t, l: Object.values(config.layers).find((l) => l.source_table === t.table && l.primary_key) }))
+      .find((x) => x.l);
+    if (lyr?.l) {
+      const { t, l } = lyr;
+      setVisible((prev) => new Set(prev).add(`l:${l.id}`));
+      history.replaceState(null, "", `?p=${encodeURIComponent(config.slug)}&obiekt=${encodeURIComponent(`${t.table}:${t.pk}`)}`);
+      guard(async () => {
+        try {
+          const feat = await api.feature(config.slug, l.id, t.pk, config.crs);
+          setSelection({ layerId: l.id, feature: feat, isNew: false });
+          if (feat.geometry) fit(new GeoJSON().readGeometry(feat.geometry));
+        } catch (e) {
+          setMessage((e as Error).message);
+        }
+      });
+      return;
+    }
+    if (f.geometry) {
+      const fmt = new GeoJSON();
+      const g = fmt.readGeometry(f.geometry, { dataProjection: "EPSG:4326", featureProjection: config.crs });
+      if (!g) return;
+      fit(g);
+      setFocusGeom(fmt.writeGeometryObject(g) as GeoJSONFeature["geometry"]);
+      if (f.label) setMessage(f.label);
+    } else if (f.targets?.length) {
+      setMessage("Obiektu nie ma na żadnej warstwie tego projektu");
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focus, config]);
 
   /** Przybliżenie mapy do obiektu (wiersz tabeli atrybutów) — bez zmiany skali, gdy obiekt jest widoczny. */
   const zoomTo = (geometry: GeoJSONFeature["geometry"]) => {
@@ -558,7 +623,7 @@ export default function App() {
               basemaps={basemaps} baseId={baseId} overlayIds={overlayIds}
               onIdentify={openFeature}
               onFetchClick={fetchAt}
-              preview={fetchTool ? fetchState.result?.geometry ?? null : selection?.cutFrom ? selection.feature.geometry : null}
+              preview={fetchTool ? fetchState.result?.geometry ?? null : selection?.cutFrom ? selection.feature.geometry : focusGeom}
               printFrame={showPrint ? printFrame : null}
               opacity={opacity}
               onSelect={(layerId, feature) => guard(() => setSelection({ layerId, feature, isNew: false }))}

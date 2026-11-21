@@ -70,6 +70,8 @@ async def project_config(slug: str, user: CurrentUser | None = Depends(optional_
             "popup": lyr.popup,
             "display_expression": lyr.display_expression,
             "primary_key": lyr.pg.key if lyr.pg else None,
+            # „schemat.tabela” źródła PostGIS — linki do obiektów (?p=…&obiekt=schemat.tabela:klucz, wtyczki)
+            "source_table": f"{lyr.pg.schema}.{lyr.pg.table}" if lyr.pg else None,
             "fields": [asdict(f) for f in lyr.fields],
             "perms": asdict(perms),
         }

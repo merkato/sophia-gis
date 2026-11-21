@@ -25,7 +25,24 @@ export interface SophiaHost {
   /** Zapytanie do dowolnego endpointu Sophii (pełna ścieżka /api/…). */
   request: <T = unknown>(path: string, init?: RequestInit) => Promise<T>;
   notify: (message: string) => void;
+  /**
+   * Pokazuje obiekt na mapie: zamyka panel administracji, otwiera projekt (jeśli podany), a potem —
+   * gdy projekt ma warstwę z którejś z tabel `targets` — otwiera ten obiekt (formularz + przybliżenie);
+   * inaczej przybliża i podświetla `geometry` (GeoJSON w EPSG:4326).
+   */
+  showOnMap: (focus: MapFocus) => void;
 }
+
+export interface MapFocus {
+  project?: string;                                 // slug projektu; brak = bieżący
+  targets?: { table: string; pk: string }[];        // „schemat.tabela” + klucz główny obiektu
+  geometry?: { type: string; coordinates: unknown } | null;   // EPSG:4326
+  label?: string;
+}
+
+let mapFocusHandler: ((f: MapFocus) => void) | null = null;
+/** App rejestruje tu obsługę `host.showOnMap`. */
+export function setMapFocusHandler(fn: ((f: MapFocus) => void) | null) { mapFocusHandler = fn; }
 
 export interface PluginModule {
   register: (host: SophiaHost) => { pages?: Record<string, React.ComponentType<{ host: SophiaHost }>> };
@@ -47,6 +64,7 @@ export function loadPlugin(p: PluginInfo, user: User, notify: (m: string) => voi
       api: (path, init) => request(`/api/plugins/${p.id}${path}`, init),
       request: (path, init) => request(path, init),
       notify,
+      showOnMap: (f) => { if (mapFocusHandler) mapFocusHandler(f); else notify("Mapa nie jest dostępna"); },
     };
     m = (import(/* @vite-ignore */ p.web!) as Promise<PluginModule>)
       .then((mod) => ({ pages: mod.register(host).pages ?? {}, host }));

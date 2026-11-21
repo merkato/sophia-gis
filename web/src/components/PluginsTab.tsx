@@ -1,7 +1,7 @@
 import { Component, useCallback, useEffect, useState, type ReactNode } from "react";
 import { adminApi, type AdminPlugin, type PluginAccessEntry } from "../api";
 import { loadPlugin, type PluginInfo, type PluginPage, type SophiaHost } from "../plugins";
-import type { AdminUser, Group, User } from "../types";
+import type { AdminProject, AdminUser, Group, User } from "../types";
 
 type Run = (fn: () => Promise<unknown>) => Promise<boolean>;
 
@@ -15,10 +15,12 @@ export function PluginsTab({ run, onChanged }: { run: Run; onChanged: () => void
   const [groups, setGroups] = useState<Group[]>([]);
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [edit, setEdit] = useState<{ id: string; access: PluginAccessEntry[] } | null>(null);
+  const [cfg, setCfg] = useState<{ id: string; values: Record<string, string> } | null>(null);
+  const [projects, setProjects] = useState<AdminProject[]>([]);
 
   const load = useCallback(() => run(async () => {
-    const [p, g, u] = await Promise.all([adminApi.plugins(), adminApi.groups(), adminApi.users()]);
-    setList(p); setGroups(g); setUsers(u);
+    const [p, g, u, pr] = await Promise.all([adminApi.plugins(), adminApi.groups(), adminApi.users(), adminApi.projects()]);
+    setList(p); setGroups(g); setUsers(u); setProjects(pr);
   }), [run]);
   useEffect(() => { load(); }, [load]);
 
@@ -28,6 +30,13 @@ export function PluginsTab({ run, onChanged }: { run: Run; onChanged: () => void
   const saveAccess = async () => {
     if (!edit) return;
     if (await run(() => adminApi.setPluginAccess(edit.id, edit.access))) { setEdit(null); load(); onChanged(); }
+  };
+
+  const saveSettings = async () => {
+    const p = cfg && list.find((x) => x.id === cfg.id);
+    if (!p || !cfg) return;
+    const settings = { ...p.settings, ...Object.fromEntries(Object.entries(cfg.values).map(([k, v]) => [k, v.trim() || null])) };
+    if (await run(() => adminApi.updatePlugin(p.id, { enabled: p.enabled, settings }))) { setCfg(null); load(); onChanged(); }
   };
 
   const has = (cap: string, k: "group_id" | "user_id", id: number) =>
@@ -63,12 +72,34 @@ export function PluginsTab({ run, onChanged }: { run: Run; onChanged: () => void
               })}</td>
               <td className="actions">
                 <button disabled={!!p.error && !p.enabled} onClick={() => toggle(p)}>{p.enabled ? "Wyłącz" : "Włącz"}</button>
-                {p.capabilities.length > 0 && <button onClick={() => setEdit({ id: p.id, access: p.access.map(({ capability, group_id, user_id }) => ({ capability, group_id, user_id })) })}>Uprawnienia</button>}
+                {p.capabilities.length > 0 && <button onClick={() => { setCfg(null); setEdit({ id: p.id, access: p.access.map(({ capability, group_id, user_id }) => ({ capability, group_id, user_id })) }); }}>Uprawnienia</button>}
+                {p.settings_schema.length > 0 && <button onClick={() => { setEdit(null); setCfg({ id: p.id, values: Object.fromEntries(p.settings_schema.map((f) => [f.id, String(p.settings[f.id] ?? "")])) }); }}>Ustawienia</button>}
               </td>
             </tr>
           ))}
         </tbody>
       </table>
+      {cfg && (() => {
+        const p = list.find((x) => x.id === cfg.id)!;
+        const set = (k: string, v: string) => setCfg((c) => c && { ...c, values: { ...c.values, [k]: v } });
+        return (
+          <div className="form plugin-access">
+            <h3>Ustawienia: {p.name}</h3>
+            {p.settings_schema.map((f) => (
+              <label key={f.id} className="field"><span>{f.title ?? f.id}</span>
+                {f.type === "project"
+                  ? <select value={cfg.values[f.id] ?? ""} onChange={(e) => set(f.id, e.target.value)}>
+                      <option value="">— brak —</option>
+                      {projects.map((pr) => <option key={pr.slug} value={pr.slug}>{pr.title} ({pr.slug})</option>)}
+                    </select>
+                  : <input value={cfg.values[f.id] ?? ""} onChange={(e) => set(f.id, e.target.value)} />}
+                {f.description && <small className="muted">{f.description}</small>}
+              </label>
+            ))}
+            <div className="actions"><button className="primary" onClick={saveSettings}>Zapisz</button><button onClick={() => setCfg(null)}>Anuluj</button></div>
+          </div>
+        );
+      })()}
       {edit && (() => {
         const p = list.find((x) => x.id === edit.id)!;
         return (

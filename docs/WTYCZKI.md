@@ -27,6 +27,8 @@ przyciskiem w przeglądarce.
 - **Włącz / Wyłącz** — włączenie wykonuje migracje (własny schemat wtyczki) i od razu udostępnia jej
   funkcje, bez restartu; wyłączenie ukrywa wtyczkę (API zwraca 404), dane zostają. Wtyczki zależne
   włącza się po wtyczce, od której zależą, a wyłącza — przed nią;
+- **Ustawienia** — pola zadeklarowane przez wtyczkę w manifeście (np. projekt mapy), zapisywane w
+  `portal.plugins.settings`;
 - **Uprawnienia** — dla każdego uprawnienia wtyczki grupy i/lub pojedynczy użytkownicy. Administrator ma
   zawsze wszystkie. Użytkownik z uprawnieniem do strony wtyczki widzi przycisk „Administracja” i w nim
   tylko strony swoich wtyczek.
@@ -61,6 +63,9 @@ przyciskiem w przeglądarce.
 - `id` = nazwa katalogu: małe litery, cyfry, `_`. Uprawnienia zaczynają się od `<id>.`.
 - `sophia`, `requires` — warunki wersji (`>=1.0`, `<2`, `==1.2`, kilka po przecinku). Niespełnione →
   wtyczka nie ładuje się, panel pokazuje powód.
+- `settings` (opcjonalnie) — pola ustawień w panelu administratora:
+  `[{"id": "projekt", "title": "Projekt mapy", "type": "project", "description": "…"}]`; typy `text`
+  i `project` (lista projektów). Odczyt w API wtyczki: `await get_settings_for("<id>")` (`app.plugins`).
 
 ### API
 Router montowany pod `/api/plugins/<id>`; wyłączona wtyczka zwraca 404 bez udziału jej kodu. Z rdzenia
@@ -95,7 +100,17 @@ export function register(host) {
 }
 ```
 `host`: `apiVersion` (1), `React`, `pluginId`, `user`, `capabilities`, `can(uprawnienie)`,
-`api(ścieżka, init)` (względem `/api/plugins/<id>`), `request(pełna ścieżka, init)`, `notify(tekst)`.
+`api(ścieżka, init)` (względem `/api/plugins/<id>`), `request(pełna ścieżka, init)`, `notify(tekst)`,
+`showOnMap(focus)` (Sophia ≥ 0.2) — zamyka panel administracji i pokazuje obiekt na mapie:
+```js
+host.showOnMap({
+  project: "slug-projektu",                                  // brak = bieżący projekt
+  targets: [{ table: "egib.v_dzialka", pk: "ULDK:…" }],      // warstwa projektu z tej tabeli → formularz obiektu
+  geometry: { type: "MultiPolygon", coordinates: [...] },    // gdy warstwy nie ma: podświetlenie (EPSG:4326)
+  label: "Działka …",
+});
+```
+Ten sam obiekt można podać w adresie: `?p=<slug>&obiekt=<schemat.tabela>:<klucz>` (link do wysłania).
 Strony z `web.pages` pojawiają się jako zakładki panelu administracji u użytkowników z uprawnieniem
 `capability`. Błąd w komponencie wtyczki nie wywraca panelu (izolacja błędów).
 

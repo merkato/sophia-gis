@@ -180,3 +180,7 @@ Część funkcji to wtyczki instalowane na serwerze (np. **EGiB** — import pli
 działek z historią). Administrator włącza je w panelu **Administracja → Wtyczki** i wskazuje, które grupy
 albo osoby mogą z nich korzystać. Kto ma uprawnienie do strony wtyczki, widzi przycisk **Administracja**,
 a w nim tylko strony swoich wtyczek. Opis techniczny: [WTYCZKI.md](../WTYCZKI.md).
+
+Link do obiektu na mapie: `?p=<projekt>&obiekt=<schemat.tabela>:<klucz>` otwiera projekt, przybliża obiekt
+i otwiera jego formularz (np. z wtyczki: „Pokaż na mapie”). Adres w przeglądarce po takim przejściu można
+skopiować i wysłać.

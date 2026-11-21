@@ -79,7 +79,7 @@ async def list_plugins():
         out.append({
             "id": p.id, "name": p.name, "version": p.version, "description": p.description,
             "sophia": p.sophia, "requires": p.requires, "capabilities": p.capabilities, "pages": p.pages,
-            "error": p.error, "enabled": s["enabled"], "settings": s["settings"],
+            "error": p.error, "enabled": s["enabled"], "settings": s["settings"], "settings_schema": p.settings,
             "migrations": {"applied": sorted(s["migrations"]),
                            "pending": [f.name for f in p.migrations() if f.name not in s["migrations"]]},
             "access": s["access"],
@@ -87,7 +87,7 @@ async def list_plugins():
     # wpisy po wtyczkach usuniętych z serwera — do posprzątania uprawnień
     for pid in sorted(set(state) - set(plugins.REGISTRY)):
         out.append({"id": pid, "name": pid, "version": "", "description": "", "sophia": "", "requires": {},
-                    "capabilities": [], "pages": [], "error": "Wtyczki nie ma na serwerze",
+                    "capabilities": [], "pages": [], "settings_schema": [], "error": "Wtyczki nie ma na serwerze",
                     "enabled": state[pid]["enabled"], "settings": state[pid]["settings"],
                     "migrations": {"applied": state[pid]["migrations"], "pending": []}, "access": state[pid]["access"]})
     return out

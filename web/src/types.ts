@@ -45,6 +45,7 @@ export interface LayerInfo {
   popup: boolean;
   display_expression: string | null;
   primary_key: string | null;
+  source_table: string | null;     // „schemat.tabela” (PostGIS) — linki do obiektów
   fields: FieldDef[];
   perms: LayerPerms;
 }

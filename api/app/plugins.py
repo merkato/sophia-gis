@@ -46,6 +46,7 @@ class Plugin:
     api_package: str | None = None
     web_entry: str | None = None                       # ścieżka względem katalogu wtyczki
     pages: list[dict] = field(default_factory=list)    # [{"id", "title", "capability"}]
+    settings: list[dict] = field(default_factory=list)  # [{"id", "title", "type": "text"|"project", "description"}]
     error: str | None = None                           # wtyczka nie załadowana (manifest, zgodność, import)
     module: object | None = None                       # zaimportowany pakiet API (opcjonalnie `async def startup()`)
 
@@ -111,6 +112,8 @@ def read_manifest(path: Path) -> Plugin:
     web = m.get("web") or {}
     plugin.web_entry = web.get("entry")
     plugin.pages = [p for p in web.get("pages") or [] if isinstance(p, dict) and p.get("id")]
+    plugin.settings = [s for s in m.get("settings") or [] if isinstance(s, dict) and s.get("id")
+                       and s.get("type", "text") in ("text", "project")]
     if not version_ok(plugin.sophia, SOPHIA_VERSION):
         plugin.error = f"Wymaga Sophii {plugin.sophia}, zainstalowana {SOPHIA_VERSION}"
     return plugin

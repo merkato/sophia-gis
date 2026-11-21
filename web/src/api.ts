@@ -159,6 +159,7 @@ export interface AdminPlugin {
   requires: Record<string, string>; capabilities: { id: string; title?: string }[];
   pages: { id: string; title: string; capability?: string }[];
   error: string | null; enabled: boolean; settings: Record<string, unknown>;
+  settings_schema: { id: string; title?: string; type?: "text" | "project"; description?: string }[];
   migrations: { applied: string[]; pending: string[] };
   access: (PluginAccessEntry & { group_name: string | null; login: string | null })[];
 }

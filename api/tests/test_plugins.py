@@ -25,7 +25,8 @@ def test_version_ok():
 
 
 def test_discover_checks_manifest_and_dependencies(tmp_path):
-    _plugin(tmp_path, "baza", capabilities=[{"id": "baza.podglad", "title": "Podgląd"}])
+    _plugin(tmp_path, "baza", capabilities=[{"id": "baza.podglad", "title": "Podgląd"}],
+            settings=[{"id": "projekt", "type": "project"}, {"id": "zly_typ", "type": "plik"}, {"title": "bez id"}])
     _plugin(tmp_path, "nad", requires={"baza": ">=1.0"})
     _plugin(tmp_path, "zla_wersja", requires={"baza": ">=2"})
     _plugin(tmp_path, "brak", requires={"nieistniejaca": ""})
@@ -37,6 +38,7 @@ def test_discover_checks_manifest_and_dependencies(tmp_path):
     (d / "sophia-plugin.json").write_text('{"id": "inna_nazwa"}', encoding="utf-8")
     found = plugins.discover(tmp_path)
     assert found["baza"].error is None and found["nad"].error is None
+    assert [s["id"] for s in found["baza"].settings] == ["projekt"]     # tylko znane typy, z identyfikatorem
     assert "nie spełnia" in found["zla_wersja"].error
     assert "brak wtyczki" in found["brak"].error
     assert "nie działa" in found["lancuch"].error
