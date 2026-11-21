@@ -320,7 +320,8 @@ def _parse_fields(ml: etree._Element) -> list[FieldDef]:
         fd = FieldDef(name=name)
         if widget is not None:
             fd.widget = widget.get("type") or "TextEdit"
-            fd.widget_config = _options_to_dict(widget.find("./config/Option"))
+            cfg = _options_to_dict(widget.find("./config/Option"))
+            fd.widget_config = cfg if isinstance(cfg, dict) else {}   # QGIS zapisuje też puste <Option/>
         fields[name] = fd
 
     for a in ml.findall("./aliases/alias"):

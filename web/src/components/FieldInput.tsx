@@ -37,7 +37,7 @@ function RelationSelect({ field, value, onChange, disabled, source }: {
     return () => { cancelled = true; };
   }, [source.slug, source.layerId, source.version, field.name]);
 
-  const cfg = field.widget_config as Record<string, unknown>;
+  const cfg = (field.widget_config ?? {}) as Record<string, unknown>;
   const allowNull = cfg.AllowNULL !== false && cfg.AllowNull !== false && !field.not_null;
   const numeric = /int|double|real|numeric|decimal/i.test(field.type ?? "");
   const str = value === null || value === undefined ? "" : String(value);
@@ -62,7 +62,7 @@ export function FieldInput({ field, value, onChange, readOnly, source, saved }: 
   source?: Source;                    // potrzebne dla widżetów relacyjnych i załączników
   saved?: unknown;                    // wartość zapisana w bazie (odróżnia nowe, niezapisane zdjęcie)
 }) {
-  const cfg = field.widget_config as Record<string, unknown>;
+  const cfg = (field.widget_config ?? {}) as Record<string, unknown>;
   const disabled = readOnly || !field.editable;
   const str = value === null || value === undefined ? "" : String(value);
 

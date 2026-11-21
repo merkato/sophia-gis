@@ -24,3 +24,19 @@ def test_label_field_without_types():
     lyr = _layer(None)
     lyr.fields = [FieldDef("fid"), FieldDef("nazwa"), FieldDef("url")]
     assert label_field(lyr) == "nazwa"
+
+
+def test_empty_widget_config_is_dict():
+    """QGIS zapisuje czasem pustą konfigurację widżetu (<Option/>) — API zawsze daje obiekt, nie null."""
+    from lxml import etree
+
+    from app.qgsproject import _parse_fields
+    ml = etree.fromstring(
+        '<maplayer><fieldConfiguration>'
+        '<field name="gmina"><editWidget type="TextEdit"><config><Option/></config></editWidget></field>'
+        '<field name="obreb"><editWidget type="TextEdit"><config><Option type="Map">'
+        '<Option name="IsMultiline" type="bool" value="false"/></Option></config></editWidget></field>'
+        '</fieldConfiguration></maplayer>')
+    fields = {f.name: f for f in _parse_fields(ml)}
+    assert fields["gmina"].widget_config == {}
+    assert fields["obreb"].widget_config == {"IsMultiline": False}
