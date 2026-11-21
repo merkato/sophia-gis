@@ -200,6 +200,10 @@ async def migrate(plugin: Plugin) -> list[str]:
     """Wykonuje nowe pliki migracji wtyczki (każdy we własnej transakcji); zwraca nazwy wykonanych."""
     applied: list[str] = []
     async with portal_conn() as conn:
+        # autocommit: blokada i odczyt wykonanych migracji poza transakcją, każda migracja we własnej, od razu
+        # zatwierdzonej transakcji — inaczej drugi proces API (kilka workerów) czekający na blokadę widzi
+        # stary stan portal.plugin_migrations i wykonuje migrację drugi raz
+        await conn.set_autocommit(True)
         await conn.execute("SELECT pg_advisory_lock(hashtext('sophia_plugin_' || %s))", (plugin.id,))
         try:
             done = {r["name"] for r in await (await conn.execute(
@@ -215,6 +219,7 @@ async def migrate(plugin: Plugin) -> list[str]:
                 log.info("wtyczka %s: migracja %s", plugin.id, f.name)
         finally:
             await conn.execute("SELECT pg_advisory_unlock(hashtext('sophia_plugin_' || %s))", (plugin.id,))
+            await conn.set_autocommit(False)
     return applied
 
 
