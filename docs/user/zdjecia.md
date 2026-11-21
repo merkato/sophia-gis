@@ -65,6 +65,10 @@ Kliknięcie miniatury otwiera zdjęcie w pełnym rozmiarze.
 
 ## Wariant B — osobna tabela zdjęć w relacji
 
+> Sophia traktuje tabelę jako galerię, gdy poza kluczami i polem „Załącznik” ma najwyżej
+> **3 widoczne pola** (np. opis, data, autor). Tabela z większą liczbą pól i jednym załącznikiem
+> (np. lustracja z fotografią) pokazuje się w formularzu rodzica jako zwykła tabelka rekordów z „+ Dodaj”.
+
 ### 1. Tabela w bazie
 
 Przykład dla tabeli obiektów `dane.obiekty` z kluczem `fid`:

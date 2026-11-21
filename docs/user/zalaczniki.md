@@ -53,6 +53,10 @@ wkleić adres. Fia rozpoznaje pole z samymi adresami i nie ostrzega o ścieżce 
 
 ## Wariant B — tabela dokumentów w relacji
 
+> Sophia traktuje tabelę jako listę dokumentów, gdy poza kluczami i polem „Załącznik” ma najwyżej
+> **3 widoczne pola** (np. opis, data, autor). Tabela z większą liczbą pól i jednym załącznikiem
+> (np. lustracja z fotografią) pokazuje się w formularzu rodzica jako zwykła tabelka rekordów z „+ Dodaj”.
+
 ```sql
 CREATE TABLE dane.obiekty_dokumenty (
     fid          bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY,

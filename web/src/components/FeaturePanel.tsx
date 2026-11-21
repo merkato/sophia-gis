@@ -62,8 +62,10 @@ export const FeaturePanel = forwardRef<FeaturePanelHandle, Props>(function Featu
 
   // Wariant B zdjęć: tabela dzieci z polem „Załącznik” (obraz) -> galeria zamiast listy powiązanych
   // Wariant B dokumentów: tabela dzieci z polem „Załącznik” na pliki -> lista w zakładce „Dokumenty”
-  const photoGroups = related.filter((g) => g.direction === "child" && photoFieldOf(config.layers[g.layer_id]));
-  const docGroups = related.filter((g) => g.direction === "child" && fileFieldOf(config.layers[g.layer_id]));
+  // — tylko tabela załączników (poza kluczami i załącznikiem najwyżej 3 widoczne pola, np. opis, data, autor).
+  // Rekord z wieloma polami i jednym zdjęciem (np. lustracja z fotografią) zostaje zwykłym rekordem powiązanym.
+  const photoGroups = related.filter((g) => attachmentTable(config, g) && photoFieldOf(config.layers[g.layer_id]));
+  const docGroups = related.filter((g) => attachmentTable(config, g) && fileFieldOf(config.layers[g.layer_id]));
   const otherGroups = related.filter((g) => !photoGroups.includes(g) && !docGroups.includes(g));
   const photoCount = photoGroups.reduce((n, g) => n + g.features.length, 0);
   const docCount = docGroups.reduce((n, g) => n + g.features.length, 0);
@@ -227,7 +229,7 @@ function RelatedTable({ config, group, parentValues, onOpen, onNew }: {
   if (!lyr) return null;
   void parentValues;
   const keys = new Set([lyr.primary_key, ...group.pairs.map(([p, c]) => (group.direction === "child" ? c : p))]);
-  const cols = lyr.fields.filter((f) => f.widget !== "Hidden" && !keys.has(f.name)).slice(0, 5);
+  const cols = lyr.fields.filter((f) => f.widget !== "Hidden" && f.widget !== "ExternalResource" && !keys.has(f.name)).slice(0, 5);
   return (
     <section className="related related-inline">
       <h4>{group.name || lyr.name} <span className="muted">({group.features.length})</span>
@@ -269,6 +271,15 @@ export function fieldSpan(f: FieldDef): number {
   // długa etykieta nie mieści się w wąskiej kolumnie
   if (span === 2 && (f.alias ?? f.name).length > 22) span = 3;
   return span;
+}
+
+/** Czy tabela dzieci relacji jest tabelą załączników (zdjęcia/dokumenty) — galeria zamiast tabelki rekordów. */
+function attachmentTable(config: ProjectConfig, g: RelatedGroup): boolean {
+  const lyr = config.layers[g.layer_id];
+  if (g.direction !== "child" || !lyr) return false;
+  const keys = new Set([lyr.primary_key, ...g.pairs.map(([, c]) => c)]);
+  const rest = lyr.fields.filter((f) => f.widget !== "Hidden" && f.widget !== "ExternalResource" && !keys.has(f.name));
+  return rest.length <= 3;
 }
 
 /** Kolejne pola łączone w wiersze do 6 kolumn (kolejność z projektu zostaje); wiersz rozciąga się na całą szerokość. */
