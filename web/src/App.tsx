@@ -9,6 +9,7 @@ import { FeaturePanel, type FeaturePanelHandle } from "./components/FeaturePanel
 import { AttributeTable } from "./components/AttributeTable";
 import { PrintPanel } from "./components/PrintPanel";
 import GeoJSON from "ol/format/GeoJSON";
+import { transformExtent } from "ol/proj";
 import { Toolbar } from "./components/Toolbar";
 import { FetchCard } from "./components/FetchCard";
 import { AdminPanel } from "./components/AdminPanel";
@@ -155,6 +156,8 @@ export default function App() {
     return o && i > 0 ? { project: q.get("p") ?? undefined, targets: [{ table: o.slice(0, i), pk: o.slice(i + 1) }] } : null;
   });
   const [focusGeom, setFocusGeom] = useState<GeoJSONFeature["geometry"] | null>(null);
+  // obraz z pliku pokazany przez wtyczkę (host.showOnMap({ raster })) — do zmiany projektu albo usunięcia w panelu
+  const [fileRaster, setFileRaster] = useState<(NonNullable<MapFocus["raster"]> & { visible: boolean }) | null>(null);
 
   /**
    * Każda zmiana obiektu w formularzu (kliknięcie na mapie, lista rekordów, powiązane,
@@ -262,6 +265,7 @@ export default function App() {
     history.replaceState(null, "", `?p=${encodeURIComponent(slug)}${location.search.match(/[?&](obiekt=[^&]*)/)?.[0].replace("?", "&") ?? ""}`);
     setSelection(null);
     setFocusGeom(null);
+    setFileRaster(null);
     setEditLayerId(null);
     setTool("identify");
     api.project(slug)
@@ -361,6 +365,29 @@ export default function App() {
       });
       return;
     }
+    if (f.raster) {   // obraz z pliku: na mapę pod warstwy projektu, przybliżenie do jego zasięgu
+      const r = f.raster;
+      ensureProjection(r.crs).then(() => {
+        setFileRaster({ ...r, visible: true });
+        map.getView().fit(transformExtent(r.extent, r.crs, config.crs), { padding: [40, 40, 40, 40], duration: 300 });
+      }).catch((e) => setMessage((e as Error).message));
+      if (!f.edit && f.label) setMessage(f.label);
+    }
+    if (f.edit) {   // warstwa z tabeli: widoczna i w edycji (nowe obiekty z polami `defaults`)
+      const target = Object.values(config.layers).find((l) => l.source_table === f.edit!.table);
+      if (!target) { setMessage(`W projekcie nie ma warstwy z tabeli ${f.edit.table}`); return; }
+      setVisible((prev) => new Set(prev).add(`l:${target.id}`));
+      guard(() => {
+        setTableLayerId(null);
+        setEditLayerId(target.id);
+        setSelection(null);
+        setTool(target.geometry_type ? "select" : "identify");
+        drawDefaults.current = f.edit!.defaults ? { layerId: target.id, props: { ...f.edit!.defaults } } : null;
+        setMessage(f.label ?? `Warstwa „${target.name}” w edycji`);
+      });
+      return;
+    }
+    if (f.raster) return;
     if (f.draw) {   // host.startDraw: przybliż (jeśli podano miejsce) i rysuj w warstwie z tabeli
       const target = Object.values(config.layers).find((l) => l.source_table === f.draw!.table);
       if (f.geometry) fit(new GeoJSON().readGeometry(f.geometry, { dataProjection: "EPSG:4326", featureProjection: config.crs }));
@@ -405,6 +432,7 @@ export default function App() {
 
   /** Wybór warstwy edycyjnej — z drzewa (ołówek) albo z paska narzędzi. */
   const chooseEditLayer = (id: string | null) => guard(() => {
+    if (drawDefaults.current?.layerId !== id) drawDefaults.current = null;
     setEditLayerId(id);
     // tabela bez geometrii: nic do zaznaczania na mapie — otwieramy jej tabelę atrybutów
     const geom = id ? config?.layers[id]?.geometry_type : null;
@@ -716,6 +744,19 @@ export default function App() {
           ) : <p className="muted">{projects.length ? "Wybierz projekt z menu." : user
             ? "Nie masz dostępu do żadnego projektu — poproś administratora o nadanie uprawnień."
             : "Mapa podkładów. Zaloguj się, aby zobaczyć projekty."}</p>}
+          {fileRaster && (
+            <section className="file-raster" title="Obraz z pliku pokazany z okna wtyczki (np. GeoTIFF decyzji) — tylko w tej karcie">
+              <h3>Obraz z pliku</h3>
+              <div className="tree-row">
+                <label>
+                  <input type="checkbox" checked={fileRaster.visible}
+                    onChange={() => setFileRaster((r) => (r ? { ...r, visible: !r.visible } : r))} />
+                  {fileRaster.label ?? "obraz"}
+                </label>
+                <button className="link" title="Usuń z mapy" onClick={() => setFileRaster(null)}>✕</button>
+              </div>
+            </section>
+          )}
           <BasemapSwitcher basemaps={basemaps} baseId={baseId} overlayIds={overlayIds}
             onBase={chooseBase} onToggleOverlay={toggleOverlay}
             opacityOf={(b) => opacity[`bm:${b.id}`] ?? Math.round(b.opacity * 100)}
@@ -728,6 +769,7 @@ export default function App() {
               config={mapConfig} wmsLayers={config ? wmsLayers : []} editLayerId={config ? editLayerId : null} tool={tool}
               reloadToken={reloadToken} mapRef={mapRef}
               basemaps={basemaps} baseId={baseId} overlayIds={overlayIds}
+              fileRaster={fileRaster?.visible ? fileRaster : null}
               onIdentify={openFeature}
               onFetchClick={fetchAt}
               preview={fetchTool ? fetchState.result?.geometry ?? null : selection?.cutFrom ? selection.feature.geometry : focusGeom}

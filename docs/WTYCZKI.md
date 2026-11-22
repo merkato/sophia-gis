@@ -129,6 +129,11 @@ Ten sam obiekt można podać w adresie: `?p=<slug>&obiekt=<schemat.tabela>:<kluc
 `host.startDraw({ project, table: "schemat.tabela", defaults: { pole: wartość }, geometry, label })` (Sophia ≥ 0.3) —
 przybliża mapę i włącza rysowanie w warstwie z tej tabeli; po narysowaniu formularz ma wypełnione `defaults`
 (warstwa bez geometrii: od razu formularz).
+Sophia ≥ 0.8.5: `raster: { url, extent: [minx, miny, maxx, maxy], crs: "EPSG:2180", label }` — obraz (PNG/WEBP/JPEG,
+np. GeoTIFF przetworzony przez wtyczkę) nad podkładami, pod warstwami projektu; mapa przybliża się do zasięgu,
+w panelu warstw pojawia się „Obraz z pliku” (ukryj / usuń). `edit: { table, defaults }` — warstwa z tabeli staje się
+widoczna i wybrana do edycji; nowe obiekty tej warstwy dostają pola `defaults`. Przykład (wtyczka wyłączeń):
+`host.showOnMap({ raster: {…}, edit: { table: "wylaczenia.kontur", defaults: { znak_sprawy } } })`.
 
 `newTab: true` otwiera mapę w nowej karcie (panel administracji zostaje na miejscu; obiekt przekazywany przez
 pamięć przeglądarki, więc geometria może być duża).

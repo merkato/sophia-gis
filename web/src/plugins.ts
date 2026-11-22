@@ -57,6 +57,11 @@ export function setWindowHandler(fn: WindowHandler | null) { windowHandler = fn;
 export interface MapFocus {
   newTab?: boolean;                                 // otwórz mapę w nowej karcie (panel zostaje na miejscu)
   draw?: { table: string; defaults?: Record<string, unknown> };   // po przybliżeniu: rysowanie nowego obiektu w warstwie
+  /** Obraz z pliku (np. GeoTIFF wtyczki przetworzony do PNG/WEBP) pod warstwami projektu: adres, zasięg
+   * [minx, miny, maxx, maxy] w układzie `crs`. Mapa przybliża się do zasięgu. Sophia ≥ 0.8.5. */
+  raster?: { url: string; extent: [number, number, number, number]; crs: string; label?: string };
+  /** Po pokazaniu: warstwa z tabeli widoczna i wybrana do edycji; `defaults` — pola nowych obiektów tej warstwy. Sophia ≥ 0.8.5. */
+  edit?: { table: string; defaults?: Record<string, unknown> };
   project?: string;                                 // slug projektu; brak = bieżący
   targets?: { table: string; pk: string }[];        // „schemat.tabela” + klucz główny obiektu
   geometry?: { type: string; coordinates: unknown } | null;   // EPSG:4326

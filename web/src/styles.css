@@ -221,6 +221,10 @@ button.block, .reports .button { display: block; width: 100%; text-align: left; 
   color: var(--muted); }
 .basemaps h3:first-of-type { margin-top: 4px; }
 .basemaps .tree { list-style: none; margin: 0; padding: 0; }
+/* obraz z pliku (GeoTIFF z wtyczki) — nad ramką usług zewnętrznych */
+.file-raster { margin-top: 14px; }
+.file-raster .tree-row { display: flex; justify-content: space-between; align-items: center; }
+.file-raster .tree-row label { display: flex; gap: 8px; align-items: center; }
 .basemaps .tree-row label { gap: 8px; }
 /* --- przezroczystość rastrów i podkładów */
 .opacity-btn { font-size: 14px; }

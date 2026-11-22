@@ -6,6 +6,7 @@ import TileLayer from "ol/layer/Tile";
 import VectorLayer from "ol/layer/Vector";
 import LayerGroup from "ol/layer/Group";
 import ImageWMS from "ol/source/ImageWMS";
+import ImageStatic from "ol/source/ImageStatic";
 import TileWMS from "ol/source/TileWMS";
 import Collection from "ol/Collection";
 import VectorSource from "ol/source/Vector";
@@ -62,6 +63,7 @@ interface Props {
   basemaps: Basemap[];               // katalog podkładów (kolejność = sort_order)
   baseId: number | null;             // wybrany podkład (null = brak)
   overlayIds: Set<number>;           // włączone nakładki (np. cieniowanie)
+  fileRaster?: { url: string; extent: [number, number, number, number]; crs: string; label?: string } | null;   // obraz z pliku nad podkładami
   onIdentify: (layerId: string, pk: string) => void;
   onSelect: (layerId: string, feature: GeoJSONFeature) => void;
   onDrawn: (layerId: string, geometry: GeoJSONFeature["geometry"]) => void;
@@ -125,6 +127,7 @@ export function MapView(props: Props) {
   const rasterGroupRef = useRef<LayerGroup | null>(null);
   const basemapGroupRef = useRef<LayerGroup | null>(null);
   const basemapLayersRef = useRef(new Map<string, TileLayer>());
+  const fileLayerRef = useRef<ImageLayer<ImageStatic> | null>(null);
   const tileLayersRef = useRef(new Map<string, TileLayer<TileWMS>>());
   const editSourceRef = useRef(new VectorSource<Feature<Geometry>>());
   const previewSourceRef = useRef(new VectorSource<Feature<Geometry>>());
@@ -163,6 +166,7 @@ export function MapView(props: Props) {
       controls: defaultControls().extend([new ScaleLine()]),
       layers: [
         basemapGroup,
+        fileLayerRef.current = new ImageLayer<ImageStatic>({ visible: false }),
         rasterGroup,
         wmsLayer,
         editLayerRef.current = new VectorLayer({
@@ -211,6 +215,17 @@ export function MapView(props: Props) {
     return () => { cancelled = true; };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [basemaps, baseId, overlayIds, config.slug, props.opacity]);
+
+  // --- obraz z pliku (np. GeoTIFF decyzji z wtyczki) nad podkładami, pod warstwami projektu
+  const { fileRaster } = props;
+  useEffect(() => {
+    const layer = fileLayerRef.current;
+    if (!layer) return;
+    if (!fileRaster) { layer.setVisible(false); layer.setSource(null); return; }
+    layer.setSource(new ImageStatic({ url: fileRaster.url, imageExtent: fileRaster.extent, projection: fileRaster.crs }));
+    layer.setVisible(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fileRaster?.url, fileRaster?.crs, fileRaster?.extent?.join(","), config.slug]);
 
   // --- widoczne warstwy: rastry jako kafle (każdy osobno), wektory jednym obrazem WMS na wierzchu
   useEffect(() => {

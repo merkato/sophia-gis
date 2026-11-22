@@ -100,6 +100,9 @@ przeciągnięty z pola na pole. Działa na istniejących schematach danych (dzi�
   projektu (metrycznym), przyciąganie do warstwy edycyjnej, Esc / Backspace / Delete; działa też bez projektu (22.11).
   Przetestowane 22.11 w przeglądarce.
 - ✅ Etykieta powierzchni i obwodu (długości) przy rysowaniu i zmianie wierzchołków obiektów warstwy edycyjnej (0.8.3).
+- ✅ Obraz z pliku z wtyczki (0.8.5): `host.showOnMap({ raster, edit })` — obraz (np. GeoTIFF przetworzony przez wtyczkę)
+  nad podkładami z przybliżeniem do zasięgu, „Obraz z pliku” w panelu warstw; warstwa z tabeli widoczna i w edycji
+  z polami nowych obiektów. Ramka „Usługi zewnętrzne” wokół podkładów i nakładek (0.8.4).
 
 ### ✅ Edycja geometrii
 Szkic w przeglądarce z przyciąganiem, geometrię liczy PostGIS w API: jedna transakcja, kontrola zakresu
