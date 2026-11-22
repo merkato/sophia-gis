@@ -319,14 +319,14 @@ async def get_settings_for(plugin_id: str) -> dict:
     return (row or {}).get("settings") or {}
 
 
-THEME_KEYS = ("css", "logo", "title", "favicon")
+THEME_KEYS = ("css", "logo", "title", "favicon", "layers_panel")
 
 
 async def theme(project: str | None = None) -> dict:
     """Wygląd interfejsu podany przez wtyczkę: pakiet API może mieć `async def theme()` albo (Sophia ≥ 0.8.1)
     `async def theme(project)` — wygląd dla projektu otwartego w mapie (slug albo None), zwracające słownik
     z polami (każde opcjonalne): "css" — adres arkusza stylów, "logo" — adres obrazka w pasku, "title" — nazwa
-    aplikacji, "favicon" — ikona karty. Pierwsza włączona wtyczka z niepustą odpowiedzią wygrywa."""
+    aplikacji, "favicon" — ikona karty, "layers_panel" — "open" / "closed": panel warstw po otwarciu (projektu). Pierwsza włączona wtyczka z niepustą odpowiedzią wygrywa."""
     providers = [p for p in REGISTRY.values() if p.module is not None and not p.error and hasattr(p.module, "theme")]
     if not providers:
         return {}

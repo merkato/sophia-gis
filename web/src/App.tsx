@@ -74,7 +74,7 @@ function LoginForm({ onLogin }: { onLogin: () => void }) {
 
 /** Wygląd z wtyczki (GET /api/theme): arkusz stylów, logo, nazwa aplikacji, ikona karty.
  *  Wtyczka po zmianie wyglądu wysyła zdarzenie `sophia-theme` na window — wtedy wczytujemy go ponownie. */
-type Theme = { css?: string; logo?: string; title?: string; favicon?: string };
+type Theme = { css?: string; logo?: string; title?: string; favicon?: string; layers_panel?: "open" | "closed" };
 function useTheme(project: string | null): Theme {
   const [theme, setTheme] = useState<Theme>({});
   useEffect(() => {
@@ -185,6 +185,10 @@ export default function App() {
   const pluginPages = plugins.some((p) => p.pages.length > 0);
   const pluginWindows = plugins.flatMap((p) => (p.windows ?? []).filter((w) => w.toolbar !== false).map((w) => ({ plugin: p, w })));
   const theme = useTheme(slug);
+  // panel warstw wg wyglądu (ogólnie albo dla projektu) — przy wczytaniu i zmianie projektu; na wąskim ekranie zamknięty
+  useEffect(() => {
+    if (theme.layers_panel) setSidebarOpen(theme.layers_panel === "open" && !matchMedia("(max-width: 800px)").matches);
+  }, [theme.layers_panel, slug]);
   usePluginsVersion();   // elementy wtyczek w pasku narzędzi pojawiają się po załadowaniu modułów
   const widgets = user ? toolbarWidgets().filter((x) => plugins.some((p) => p.id === x.id)) : [];
   const [openWindows, setOpenWindows] = useState<OpenWindow[]>([]);

@@ -152,7 +152,8 @@ przycisk-ikona”. Komponent sam sprawdza uprawnienia (`host.can`) i zwraca `nul
 **Wygląd** (Sophia ≥ 0.8): pakiet API może mieć `async def theme()` — albo `async def theme(project)` (Sophia ≥ 0.8.1:
 slug projektu otwartego w mapie albo `None`, np. osobny motyw dla projektu) — zwracającą `{"css", "logo", "title", "favicon"}`
 (każde pole opcjonalne): adres arkusza stylów, logo w górnym pasku, nazwę aplikacji (pasek i tytuł karty) i ikonę
-karty. Sophia pyta o to bez logowania (`GET /api/theme`, także ekran logowania), więc te adresy muszą być publiczne
+karty; od 0.8.1 także `"layers_panel": "open" | "closed"` — panel warstw po wczytaniu i po zmianie projektu
+(użytkownik nadal może go przełączyć; na wąskim ekranie zawsze zamknięty). Sophia pyta o to bez logowania (`GET /api/theme`, także ekran logowania), więc te adresy muszą być publiczne
 (endpointy wtyczki bez `require_plugin`). Arkusz nadpisuje zmienne CSS rdzenia: `--bg`, `--surface`, `--ink`, `--muted`,
 `--line`, `--accent`, `--accent-ink`, `--danger`, `--edit` oraz paska: `--topbar-bg`, `--topbar-ink`, `--topbar-muted`,
 `--topbar-btn`, `--topbar-btn-ink`, `--topbar-btn-line`, `--topbar-line`, `--brand-logo-height`; nazwę obok logo ukrywa

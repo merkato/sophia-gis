@@ -40,7 +40,7 @@ export const api = {
   me: () => request<User>("/api/auth/me"),
   /** Włączone wtyczki z uprawnieniami zalogowanego (moduł web, strony w administracji). */
   plugins: () => request<PluginInfo[]>("/api/plugins"),
-  theme: (project?: string | null) => request<{ css?: string; logo?: string; title?: string; favicon?: string }>(
+  theme: (project?: string | null) => request<{ css?: string; logo?: string; title?: string; favicon?: string; layers_panel?: "open" | "closed" }>(
     `/api/theme${project ? `?project=${encodeURIComponent(project)}` : ""}`),
   login: (login: string, password: string) =>
     request<{ token: string }>("/api/auth/login", { method: "POST", body: JSON.stringify({ login, password }) }),
