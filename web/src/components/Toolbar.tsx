@@ -3,7 +3,7 @@ import type { LayerInfo, ProjectConfig } from "../types";
 import type { Tool } from "./MapView";
 import {
   GEOMETRY_ICON, IconAddPolygon, IconAddRecord, IconDelete, IconEdit, IconFetchBuilding, IconFetchParcel, IconIdentify,
-  IconDeletePart, IconDeleteRing, IconFillRing, IconLayers, IconMerge, IconMove, IconPrint, IconRing, IconSelect, IconSplit,
+  IconDeletePart, IconDeleteRing, IconFillRing, IconLayers, IconMeasureArea, IconMeasureLength, IconMerge, IconMove, IconPrint, IconRing, IconSelect, IconSplit,
   IconAddPart, IconCopy, IconReshape, IconRotate, IconTable, IconUndo, IconVertex,
 } from "./Icons";
 
@@ -60,6 +60,10 @@ export function Toolbar({ config, editLayerId, onEditLayer, tool, onTool, canDel
       <ToolButton icon={IconIdentify} label="Identyfikuj obiekty" active={tool === "identify"}
         disabled={!config} onClick={() => onTool("identify")} />
       <ToolButton icon={IconPrint} label="Wydruk widoku mapy (PDF)" disabled={!onPrint} onClick={() => onPrint?.()} />
+      <ToolButton icon={IconMeasureLength} label="Pomiar długości (dwuklik kończy, Esc przerywa, Delete czyści)"
+        active={tool === "measure-length"} onClick={() => onTool(tool === "measure-length" ? (editLayerId ? "select" : "identify") : "measure-length")} />
+      <ToolButton icon={IconMeasureArea} label="Pomiar powierzchni i obwodu (dwuklik kończy, Esc przerywa, Delete czyści)"
+        active={tool === "measure-area"} onClick={() => onTool(tool === "measure-area" ? (editLayerId ? "select" : "identify") : "measure-area")} />
 
       {config && editable.length > 0 && (
         <>

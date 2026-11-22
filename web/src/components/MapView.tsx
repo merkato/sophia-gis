@@ -27,6 +27,7 @@ import { api } from "../api";
 import type { Basemap, GeoJSONFeature, ProjectConfig, TreeNode } from "../types";
 import { PNG8, basemapLayer, ensureBasemapProjections, tileGridFor } from "../tiles";
 import { attributionHtml, projectAttributions } from "../attribution";
+import { startMeasure } from "../measure";
 
 // --- Kafle rastrów
 // Rastry projektu (skany, mozaiki) idą jako kafle WMS na stałej siatce: te same adresy
@@ -47,7 +48,7 @@ export function tileFormats(config: ProjectConfig): Map<string, string> {
 }
 
 export type Tool = "identify" | "select" | "draw" | "modify" | "split" | "ring" | "fillring" | "delring"
-  | "delpart" | "addpart" | "reshape" | "move" | "rotate" | "copy" | "merge" | "fetch";
+  | "delpart" | "addpart" | "reshape" | "move" | "rotate" | "copy" | "merge" | "fetch" | "measure-length" | "measure-area";
 
 /** Narzędzia, które klikają w obiekt warstwy edycyjnej (wynik liczy API). */
 export type PointTool = "delring" | "delpart";
@@ -532,6 +533,14 @@ export function MapView(props: Props) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tool, editLayerId, config.slug, wmsLayers]);
+
+  // --- pomiar długości i powierzchni (niezależny od warstwy edycyjnej; działa też bez projektu)
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || (tool !== "measure-length" && tool !== "measure-area")) return;
+    return startMeasure(map, tool === "measure-area" ? "area" : "length", editLayerId ? editSourceRef.current : null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tool, editLayerId, config.slug]);
 
   // --- wyróżnienie obiektów wybranych do połączenia
   const { marked } = props;

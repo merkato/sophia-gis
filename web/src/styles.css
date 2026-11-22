@@ -336,3 +336,9 @@ ul.plain li { padding: 4px 0; }
 
 /* akcje wtyczek w formularzu obiektu */
 .feature-actions { display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 4px 0 8px; border-bottom: 1px solid var(--line); margin-bottom: 8px; }
+
+/* --- pomiar na mapie (web/src/measure.ts) */
+.measure-label { background: rgba(29, 36, 48, .85); color: #fff; padding: 3px 8px; border-radius: 5px; font-size: 12px;
+  white-space: pre; pointer-events: none; box-shadow: 0 1px 4px rgba(0,0,0,.3); }
+.measure-label.done { background: #e8590c; }
+.measure-label.hint { background: rgba(29, 36, 48, .7); font-size: 11px; }

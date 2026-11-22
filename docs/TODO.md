@@ -11,11 +11,9 @@ Oznaczenia: ✅ zrobione · ✔️ zrobione częściowo (co zostało — w plani
 
 ### ⬜ 1. Do przetestowania (zrobione, nieprzetestowane w pełni)
 - ⬜ Etykiety `zrodla`/`autor` na szablonie, który je ma (szablon projektu kolejowego ma tylko `title`).
-- ⬜ Zakładki Fii w QGIS: „Zakres danych”, „Narzędzia pobierania”, zapamiętane poświadczenia.
 - ⬜ Narzędzia edycji geometrii w przeglądarce na prawdziwych danych, cofanie (Ctrl+Z).
 
 ### ⬜ 2. Drobne zaległości
-- ⬜ **Pomiar** (długość, powierzchnia) na pasku narzędzi — był na liście ikon, nie powstał.
 - ⬜ **Limit wielkości plików per warstwa** (zdjęcia, dokumenty) — dziś globalne limity w konfiguracji API.
 - ⬜ Kolejne źródła narzędzi pobierania: PRG adresy, BDOT10k (nowy wpis w `SOURCES` i w `fia/tools.py`).
 - ⬜ **Wydajność mapy z filtrem zakresu danych** — kafle warstw z zakresem użytkownika renderują się
@@ -95,10 +93,11 @@ przeciągnięty z pola na pole. Działa na istniejących schematach danych (dzi�
   (`docs/SERVER.md`, 5b).
 - ⬜ Limit wielkości plików per warstwa → plan, punkt 2.
 
-### ✔️ Pasek narzędzi
+### ✅ Pasek narzędzi
 - ✅ Górny pasek narzędzi edycji, wyszarzony bez warstwy edycyjnej; wybór warstwy z drzewa i z listy.
 - ✅ Ikony w stylu QGIS z podpowiedziami — własne SVG (`Icons.tsx`), bez grafik QGIS (GPL).
-- ⬜ Pomiar → plan, punkt 2.
+- ✅ Pomiar długości oraz powierzchni z obwodem (`web/src/measure.ts`): etykiety przy szkicu, płasko w układzie
+  projektu (metrycznym), przyciąganie do warstwy edycyjnej, Esc / Backspace / Delete; działa też bez projektu (22.11).
 
 ### ✅ Edycja geometrii
 Szkic w przeglądarce z przyciąganiem, geometrię liczy PostGIS w API: jedna transakcja, kontrola zakresu
@@ -111,6 +110,8 @@ danych, wpis do dziennika zmian. Opis: `docs/user/README.md`.
   (migracja `audit_undo`).
 
 ### ✅ Uprawnienia i zakres danych
+- ✅ Przetestowane w praktyce (wyłączenia, 22.11): zakładka Fii „Zakres danych”, zapamiętane poświadczenia Fii,
+  narzędzie pobierania ULDK zdefiniowane w Fii działa w aplikacji.
 - ✅ Serwer → projekt → zakres danych: autor projektów, role w grupach, prawa do zdjęć i plików, zakres
   przestrzenny / atrybut / przez relację / bez filtra (`api/app/scope.py`).
 - ✅ Jeden filtr w API i w QGIS Server (wtyczka `sophia_filter`), Fia: zakładka „Zakres danych”,

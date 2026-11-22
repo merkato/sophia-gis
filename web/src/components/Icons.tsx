@@ -228,6 +228,25 @@ export const IconPrint = (p: P) => (
   </Svg>
 );
 
+/** Pomiar długości: linijka z łamaną. */
+export const IconMeasureLength = (p: P) => (
+  <Svg {...p}>
+    <rect x="2" y="15" width="20" height="6" rx="1" fill="#f6dfb0" stroke={C.yellowDark} strokeWidth="1.1" />
+    <path d="M5 15v2.5M8 15v1.6M11 15v2.5M14 15v1.6M17 15v2.5M20 15v1.6" stroke={C.yellowDark} strokeWidth="1" />
+    <path d="M3.5 11l5-6 5 4 7-6" stroke={C.red} strokeWidth="1.6" />
+    <circle cx="3.5" cy="11" r="1.4" fill={C.red} /><circle cx="20.5" cy="3" r="1.4" fill={C.red} />
+  </Svg>
+);
+
+/** Pomiar powierzchni: poligon z linijką. */
+export const IconMeasureArea = (p: P) => (
+  <Svg {...p}>
+    <path d="M4 12l3-8 9 1 4 7-6 2z" fill="#ffd8a8" fillOpacity=".8" stroke={C.red} strokeWidth="1.4" strokeDasharray="2.5 1.8" />
+    <rect x="2" y="16" width="20" height="5" rx="1" fill="#f6dfb0" stroke={C.yellowDark} strokeWidth="1.1" />
+    <path d="M5 16v2M8 16v1.4M11 16v2M14 16v1.4M17 16v2M20 16v1.4" stroke={C.yellowDark} strokeWidth="1" />
+  </Svg>
+);
+
 /** Tabela atrybutów. */
 export const IconTable = (p: P) => (
   <Svg {...p}>
