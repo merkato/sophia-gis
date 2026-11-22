@@ -9,6 +9,28 @@ import /etc/caddy/sites/*.caddy
 {$SITE_ADDRESS} {
 	encode zstd gzip
 
+	# --- dziennik czasów żądań mapy (/ows): czas, rozmiar, status, adres z parametrami WMS
+	# Bez nagłówków (tokeny, zakres danych) i adresów IP. Raport: scripts/server/ows-report.sh
+	log ows {
+		output file /data/logs/ows.log {
+			roll_size 50MiB
+			roll_keep 10
+			roll_uncompressed
+		}
+		format filter {
+			wrap json
+			fields {
+				request>headers delete
+				request>remote_ip delete
+				request>remote_port delete
+				request>client_ip delete
+				resp_headers delete
+			}
+		}
+	}
+	@not_ows not path /ows
+	log_skip @not_ows
+
 	# --- API ---
 	handle /api/* {
 		request_body {

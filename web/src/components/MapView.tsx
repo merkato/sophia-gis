@@ -142,7 +142,10 @@ export function MapView(props: Props) {
     const wms = new ImageWMS({
       url: "/ows",
       params: { PROJECT: config.slug, VERSION: "1.1.1", FORMAT: "image/png", TRANSPARENT: "true", LAYERS: "" },
-      ratio: 1.2,
+      // jeden obraz wektorów na widok: rozdzielczość 1:1 także na ekranach HiDPI (2× = 4× pikseli do narysowania
+      // w QGIS Server przy każdym przesunięciu) i mały zapas wokół widoku — analiza wydajności 22.11, docs/TODO.md
+      ratio: 1.1,
+      hidpi: false,
       serverType: "qgis",
     });
     wmsRef.current = wms;

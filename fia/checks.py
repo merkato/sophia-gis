@@ -4,7 +4,17 @@ from __future__ import annotations
 
 import os
 
-from qgis.core import Qgis, QgsDataSourceUri, QgsLayoutItemMap, QgsMapLayer, QgsProject, QgsRasterLayer, QgsVectorLayer
+from qgis.core import (
+    Qgis,
+    QgsDataProvider,
+    QgsDataSourceUri,
+    QgsLayoutItemMap,
+    QgsMapLayer,
+    QgsProject,
+    QgsProviderRegistry,
+    QgsRasterLayer,
+    QgsVectorLayer,
+)
 
 LIBRARY_DIR = "rasters"     # wspólna biblioteka: <katalog>/rasters  <->  /opt/sophia/data/rasters
 
@@ -110,6 +120,10 @@ def layer_issues(layer: QgsMapLayer, want_edit: bool = False) -> list[tuple[str,
                 out.append(("warning", "Hasło zapisane w projekcie — usuń je i użyj pg_service.conf"))
             if not uri.keyColumn():
                 out.append(("error" if want_edit else "warning", "Brak klucza głównego"))
+            if pk_unicity_checked(layer):
+                msg = ("Widok ze sprawdzaniem unikalności klucza — przy filtrze zakresu każde żądanie mapy w Sophii "
+                       "skanuje cały widok (np. +0,1 s); wyłącz przyciskiem w Diagnostyce (klucz widoku musi być unikalny)")
+                out.append(("warning", msg))
             if uri.wkbType() == Qgis.WkbType.Unknown and layer.isSpatial():
                 out.append(("warning", "Nieokreślony typ geometrii — ustaw go w źródle warstwy"))
         elif want_edit:
@@ -204,3 +218,47 @@ def layout_issues() -> list[tuple[str, str, str]]:
                             f"Mapa „{m.displayName()}” pokazuje warstwy, których Sophia nie wydrukuje ({kto}): "
                             + ", ".join(bad)))
     return out
+
+
+_VIEW_CACHE: dict[str, bool] = {}
+
+
+def _lit(v: str) -> str:
+    return "'" + v.replace("'", "''") + "'"
+
+
+def _is_view(layer: QgsVectorLayer) -> bool:
+    """Czy źródło warstwy PostgreSQL to widok (zwykły albo zmaterializowany); błąd połączenia = nie wiadomo (False)."""
+    uri = QgsDataSourceUri(layer.source())
+    key = f"{uri.service()}|{uri.database()}|{uri.schema()}.{uri.table()}"
+    if key not in _VIEW_CACHE:
+        try:
+            md = QgsProviderRegistry.instance().providerMetadata("postgres")
+            conn = md.createConnection(uri.uri(False), {})
+            rows = conn.executeSql(
+                "SELECT c.relkind FROM pg_class c JOIN pg_namespace n ON n.oid = c.relnamespace "
+                f"WHERE n.nspname = {_lit(uri.schema())} AND c.relname = {_lit(uri.table())}")
+            _VIEW_CACHE[key] = bool(rows) and str(rows[0][0]) in ("v", "m")
+        except Exception:  # noqa: BLE001 — brak połączenia z bazą w czasie diagnostyki
+            return False
+    return _VIEW_CACHE[key]
+
+
+def pk_unicity_checked(layer: QgsMapLayer) -> bool:
+    """Widok PostgreSQL, dla którego QGIS sprawdza unikalność klucza (opcja źródła checkPrimaryKeyUnicity, domyślnie
+    włączona). QGIS Server robi to przy każdej zmianie filtra warstwy — w Sophii przy każdym żądaniu z zakresem danych:
+    zapytanie po całym widoku z warunkiem zakresu (zmierzone 22.11: widok użytków EGiB, filtr przestrzenny — 105 ms)."""
+    if not isinstance(layer, QgsVectorLayer) or layer.providerType() != "postgres":
+        return False
+    uri = QgsDataSourceUri(layer.source())
+    if uri.hasParam("checkPrimaryKeyUnicity") and uri.param("checkPrimaryKeyUnicity") == "0":
+        return False
+    return _is_view(layer)
+
+
+def disable_pk_unicity(layer: QgsVectorLayer) -> None:
+    """Wyłącza sprawdzanie unikalności klucza w źródle warstwy (styl, formularz i pola zostają)."""
+    uri = QgsDataSourceUri(layer.source())
+    uri.removeParam("checkPrimaryKeyUnicity")
+    uri.setParam("checkPrimaryKeyUnicity", "0")
+    layer.setDataSource(uri.uri(False), layer.name(), "postgres", QgsDataProvider.ProviderOptions())

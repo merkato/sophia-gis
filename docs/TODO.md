@@ -15,15 +15,18 @@ Oznaczenia: ✅ zrobione · ✔️ zrobione częściowo (co zostało — w plani
 
 ### ⬜ 2. Drobne zaległości
 - ⬜ Kolejne źródła narzędzi pobierania: PRG adresy, BDOT10k (nowy wpis w `SOURCES` i w `fia/tools.py`).
-- ⬜ **Wydajność mapy z filtrem zakresu danych** — analiza 22.11 (wyłączenia, użytkownik z jednym nadleśnictwem):
-  render w QGIS Server z filtrem +0–0,15 s na obraz (tylko filtr przestrzenny — granice do 17 tys. wierzchołków),
-  autoryzacja `/ows` ~4 ms, naprzemienni użytkownicy bez kary. Główny koszt: jeden obraz wektorów na cały widok
-  w 2× na HiDPI (np. 3780×1458 px, 0,5–0,65 s przy każdym przesunięciu, bez cache). Decyzje (ankieta 22.11):
-  - ⬜ obraz wektorów w 1:1 (bez 2× HiDPI) i mniejszy zapas wokół widoku (`ImageWMS` `hidpi: false`, `ratio`),
-  - ⬜ podzielone granice wymiaru zakresu w rdzeniu (`ST_Subdivide`, indeks; odświeżanie przy publikacji
-    i na żądanie) — filtr przestrzenny po kawałkach zamiast całej granicy,
-  - ⬜ dziennik czasów `/ows` w Caddy (czas, rozmiar, bez tokenów; rotacja) + skrypt raportu (mediana, p95),
-  - ⬜ strojenie QGIS Server pod 6 rdzeni (liczba procesów FastCGI, cache projektów).
+- ✅ **Wydajność mapy z filtrem zakresu danych** — analiza i zmiany 22.11 (wyłączenia, użytkownik z jednym
+  nadleśnictwem): render z filtrem +0–0,15 s na obraz, autoryzacja `/ows` ~4 ms, naprzemienni użytkownicy bez kary.
+  - ✅ obraz wektorów w 1:1 (`ImageWMS` `hidpi: false`, `ratio` 1,1) — wcześniej np. 3780×1458 px na HiDPI,
+    0,5–0,65 s przy każdym przesunięciu; teraz ok. 4× mniej pikseli,
+  - ✅ źródło narzutu filtra na warstwie użytków EGiB: QGIS sprawdza unikalność klucza widoku
+    (`checkPrimaryKeyUnicity`) przy każdej zmianie filtra — z filtrem przestrzennym 105 ms (bez 8 ms). Fia →
+    Diagnostyka: ostrzeżenie i przycisk „Wyłącz sprawdzanie unikalności klucza w widokach”,
+  - ✖ podzielone granice zakresu (`ST_Subdivide`) — sprawdzone i odrzucone: na danych produkcji filtr na całej
+    granicy kosztuje 1–3 ms (PostGIS cache'uje przygotowaną geometrię), a pocięcie granic całego kraju 20 s,
+  - ✅ dziennik czasów `/ows` w Caddy + `scripts/server/ows-report.sh` (mediana, p95, rozmiar, błędy),
+  - ✅ strojenie QGIS Server przy starcie z CPU i pamięci kontenera (`config/qgis-start.sh`, nadpisanie
+    `SOPHIA_QGIS_*` w `.env`) — działa tak samo na serwerze RDLP o innej liczbie rdzeni.
 
 ### ⬜ 3. Graficzny edytor schematu bazy (WebUI) — plan z 15.11
 Diagram tabel jak w narzędziach ERD: karty tabel przeciągane po płótnie, relacja = „sznurek”

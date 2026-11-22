@@ -413,14 +413,42 @@ class FiaDialog(QDialog):
         self.diag_tree.header().setSectionResizeMode(2, QHeaderView.ResizeMode.Stretch)
         btn = QPushButton("Sprawdź projekt")
         btn.clicked.connect(self.run_diagnostics)
+        self.pk_btn = QPushButton()
+        self.pk_btn.setToolTip("Widoki PostgreSQL: QGIS Server sprawdza unikalność klucza przy każdej zmianie filtra — "
+                               "w Sophii przy każdym żądaniu mapy z zakresem danych. Wyłącz, gdy klucz widoku jest unikalny.")
+        self.pk_btn.clicked.connect(self.on_disable_pk_unicity)
         lay = QVBoxLayout(w)
-        lay.addWidget(btn)
+        row = QHBoxLayout()
+        row.addWidget(btn)
+        row.addWidget(self.pk_btn)
+        row.addStretch(1)
+        lay.addLayout(row)
         lay.addWidget(self.diag_tree)
         self.run_diagnostics()
         return w
 
+    def _pk_views(self) -> list:
+        return [lyr for lyr in self.prj.mapLayers().values() if checks.pk_unicity_checked(lyr)]
+
+    def on_disable_pk_unicity(self):
+        views = self._pk_views()
+        if not views:
+            return
+        names = "\n".join(f"• {v.name()}" for v in views)
+        if QMessageBox.question(self, "Fia", "Wyłączyć sprawdzanie unikalności klucza w widokach?\n\n" + names +
+                                "\n\nKlucz każdego widoku musi być unikalny (inaczej obiekty mogą się mylić w formularzach). "
+                                "Zapisz potem projekt i opublikuj go.") != QMessageBox.StandardButton.Yes:
+            return
+        for v in views:
+            checks.disable_pk_unicity(v)
+        self.prj.setDirty(True)
+        self.run_diagnostics()
+
     def run_diagnostics(self) -> int:
         self.diag_tree.clear()
+        n = len(self._pk_views())
+        self.pk_btn.setText(f"Wyłącz sprawdzanie unikalności klucza w widokach ({n})")
+        self.pk_btn.setEnabled(n > 0)
         layer_cfg = self._collect()["layers"]
         rows = list(checks.project_issues())
         for lyr in self.prj.mapLayers().values():

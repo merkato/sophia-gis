@@ -30,13 +30,10 @@ services:
 
   qgis:
     environment:
-      # Apache mod_fcgid w obrazie camptocamp: liczba procesów QGIS Server.
-      # Każdy proces trzyma wczytane projekty i własny cache GDAL.
-      FCGID_MIN_PROCESSES: 1
-      FCGID_MAX_PROCESSES: 3
+      # Liczbę procesów QGIS Server i wątków renderu liczy przy starcie config/qgis-start.sh z limitu pamięci
+      # (niżej) i CPU — przy 2,5 GB i 6 rdzeniach: 3 procesy, 2 wątki. Nadpisanie: SOPHIA_QGIS_* w .env.
       FCGID_MAX_REQUESTS_PER_PROCESS: 2000   # okresowy restart procesu = brak wycieków pamięci
       FCGID_IO_TIMEOUT: 120
-      QGIS_SERVER_MAX_THREADS: 2
       GDAL_CACHEMAX: 256                     # MB na proces
       # TRUE: bez listowania katalogów, ale pliki obok rastra (.ovr, .aux.xml) są sprawdzane.
       # NIE "EMPTY_DIR": wtedy GDAL nie widzi piramid VRT (tk25.vrt.ovr) i oddalony widok

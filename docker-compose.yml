@@ -25,6 +25,8 @@ services:
   qgis:
     image: ${QGIS_SERVER_IMAGE:-camptocamp/qgis-server:4.2}
     restart: unless-stopped
+    # start ze strojeniem pod CPU i pamięć kontenera (procesy, wątki renderu) — config/qgis-start.sh
+    command: ["/usr/local/bin/sophia-start"]
     environment:
       PGSERVICEFILE: /etc/sophia/pg_service.conf
       QGIS_SERVER_LOG_LEVEL: 1
@@ -33,11 +35,17 @@ services:
       QGIS_SERVER_TRUST_LAYER_METADATA: "true"
       QGIS_PLUGINPATH: /var/www/plugins
       MAX_CACHE_LAYERS: 500
+      # nadpisanie strojenia (puste = wyliczone przy starcie z CPU i pamięci kontenera)
+      SOPHIA_QGIS_PROCESSES: ${SOPHIA_QGIS_PROCESSES:-}
+      SOPHIA_QGIS_MIN_PROCESSES: ${SOPHIA_QGIS_MIN_PROCESSES:-}
+      SOPHIA_QGIS_THREADS: ${SOPHIA_QGIS_THREADS:-}
+      SOPHIA_QGIS_PROCESS_MB: ${SOPHIA_QGIS_PROCESS_MB:-}
     volumes:
       - ./data/projects:/projects:ro
       - ./data/rasters:/rasters:ro
       - ./config/pg_service.conf:/etc/sophia/pg_service.conf:ro
       - ./qgis-server-plugins:/var/www/plugins:ro
+      - ./config/qgis-start.sh:/usr/local/bin/sophia-start:ro
     depends_on:
       db:
         condition: service_healthy

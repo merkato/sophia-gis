@@ -300,12 +300,39 @@ Rastrów skrypt nie kopiuje — oryginały trzymaj u siebie.
 
 Profil `docker-compose.small.yml` zabiera Sophii twardo ok. 4,5 GB RAM. Około 7 GB zostaje na inne
 usługi i na cache plików rastrów. Gdy inne usługi okażą się lekkie, a rastrów przybędzie, podnieś
-w profilu `FCGID_MAX_PROCESSES` do 4 i limit pamięci `qgis` do 3,5 GB.
+w profilu limit pamięci `qgis` (np. do 3,5 GB) — liczba procesów dostosuje się sama (niżej).
+
+### Strojenie QGIS Server przy starcie
+
+QGIS Server startuje przez `config/qgis-start.sh`, który liczy liczbę procesów (Apache mod_fcgid) i wątków renderu
+z rdzeni CPU i pamięci **dostępnych dla kontenera** (limity `deploy.resources.limits`, bez limitów — cała maszyna).
+Ten sam projekt Sophii działa więc bez zmian na małym VPS i na większym serwerze produkcyjnym:
+
+- procesy: tyle, ile rdzeni, ale nie więcej niż ¾ pamięci / 500 MB na proces (min. 2); połowa utrzymywana stale,
+- wątki renderu na żądanie: rdzenie / procesy, co najmniej 2.
+
+Wynik jest w logu: `docker compose logs qgis | grep Sophia` — np. `CPU: 6, pamięć: 2560 MB → procesy: 1–3,
+wątki renderu: 2`. Nadpisanie (np. serwer współdzielony z innymi usługami) w `.env`: `SOPHIA_QGIS_PROCESSES`,
+`SOPHIA_QGIS_MIN_PROCESSES`, `SOPHIA_QGIS_THREADS`, `SOPHIA_QGIS_PROCESS_MB` (`.env.example`); potem
+`docker compose up -d qgis`.
+
+### Czasy żądań mapy (`/ows`)
+
+Caddy zapisuje dziennik żądań `/ows` (czas, rozmiar, status, adres z parametrami WMS; bez nagłówków i adresów IP)
+w wolumenie `caddy_data`, `/data/logs/ows.log` (rotacja co 50 MB, 10 plików). Raport — mediana, 95. percentyl,
+maksimum, rozmiar, błędy na projekt i rodzaj żądania:
+
+```bash
+scripts/server/ows-report.sh            # ostatnie 24 h
+scripts/server/ows-report.sh 2 --warstwy  # ostatnie 2 h, z podziałem na zestawy warstw
+```
+
+Po zmianie `proxy/Caddyfile` odtwórz kontener proxy (`docker compose up -d --force-recreate proxy`).
 
 | Usługa | RAM | Limit w `docker-compose.small.yml` |
 |---|---|---|
 | PostGIS (ok. 1000 obiektów) | 0,3–0,5 GB | 1 GB |
-| QGIS Server (3 procesy, GDAL cache 256 MB) | 1,5–2 GB | 2,5 GB |
+| QGIS Server (3 procesy przy 2,5 GB — wyliczane przy starcie, GDAL cache 256 MB) | 1,5–2 GB | 2,5 GB |
 | API (2 procesy) | 0,2 GB | 512 MB |
 | Caddy + nginx (WebUI, cache kafli) | 0,15 GB | 450 MB |
 
