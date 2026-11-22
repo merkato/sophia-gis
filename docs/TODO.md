@@ -1,6 +1,7 @@
 # TO DO — Sophia (WebUI, API, Fia)
 
-Aktualizacja 15.11.2026. Na górze plan (kolejność = kolejność realizacji), niżej zrobione — tematycznie.
+Aktualizacja 22.11.2026. Na górze plan (kolejność = kolejność realizacji), niżej zrobione — tematycznie.
+Tylko rdzeń Sophii i ogólne wtyczki z `sophia-plugins`; prace wtyczek branżowych (np. wyłączenia) — w ich repozytoriach.
 
 Oznaczenia: ✅ zrobione · ✔️ zrobione częściowo (co zostało — w planie) · ⬜ do zrobienia
 
@@ -22,6 +23,8 @@ Oznaczenia: ✅ zrobione · ✔️ zrobione częściowo (co zostało — w plani
 - ⬜ **Pomiar** (długość, powierzchnia) na pasku narzędzi — był na liście ikon, nie powstał.
 - ⬜ **Limit wielkości plików per warstwa** (zdjęcia, dokumenty) — dziś globalne limity w konfiguracji API.
 - ⬜ Kolejne źródła narzędzi pobierania: PRG adresy, BDOT10k (nowy wpis w `SOURCES` i w `fia/tools.py`).
+- ⬜ **Wydajność mapy z filtrem zakresu danych** — kafle warstw z zakresem użytkownika renderują się
+  wyraźnie wolniej (filtr `sophia_filter` w QGIS Server); do zbadania: indeksy, prostszy warunek, cache.
 
 ### ⬜ 4. Graficzny edytor schematu bazy (WebUI) — plan z 15.11
 Diagram tabel jak w narzędziach ERD: karty tabel przeciągane po płótnie, relacja = „sznurek”
@@ -68,10 +71,6 @@ przeciągnięty z pola na pole. Działa na istniejących schematach danych (dzi�
 6. ⬜ Testy (generator SQL — jednostkowe; próba na tymczasowym schemacie na serwerze), dokumentacja
    `docs/user/baza.md`. Na telefonie diagram tylko do podglądu.
 
-### ⬜ 5. Raporty po stronie Sophii (na sam koniec)
-Zamiast raportów z menedżera wydruków QGIS — np. raporty z oględzin terenowych do PDF, z filtrem zakresu
-użytkownika. Najpierw analiza dotychczasowego rozwiązania raportów w projekcie, który będzie przenoszony.
-
 ---
 
 ## Zrobione
@@ -84,6 +83,12 @@ użytkownika. Najpierw analiza dotychczasowego rozwiązania raportów w projekci
 - ✅ Tabela atrybutów zamiast listy rekordów: okno nad mapą, sortowanie i wyszukiwanie po stronie API,
   ukrywanie kolumn, stronicowanie, wiersz → formularz i przybliżenie (`AttributeTable.tsx`,
   `FloatingWindow.tsx`).
+
+- ✅ Układ formularza z projektanta QGIS (przeciągnij i upuść): kolejność pól, pola spoza układu ukryte;
+  krótkie pola obok siebie (typ i średnia szerokość z bazy, wiersze po 6 kolumn), znaczniki czasu tylko do
+  odczytu w czasie lokalnym (0.4–0.5).
+- ✅ Rekordy powiązane: tabela podrzędna jest galerią zdjęć/dokumentów tylko przy ≤ 3 widocznych polach
+  poza kluczami i załącznikiem — inaczej zwykła lista (np. lustracje).
 
 ### ✔️ Zdjęcia, dokumenty i pliki
 - ✅ Zdjęcia, także z aparatu telefonu: pole „Załącznik” (wariant A) albo tabela zdjęć w relacji
@@ -130,6 +135,12 @@ danych, wpis do dziennika zmian. Opis: `docs/user/README.md`.
 - ✅ Rastry: `sync-rasters.ps1` (wysyłka zmienionych plików, restart QGIS Server, czyszczenie cache kafli),
   Fia: VRT z piramidami, także RGBA (11.11).
 
+### ✅ Raporty i PDF
+- ✅ `app.pdf.html_to_pdf` — dokumenty z HTML/CSS jako **PDF/A-2b** (WeasyPrint, czcionki DejaVu i Liberation
+  osadzone, zasoby tylko jako `data:`), gotowe do podpisu elektronicznego; nagłówki, stopki, „Strona X z Y”.
+- ✅ Raporty do PDF z filtrem zakresu użytkownika budują wtyczki na tym mechanizmie (np. załączniki
+  sprawozdawcze, także paczka ZIP wielu PDF) — zamiast raportów z menedżera wydruków QGIS.
+
 ### ✔️ Wydruki
 - ✅ Układ Sophii w przeglądarce: bieżący widok z podkładami i warstwami na A4/A3, tytuł, skala,
   podziałka, data, źródła (`web/src/print.ts`).
@@ -147,7 +158,7 @@ danych, wpis do dziennika zmian. Opis: `docs/user/README.md`.
 - ✅ Dokumentacja `docs/user/wydruki.md`: etykiety, legenda, mapa przeglądowa, postęp i limity.
 - ⬜ Podkład bez warstwy w projekcie, obrót → plan, punkt 1.
 
-### ✔️ Wtyczki
+### ✅ Wtyczki
 - ✅ System wtyczek (16.11): manifest `sophia-plugin.json`, ładowanie z `plugins/` (wolumen `/plugins`),
   zgodność wersji i zależności, migracje we własnym schemacie przy włączeniu, `startup()` wtyczki,
   `portal.plugins` / `plugin_migrations` / `plugin_access`, `require_plugin(id, uprawnienie)`, strażnik
@@ -160,7 +171,18 @@ danych, wpis do dziennika zmian. Opis: `docs/user/README.md`.
   zmiany EGiB, raport zmian dla listy działek. Próba na kopii bazy (plik całego powiatu,
   136 tys. obiektów): wczytanie ~1,5 min, scalanie ~1,5 min, ponowny import bez zmian 4 s, wykrycie
   zmienionej i usuniętej działki, ~93 MB w bazie (z punktami granicznymi).
-- ⬜ Wtyczki branżowe (np. wyłączenia z produkcji — osobne repozytorium prywatne) — etap 3.
+- ✅ Rozszerzenia API wtyczek (0.4–0.8.1, `docs/WTYCZKI.md`): zakres danych z wtyczki (`scope_codes`),
+  akcje w formularzu obiektu (`featureActions`), okna nad mapą, `host.currentProject()` / `currentExtent()`,
+  układ górnego paska (`menu`, `order` — menu rozwijane), element w pasku narzędzi (`toolbar`), wygląd
+  (`theme(project)`: arkusz CSS, logo, nazwa, ikona karty, panel warstw), zapis plików przez pyogrio
+  (XLSX, CSV, GPKG, SHP).
+- ✅ Nagłówki `X-Portal-User` / `X-Portal-Groups` do QGIS Server kodowane procentowo (polskie nazwy grup
+  dawały błąd 500 kafli).
+- ✅ Ogólne wtyczki w `sophia-plugins`: **`wyszukiwarka`** 1.1.1 (pole „Szukaj” w pasku narzędzi, warstwy
+  i pola wskazane dla projektu, wyniki w zakresie użytkownika), **`eksport`** 1.1.0 (XLSX, CSV, GeoPackage,
+  paczka mLas; cały zakres albo bieżący widok; zestawienia innych wtyczek; dziennik pobrań), **`wyglad`**
+  1.0.1 (motywy Sophia / Grafit / Lasy Państwowe, edytor motywów, logo PNG/WEBP, ikona karty, wyłączalna
+  nazwa, motyw i panel warstw dla projektu).
 
 ### ✅ Serwer i wdrożenie
 - ✅ `config/pg_service.conf` poza gitem, w repo `pg_service.conf.example` (d5478d1). Plik musi być
