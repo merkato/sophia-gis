@@ -117,3 +117,20 @@ def test_theme_provider(monkeypatch):
         return set()
     monkeypatch.setattr(plugins, "enabled_ids", none)
     assert asyncio.run(plugins.theme()) == {}
+
+
+def test_theme_for_project(monkeypatch):
+    """theme(project) dostaje slug projektu z mapy; theme() bez parametru działa jak dotąd."""
+    import asyncio
+    import types
+
+    async def theme(project):
+        return {"css": f"/m.css?p={project}"}
+
+    monkeypatch.setattr(plugins, "REGISTRY", {"w": plugins.Plugin(id="w", path=Path("."), module=types.SimpleNamespace(theme=theme))})
+
+    async def enabled():
+        return {"w"}
+    monkeypatch.setattr(plugins, "enabled_ids", enabled)
+    assert asyncio.run(plugins.theme("lasy")) == {"css": "/m.css?p=lasy"}
+    assert asyncio.run(plugins.theme()) == {"css": "/m.css?p=None"}

@@ -149,7 +149,8 @@ rozwijanego na miejscu pierwszego z nich. Gdy użytkownik ma dostęp tylko do je
 wyszukiwania po prawej stronie paska narzędzi pod górnym paskiem. Klasa `toolbar-field` daje układ „etykieta, pole,
 przycisk-ikona”. Komponent sam sprawdza uprawnienia (`host.can`) i zwraca `null`, gdy ich brak.
 
-**Wygląd** (Sophia ≥ 0.8): pakiet API może mieć `async def theme()` zwracającą `{"css", "logo", "title", "favicon"}`
+**Wygląd** (Sophia ≥ 0.8): pakiet API może mieć `async def theme()` — albo `async def theme(project)` (Sophia ≥ 0.8.1:
+slug projektu otwartego w mapie albo `None`, np. osobny motyw dla projektu) — zwracającą `{"css", "logo", "title", "favicon"}`
 (każde pole opcjonalne): adres arkusza stylów, logo w górnym pasku, nazwę aplikacji (pasek i tytuł karty) i ikonę
 karty. Sophia pyta o to bez logowania (`GET /api/theme`, także ekran logowania), więc te adresy muszą być publiczne
 (endpointy wtyczki bez `require_plugin`). Arkusz nadpisuje zmienne CSS rdzenia: `--bg`, `--surface`, `--ink`, `--muted`,

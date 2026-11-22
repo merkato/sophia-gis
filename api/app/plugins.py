@@ -13,6 +13,7 @@ Kod wtyczki działa w procesie API z pełnym dostępem do bazy — tylko zaufane
 from __future__ import annotations
 
 import importlib
+import inspect
 import json
 import logging
 import re
@@ -321,8 +322,9 @@ async def get_settings_for(plugin_id: str) -> dict:
 THEME_KEYS = ("css", "logo", "title", "favicon")
 
 
-async def theme() -> dict:
-    """Wygląd interfejsu podany przez wtyczkę: pakiet API może mieć `async def theme()`, zwracające słownik
+async def theme(project: str | None = None) -> dict:
+    """Wygląd interfejsu podany przez wtyczkę: pakiet API może mieć `async def theme()` albo (Sophia ≥ 0.8.1)
+    `async def theme(project)` — wygląd dla projektu otwartego w mapie (slug albo None), zwracające słownik
     z polami (każde opcjonalne): "css" — adres arkusza stylów, "logo" — adres obrazka w pasku, "title" — nazwa
     aplikacji, "favicon" — ikona karty. Pierwsza włączona wtyczka z niepustą odpowiedzią wygrywa."""
     providers = [p for p in REGISTRY.values() if p.module is not None and not p.error and hasattr(p.module, "theme")]
@@ -333,7 +335,8 @@ async def theme() -> dict:
         if p.id not in active:
             continue
         try:
-            t = await p.module.theme()
+            fn = p.module.theme
+            t = await (fn(project) if inspect.signature(fn).parameters else fn())
         except Exception:  # błąd wtyczki nie może zablokować ekranu logowania
             log.exception("wtyczka %s: błąd theme()", p.id)
             continue

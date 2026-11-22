@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import mimetypes
 
-from fastapi import APIRouter, Depends, HTTPException, Response, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
@@ -51,11 +51,11 @@ async def plugin_web(plugin_id: str, path: str, user: CurrentUser = Depends(requ
 
 
 @theme_router.get("")
-async def current_theme(response: Response):
+async def current_theme(response: Response, project: str | None = Query(None, max_length=100)):
     """Wygląd interfejsu (bez logowania — dotyczy też ekranu logowania): {"css", "logo", "title", "favicon"}
-    z pierwszej włączonej wtyczki z `theme()`; {} — wygląd domyślny Sophii."""
+    z pierwszej włączonej wtyczki z `theme()`; {} — wygląd domyślny Sophii. `project` — slug projektu w mapie."""
     response.headers["Cache-Control"] = "no-cache"
-    return await plugins.theme()
+    return await plugins.theme(project or None)
 
 
 # ---------------------------------------------------------------------------- administracja

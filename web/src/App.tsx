@@ -75,14 +75,15 @@ function LoginForm({ onLogin }: { onLogin: () => void }) {
 /** Wygląd z wtyczki (GET /api/theme): arkusz stylów, logo, nazwa aplikacji, ikona karty.
  *  Wtyczka po zmianie wyglądu wysyła zdarzenie `sophia-theme` na window — wtedy wczytujemy go ponownie. */
 type Theme = { css?: string; logo?: string; title?: string; favicon?: string };
-function useTheme(): Theme {
+function useTheme(project: string | null): Theme {
   const [theme, setTheme] = useState<Theme>({});
   useEffect(() => {
-    const load = () => api.theme().then(setTheme).catch(() => setTheme({}));
+    let current = true;
+    const load = () => api.theme(project).then((t) => { if (current) setTheme(t); }).catch(() => { if (current) setTheme({}); });
     load();
     window.addEventListener("sophia-theme", load);
-    return () => window.removeEventListener("sophia-theme", load);
-  }, []);
+    return () => { current = false; window.removeEventListener("sophia-theme", load); };
+  }, [project]);
   useEffect(() => {
     const setLink = (id: string, rel: string, href?: string) => {
       let el = document.getElementById(id) as HTMLLinkElement | null;
@@ -183,7 +184,7 @@ export default function App() {
   const [plugins, setPlugins] = useState<PluginInfo[]>([]);
   const pluginPages = plugins.some((p) => p.pages.length > 0);
   const pluginWindows = plugins.flatMap((p) => (p.windows ?? []).filter((w) => w.toolbar !== false).map((w) => ({ plugin: p, w })));
-  const theme = useTheme();
+  const theme = useTheme(slug);
   usePluginsVersion();   // elementy wtyczek w pasku narzędzi pojawiają się po załadowaniu modułów
   const widgets = user ? toolbarWidgets().filter((x) => plugins.some((p) => p.id === x.id)) : [];
   const [openWindows, setOpenWindows] = useState<OpenWindow[]>([]);
