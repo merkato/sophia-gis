@@ -6,13 +6,14 @@ import type OlMap from "ol/Map";
 import Overlay from "ol/Overlay";
 import VectorLayer from "ol/layer/Vector";
 import VectorSource from "ol/source/Vector";
-import { Draw, Snap } from "ol/interaction";
+import { Draw, Modify, Snap } from "ol/interaction";
 import { Circle, Fill, Stroke, Style } from "ol/style";
 import { unByKey } from "ol/Observable";
 import type { EventsKey } from "ol/events";
 import { getArea, getLength } from "ol/sphere";
 import type Feature from "ol/Feature";
-import type { Geometry, LineString, Polygon } from "ol/geom";
+import type { Geometry, LineString, MultiLineString, MultiPolygon, Polygon } from "ol/geom";
+import type Projection from "ol/proj/Projection";
 
 export type MeasureKind = "length" | "area";
 
@@ -26,6 +27,85 @@ export function formatArea(m2: number): string {
   if (m2 < 10000) return `${nf(m2, 1)} m²`;
   if (m2 < 1e8) return `${nf(m2 / 10000, 4)} ha (${nf(m2, 0)} m²)`;
   return `${nf(m2 / 1e6, 3)} km² (${nf(m2 / 10000, 0)} ha)`;
+}
+
+/** Długość i powierzchnia w układzie mapy: płasko w układzie metrycznym, geodezyjnie w kątowym. */
+function measurer(proj: Projection) {
+  const planar = proj.getUnits() === "m";
+  const pathLength = (coords: number[][]) =>
+    coords.reduce((s, c, i, a) => (i ? s + Math.hypot(c[0] - a[i - 1][0], c[1] - a[i - 1][1]) : 0), 0);
+  const lengthOf = (g: Geometry): number => {
+    if (!planar) return getLength(g, { projection: proj });
+    switch (g.getType()) {
+      case "LineString": return (g as LineString).getLength();
+      case "MultiLineString": return (g as MultiLineString).getLineStrings().reduce((s, l) => s + l.getLength(), 0);
+      case "Polygon": return (g as Polygon).getLinearRings().reduce((s, r) => s + pathLength(r.getCoordinates()), 0);
+      case "MultiPolygon": return (g as MultiPolygon).getPolygons().reduce((s, p) => s + lengthOf(p), 0);
+      default: return 0;
+    }
+  };
+  const areaOf = (g: Polygon | MultiPolygon) => (planar ? g.getArea() : getArea(g, { projection: proj }));
+  /** Poligon — powierzchnia i obwód (z pierścieniami wewnętrznymi), linia — długość, punkt — brak etykiety. */
+  const text = (g: Geometry): string | null => {
+    const t = g.getType();
+    if (t === "Polygon" || t === "MultiPolygon") return `${formatArea(areaOf(g as Polygon))}\nobwód ${formatLength(lengthOf(g))}`;
+    if (t === "LineString" || t === "MultiLineString") return formatLength(lengthOf(g));
+    return null;
+  };
+  /** Miejsce etykiety: wnętrze (największej części) poligonu albo koniec linii. */
+  const anchor = (g: Geometry): number[] | null => {
+    const t = g.getType();
+    if (t === "Polygon") return (g as Polygon).getInteriorPoint().getCoordinates().slice(0, 2);
+    if (t === "MultiPolygon") {
+      const parts = (g as MultiPolygon).getPolygons();
+      if (!parts.length) return null;
+      return parts.reduce((a, b) => (b.getArea() > a.getArea() ? b : a)).getInteriorPoint().getCoordinates().slice(0, 2);
+    }
+    if (t === "LineString") return (g as LineString).getLastCoordinate().slice(0, 2);
+    if (t === "MultiLineString") return (g as MultiLineString).getLastCoordinate().slice(0, 2);
+    return null;
+  };
+  return { planar, lengthOf, areaOf, text, anchor };
+}
+
+/** Etykieta powierzchni i obwodu (długości) przy szkicach edycji: rysowanie i zmiana wierzchołków.
+ * Śledzi szkic na żywo, po zakończeniu zostaje z ostatnią wartością do następnego szkicu albo zmiany narzędzia.
+ * Zwraca funkcję sprzątającą. */
+export function attachEditLabels(map: OlMap, interactions: (Draw | Modify)[]): () => void {
+  const m = measurer(map.getView().getProjection());
+  const el = document.createElement("div");
+  el.className = "measure-label live";
+  const overlay = new Overlay({ element: el, offset: [0, -12], positioning: "bottom-center", stopEvent: false });
+  map.addOverlay(overlay);
+  let watch: EventsKey | null = null;
+  const stop = () => { if (watch) unByKey(watch); watch = null; };
+  const update = (g: Geometry) => {
+    const t = m.text(g);
+    const pos = t ? m.anchor(g) : null;
+    if (!t || !pos) { overlay.setPosition(undefined); return; }
+    el.textContent = t;
+    overlay.setPosition(pos);
+  };
+  const follow = (g: Geometry | null | undefined) => {
+    stop();
+    if (!g) return;
+    el.classList.replace("done", "live");
+    update(g);
+    watch = g.on("change", () => update(g));
+  };
+  const finish = () => { stop(); el.classList.replace("live", "done"); };
+  const keys: EventsKey[] = [];
+  for (const i of interactions) {
+    if (i instanceof Draw) {
+      keys.push(i.on("drawstart", (e) => follow(e.feature.getGeometry())));
+      keys.push(i.on("drawend", (e) => { const g = e.feature.getGeometry(); if (g) update(g); finish(); }));
+      keys.push(i.on("drawabort", () => { stop(); overlay.setPosition(undefined); }));
+    } else {
+      keys.push(i.on("modifystart", (e) => follow((e.features.item(0) as Feature<Geometry> | undefined)?.getGeometry())));
+      keys.push(i.on("modifyend", finish));
+    }
+  }
+  return () => { stop(); keys.forEach((k) => unByKey(k)); map.removeOverlay(overlay); };
 }
 
 const style = [
@@ -42,15 +122,8 @@ export function startMeasure(map: OlMap, kind: MeasureKind, snapSource?: VectorS
   const layer = new VectorLayer({ source, style, zIndex: 1000 });
   map.addLayer(layer);
   const proj = map.getView().getProjection();
-  const planar = proj.getUnits() === "m";
+  const { planar, lengthOf, areaOf } = measurer(proj);
   const unit = planar ? ` (płasko, ${proj.getCode()})` : " (geodezyjnie)";
-
-  const lengthOf = (g: LineString | Polygon) => {
-    if (planar) return g.getType() === "Polygon" ? (g as Polygon).getLinearRing(0)!.getCoordinates()
-      .reduce((s, c, i, a) => (i ? s + Math.hypot(c[0] - a[i - 1][0], c[1] - a[i - 1][1]) : 0), 0) : (g as LineString).getLength();
-    return getLength(g, { projection: proj });
-  };
-  const areaOf = (g: Polygon) => (planar ? g.getArea() : getArea(g, { projection: proj }));
   const text = (g: LineString | Polygon) => kind === "area"
     ? `${formatArea(areaOf(g as Polygon))}\nobwód ${formatLength(lengthOf(g))}`
     : formatLength(lengthOf(g));

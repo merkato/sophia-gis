@@ -59,6 +59,8 @@ Pod paskiem tytułu jest pasek narzędzi z ikonami w stylu QGIS. Nazwa każdego 
 po najechaniu kursorem. Narzędzia edycji są zawsze na miejscu. Bez aktywnej warstwy edycyjnej są
 wyszarzone.
 
+Przy rysowaniu obiektu, części i pierścienia oraz przy przeciąganiu wierzchołków etykieta przy szkicu pokazuje na bieżąco powierzchnię i obwód (linia: długość); po zakończeniu zostaje z ostatnią wartością do następnego szkicu.
+
 | Ikona | Narzędzie | Odpowiednik w QGIS |
 |---|---|---|
 | warstwy (trzy arkusze) | pokaż / ukryj panel warstw i podkładów | panel Warstwy |

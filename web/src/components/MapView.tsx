@@ -27,7 +27,7 @@ import { api } from "../api";
 import type { Basemap, GeoJSONFeature, ProjectConfig, TreeNode } from "../types";
 import { PNG8, basemapLayer, ensureBasemapProjections, tileGridFor } from "../tiles";
 import { attributionHtml, projectAttributions } from "../attribution";
-import { startMeasure } from "../measure";
+import { attachEditLabels, startMeasure } from "../measure";
 
 // --- Kafle rastrów
 // Rastry projektu (skany, mozaiki) idą jako kafle WMS na stałej siatce: te same adresy
@@ -517,6 +517,11 @@ export function MapView(props: Props) {
       interactions.push(new Snap({ source }));
     }
 
+    // Etykieta powierzchni i obwodu (długości) przy rysowaniu i zmianie wierzchołków
+    const labelled = interactions.filter((i): i is Draw | Modify => i instanceof Modify
+      || (i instanceof Draw && ["draw", "addpart", "ring", "fillring"].includes(tool)));
+    const dropLabels = labelled.length ? attachEditLabels(map, labelled) : null;
+
     // Szkic: Esc przerywa, Backspace cofa ostatni wierzchołek (poza polami formularza)
     const draws = interactions.filter((i): i is Draw => i instanceof Draw);
     const onKey = (e: KeyboardEvent) => {
@@ -530,6 +535,7 @@ export function MapView(props: Props) {
     interactions.forEach((i) => map.addInteraction(i));
     return () => {
       interactions.forEach((i) => map.removeInteraction(i));
+      dropLabels?.();
       document.removeEventListener("keydown", onKey);
       if (clickKey) unByKey(clickKey);
       selectRef.current = null;

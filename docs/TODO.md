@@ -15,6 +15,8 @@ Oznaczenia: ✅ zrobione · ✔️ zrobione częściowo (co zostało — w plani
 
 ### ⬜ 2. Drobne zaległości
 - ⬜ Kolejne źródła narzędzi pobierania: PRG adresy, BDOT10k (nowy wpis w `SOURCES` i w `fia/tools.py`).
+- ⬜ Przyciąganie w edycji (ustawienia z projektu QGIS i przełącznik w aplikacji, inne warstwy) i usuwanie
+  wierzchołków (dziś tylko Alt+klik) — do ustalenia.
 
 ### ⬜ 3. Graficzny edytor schematu bazy (WebUI) — plan z 15.11
 Diagram tabel jak w narzędziach ERD: karty tabel przeciągane po płótnie, relacja = „sznurek”
@@ -97,6 +99,7 @@ przeciągnięty z pola na pole. Działa na istniejących schematach danych (dzi�
 - ✅ Ikony w stylu QGIS z podpowiedziami — własne SVG (`Icons.tsx`), bez grafik QGIS (GPL).
 - ✅ Pomiar długości oraz powierzchni z obwodem (`web/src/measure.ts`): etykiety przy szkicu, płasko w układzie
   projektu (metrycznym), przyciąganie do warstwy edycyjnej, Esc / Backspace / Delete; działa też bez projektu (22.11).
+- ✅ Etykieta powierzchni i obwodu (długości) przy rysowaniu i zmianie wierzchołków obiektów warstwy edycyjnej (0.8.3).
 
 ### ✅ Edycja geometrii
 Szkic w przeglądarce z przyciąganiem, geometrię liczy PostGIS w API: jedna transakcja, kontrola zakresu
@@ -183,6 +186,11 @@ danych, wpis do dziennika zmian. Opis: `docs/user/README.md`.
   paczka mLas; cały zakres albo bieżący widok; zestawienia innych wtyczek; dziennik pobrań), **`wyglad`**
   1.0.1 (motywy Sophia / Grafit / Lasy Państwowe, edytor motywów, logo PNG/WEBP, ikona karty, wyłączalna
   nazwa, motyw i panel warstw dla projektu).
+- ✅ **`prg`** 1.0.0 (22.11): obręby ewidencyjne i nadleśnictwa z Państwowego Rejestru Granic w schemacie
+  `prg` — usługa WFS GUGiK (obszar: TERYT / kod RDLP, w tle, stronami) albo paczka SHP/GML; podgląd zmian,
+  zakres pełny / uzupełnienie, kontrola duplikatów (identyfikator IIP, unikalny kod), stan bieżący + historia;
+  porównanie z tabelą z innego źródła (np. dane Lasów Państwowych; po kodzie albo po położeniu, tolerancja)
+  z warstwą rozbieżności `prg.v_roznice_ostatnie`.
 
 ### ✅ Wydajność mapy z filtrem zakresu danych
 Analiza i zmiany 22.11, wdrożone (wyłączenia, użytkownik z jednym nadleśnictwem): render z filtrem +0–0,15 s na obraz, autoryzacja `/ows` ~4 ms, naprzemienni użytkownicy bez kary.
