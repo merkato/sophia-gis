@@ -10,7 +10,6 @@ Oznaczenia: ✅ zrobione · ✔️ zrobione częściowo (co zostało — w plani
 ## Plan
 
 ### ⬜ 1. Do przetestowania (zrobione, nieprzetestowane w pełni)
-- ⬜ Etykiety `zrodla`/`autor` na szablonie, który je ma (szablon projektu kolejowego ma tylko `title`).
 - ⬜ Narzędzia edycji geometrii w przeglądarce na prawdziwych danych, cofanie (Ctrl+Z).
 
 ### ⬜ 2. Drobne zaległości
@@ -99,6 +98,7 @@ przeciągnięty z pola na pole. Działa na istniejących schematach danych (dzi�
 - ✅ Ikony w stylu QGIS z podpowiedziami — własne SVG (`Icons.tsx`), bez grafik QGIS (GPL).
 - ✅ Pomiar długości oraz powierzchni z obwodem (`web/src/measure.ts`): etykiety przy szkicu, płasko w układzie
   projektu (metrycznym), przyciąganie do warstwy edycyjnej, Esc / Backspace / Delete; działa też bez projektu (22.11).
+  Przetestowane 22.11 w przeglądarce.
 - ✅ Etykieta powierzchni i obwodu (długości) przy rysowaniu i zmianie wierzchołków obiektów warstwy edycyjnej (0.8.3).
 
 ### ✅ Edycja geometrii
@@ -150,6 +150,7 @@ danych, wpis do dziennika zmian. Opis: `docs/user/README.md`.
 - ✅ Etykiety `zrodla` (atrybucje) i `autor` (zalogowany użytkownik), przezroczystość ◐ w szablonie
   (`OPACITIES` w GetPrint), panel podaje, co wpisze do szablonu (15.11, 6c84653). Krycie z panelu
   dociera do QGIS Server (sprawdzone w przeglądarce).
+  Przetestowane 22.11 na szablonie z ramkami tekstowymi `zrodla` i `autor`.
 - ✅ Układ Sophii przy dużych rastrach: licznik postępu kafli, najwyżej 6 zapytań naraz, limit od
   ostatniego postępu (45 s) zamiast stałych 60 s, najwyżej 5 min; w karcie w tle limit stoi (15.11,
   cfde0c1). Sprawdzone w przeglądarce: Schmettau A3, 200 dpi, 1:25 000 — 98 kafli w 5 s, z licznikiem.
@@ -160,6 +161,7 @@ danych, wpis do dziennika zmian. Opis: `docs/user/README.md`.
   „Tylko w QGIS”, grupa „Podkłady Sophii”); API dopasowuje także podkłady WMS. Fia → Diagnostyka: brak szablonów
   (informacja), mapy szablonów z warstwami, których Sophia nie wydrukuje (ostrzeżenie). Wydruk bez szablonu —
   układ Sophii (22.11).
+  Przetestowane 22.11 w QGIS.
 
 ### ✅ Wtyczki
 - ✅ System wtyczek (16.11): manifest `sophia-plugin.json`, ładowanie z `plugins/` (wolumen `/plugins`),

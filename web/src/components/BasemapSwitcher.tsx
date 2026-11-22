@@ -18,7 +18,8 @@ export function BasemapSwitcher({ basemaps, baseId, overlayIds, onBase, onToggle
   const overlays = basemaps.filter((b) => b.is_overlay);
   if (!basemaps.length) return null;
   return (
-    <section className="basemaps">
+    <fieldset className="basemaps" title="Podkłady i nakładki z katalogu Sophii — usługi zewnętrzne, wspólne dla wszystkich projektów">
+      <legend>Usługi zewnętrzne</legend>
       <h3>Podkład</h3>
       <ul className="tree">
         {bases.map((b) => (
@@ -69,7 +70,7 @@ export function BasemapSwitcher({ basemaps, baseId, overlayIds, onBase, onToggle
           </ul>
         </>
       )}
-    </section>
+    </fieldset>
   );
 }
 
