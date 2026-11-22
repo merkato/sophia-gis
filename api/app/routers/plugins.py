@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import mimetypes
 
-from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi import APIRouter, Depends, HTTPException, Response, status
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
@@ -13,6 +13,7 @@ from ..security import CurrentUser, optional_user, require_admin, require_user
 
 router = APIRouter(prefix="/api/plugins", tags=["wtyczki"])
 admin = APIRouter(prefix="/api/admin/plugins", tags=["wtyczki"], dependencies=[Depends(require_admin)])
+theme_router = APIRouter(prefix="/api/theme", tags=["wtyczki"])
 
 mimetypes.add_type("text/javascript", ".js")
 mimetypes.add_type("text/javascript", ".mjs")
@@ -47,6 +48,14 @@ async def plugin_web(plugin_id: str, path: str, user: CurrentUser = Depends(requ
     if base not in f.parents or not f.is_file():
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Brak pliku")
     return FileResponse(f, headers={"Cache-Control": "private, max-age=300"})
+
+
+@theme_router.get("")
+async def current_theme(response: Response):
+    """Wygląd interfejsu (bez logowania — dotyczy też ekranu logowania): {"css", "logo", "title", "favicon"}
+    z pierwszej włączonej wtyczki z `theme()`; {} — wygląd domyślny Sophii."""
+    response.headers["Cache-Control"] = "no-cache"
+    return await plugins.theme()
 
 
 # ---------------------------------------------------------------------------- administracja

@@ -1,4 +1,4 @@
-import type { ComponentType, SVGProps } from "react";
+import type { ComponentType, ReactNode, SVGProps } from "react";
 import type { LayerInfo, ProjectConfig } from "../types";
 import type { Tool } from "./MapView";
 import {
@@ -25,7 +25,7 @@ function ToolButton({ icon: Icon, label, active, disabled, onClick }: {
  * Narzędzia edycji są zawsze widoczne; bez aktywnej warstwy edycyjnej są wyszarzone.
  */
 export function Toolbar({ config, editLayerId, onEditLayer, tool, onTool, canDelete, onDelete, onNewRecord, onUndo,
-  sidebarOpen, onToggleSidebar, fetchToolId, onFetchTool, onOpenTable, onPrint }: {
+  sidebarOpen, onToggleSidebar, fetchToolId, onFetchTool, onOpenTable, onPrint, widgets }: {
   config: ProjectConfig | null;
   editLayerId: string | null;
   onEditLayer: (id: string | null) => void;
@@ -41,6 +41,7 @@ export function Toolbar({ config, editLayerId, onEditLayer, tool, onTool, canDel
   onFetchTool: (id: string) => void;
   onOpenTable: () => void;         // tabela atrybutów warstwy edycyjnej
   onPrint: (() => void) | null;    // wydruk widoku mapy (null = mapa jeszcze niegotowa)
+  widgets?: ReactNode[];           // elementy wtyczek (np. pole wyszukiwania) — po prawej
 }) {
   const editable: LayerInfo[] = Object.values(config?.layers ?? {})
     .filter((l) => l.perms.insert || l.perms.update || l.perms.delete)
@@ -129,6 +130,7 @@ export function Toolbar({ config, editLayerId, onEditLayer, tool, onTool, canDel
           {config.scope.label}: {config.scope.codes.length ? config.scope.codes.join(", ") : "brak"}
         </span>
       )}
+      {widgets && widgets.length > 0 && <div className="toolbar-widgets">{widgets}</div>}
     </div>
   );
 }

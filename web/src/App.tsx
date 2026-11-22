@@ -12,7 +12,8 @@ import GeoJSON from "ol/format/GeoJSON";
 import { Toolbar } from "./components/Toolbar";
 import { FetchCard } from "./components/FetchCard";
 import { AdminPanel } from "./components/AdminPanel";
-import { setCurrentExtentGetter, setCurrentProjectGetter, setMapFocusHandler, setWindowHandler, takeMapFocus, type MapFocus, type PluginInfo, preloadPlugins } from "./plugins";
+import { setCurrentExtentGetter, setCurrentProjectGetter, setMapFocusHandler, setWindowHandler, takeMapFocus, type MapFocus, type PluginInfo, preloadPlugins, toolbarWidgets, usePluginsVersion } from "./plugins";
+import { TopMenu } from "./components/TopMenu";
 import { PluginWindows, type OpenWindow } from "./components/PluginWindows";
 import { BasemapSwitcher, initialBasemapChoice, saveBasemapChoice } from "./components/BasemapSwitcher";
 import { loadOpacity, saveOpacity, useOpenSliders } from "./components/OpacitySlider";
@@ -69,6 +70,31 @@ function LoginForm({ onLogin }: { onLogin: () => void }) {
       <button className="primary" type="submit">Zaloguj</button>
     </form>
   );
+}
+
+/** Wygląd z wtyczki (GET /api/theme): arkusz stylów, logo, nazwa aplikacji, ikona karty.
+ *  Wtyczka po zmianie wyglądu wysyła zdarzenie `sophia-theme` na window — wtedy wczytujemy go ponownie. */
+type Theme = { css?: string; logo?: string; title?: string; favicon?: string };
+function useTheme(): Theme {
+  const [theme, setTheme] = useState<Theme>({});
+  useEffect(() => {
+    const load = () => api.theme().then(setTheme).catch(() => setTheme({}));
+    load();
+    window.addEventListener("sophia-theme", load);
+    return () => window.removeEventListener("sophia-theme", load);
+  }, []);
+  useEffect(() => {
+    const setLink = (id: string, rel: string, href?: string) => {
+      let el = document.getElementById(id) as HTMLLinkElement | null;
+      if (!href) { el?.remove(); return; }
+      if (!el) { el = document.createElement("link"); el.id = id; el.rel = rel; document.head.appendChild(el); }
+      if (el.getAttribute("href") !== href) el.href = href;
+    };
+    setLink("sophia-theme-css", "stylesheet", theme.css);
+    setLink("sophia-theme-icon", "icon", theme.favicon);
+    document.title = theme.title || "Sophia";
+  }, [theme]);
+  return theme;
 }
 
 /** „obiekt” w liczbie mnogiej: 2–4 obiekty, 5+ obiektów (bez 12–14). */
@@ -157,6 +183,9 @@ export default function App() {
   const [plugins, setPlugins] = useState<PluginInfo[]>([]);
   const pluginPages = plugins.some((p) => p.pages.length > 0);
   const pluginWindows = plugins.flatMap((p) => (p.windows ?? []).filter((w) => w.toolbar !== false).map((w) => ({ plugin: p, w })));
+  const theme = useTheme();
+  usePluginsVersion();   // elementy wtyczek w pasku narzędzi pojawiają się po załadowaniu modułów
+  const widgets = user ? toolbarWidgets().filter((x) => plugins.some((p) => p.id === x.id)) : [];
   const [openWindows, setOpenWindows] = useState<OpenWindow[]>([]);
   const zTop = useRef(0);
   const openWindow = useCallback((plugin: PluginInfo, windowId: string, opts?: { props?: Record<string, unknown>; title?: string } | null) => {
@@ -632,7 +661,10 @@ export default function App() {
   return (
     <div className="app">
       <header className="topbar">
-        <strong className="brand">Sophia</strong>
+        <strong className="brand">
+          {theme.logo && <img className="brand-logo" src={theme.logo} alt="" />}
+          <span className="brand-name">{theme.title || "Sophia"}</span>
+        </strong>
         <select value={slug ?? ""} onChange={(e) => setSlug(e.target.value || null)} aria-label="Projekt">
           <option value="">{projects.length === 0 ? "Brak dostępnych projektów" : "— bez projektu (same podkłady) —"}</option>
           {projects.map((p) => <option key={p.slug} value={p.slug}>{p.title}</option>)}
@@ -641,9 +673,7 @@ export default function App() {
         {user ? (
           <>
             <span className="muted">{user.full_name ?? user.login}</span>
-            {pluginWindows.map(({ plugin, w }) => (
-              <button key={`${plugin.id}:${w.id}`} onClick={() => openWindow(plugin, w.id, {})}>{w.title}</button>
-            ))}
+            <TopMenu windows={pluginWindows} onOpen={({ plugin, w }) => openWindow(plugin, w.id, {})} />
             {(user.is_admin || pluginPages) && <button onClick={() => setShowAdmin(true)}>Administracja</button>}
             <button onClick={async () => { await api.logout(); await refreshSession(); }}>Wyloguj</button>
           </>
@@ -658,7 +688,8 @@ export default function App() {
         sidebarOpen={sidebarOpen} onToggleSidebar={() => setSidebarOpen((o) => !o)}
         fetchToolId={fetchToolId} onFetchTool={startFetchTool}
         onOpenTable={() => editLayerId && setTableLayerId(editLayerId)}
-        onPrint={mapConfig ? () => setShowPrint(true) : null} />
+        onPrint={mapConfig ? () => setShowPrint(true) : null}
+        widgets={widgets.map(({ id, Widget, host }) => <Widget key={id} host={host} />)} />
 
       <div className="body">
         {sidebarOpen && <aside className="sidebar">

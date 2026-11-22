@@ -90,3 +90,30 @@ def test_plugin_scope_provider(monkeypatch):
         return set()
     monkeypatch.setattr(plugins, "enabled_ids", disabled)
     assert run("lasy") == (False, None)
+
+
+def test_theme_provider(monkeypatch):
+    """Wygląd z wtyczki: tylko włączona, tylko znane pola; błąd wtyczki — wygląd domyślny."""
+    import asyncio
+    import types
+
+    async def theme():
+        return {"css": "/api/plugins/wyglad/motyw.css?v=3", "title": "Portal", "logo": "", "obce": "x"}
+
+    async def zepsuty():
+        raise RuntimeError("baza niedostępna")
+
+    monkeypatch.setattr(plugins, "REGISTRY", {
+        "a_zepsuta": plugins.Plugin(id="a_zepsuta", path=Path("."), module=types.SimpleNamespace(theme=zepsuty)),
+        "wyglad": plugins.Plugin(id="wyglad", path=Path("."), module=types.SimpleNamespace(theme=theme)),
+    })
+
+    async def enabled():
+        return {"a_zepsuta", "wyglad"}
+    monkeypatch.setattr(plugins, "enabled_ids", enabled)
+    assert asyncio.run(plugins.theme()) == {"css": "/api/plugins/wyglad/motyw.css?v=3", "title": "Portal"}
+
+    async def none():
+        return set()
+    monkeypatch.setattr(plugins, "enabled_ids", none)
+    assert asyncio.run(plugins.theme()) == {}

@@ -316,3 +316,27 @@ async def get_settings_for(plugin_id: str) -> dict:
     async with portal_conn() as conn:
         row = await (await conn.execute("SELECT settings FROM portal.plugins WHERE id = %s", (plugin_id,))).fetchone()
     return (row or {}).get("settings") or {}
+
+
+THEME_KEYS = ("css", "logo", "title", "favicon")
+
+
+async def theme() -> dict:
+    """Wygląd interfejsu podany przez wtyczkę: pakiet API może mieć `async def theme()`, zwracające słownik
+    z polami (każde opcjonalne): "css" — adres arkusza stylów, "logo" — adres obrazka w pasku, "title" — nazwa
+    aplikacji, "favicon" — ikona karty. Pierwsza włączona wtyczka z niepustą odpowiedzią wygrywa."""
+    providers = [p for p in REGISTRY.values() if p.module is not None and not p.error and hasattr(p.module, "theme")]
+    if not providers:
+        return {}
+    active = await enabled_ids()
+    for p in providers:
+        if p.id not in active:
+            continue
+        try:
+            t = await p.module.theme()
+        except Exception:  # błąd wtyczki nie może zablokować ekranu logowania
+            log.exception("wtyczka %s: błąd theme()", p.id)
+            continue
+        if t:
+            return {k: str(t[k]) for k in THEME_KEYS if t.get(k)}
+    return {}

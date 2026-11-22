@@ -51,6 +51,7 @@ app.include_router(photos.projects_router)
 # wtyczki: najpierw endpointy rdzenia (/api/plugins, moduły web, administracja), potem routery wtyczek
 app.include_router(plugins_router.router)
 app.include_router(plugins_router.admin)
+app.include_router(plugins_router.theme_router)
 plugins.load_into(app)
 
 

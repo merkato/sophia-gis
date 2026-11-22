@@ -141,6 +141,22 @@ properties }`. Moduły wtyczek z interfejsem ładują się w tle po zalogowaniu,
 przycisk w górnym pasku otwiera okno (przeciągane, ze zmianą rozmiaru); `"toolbar": false` = okno bez przycisku,
 otwierane z kodu: `host.openWindow("drzewo", { props: { id: 7 }, title: "Decyzja …" })`, `host.closeWindow(id)`.
 `register` zwraca `{ pages, windows: { decyzje: Komponent } }`; komponent okna dostaje `{ host, props, close }`.
+Układ górnego paska (Sophia ≥ 0.8): `"order": 100` — kolejność przycisków (rosnąco, brak = 500, także między
+wtyczkami); `"menu": "Decyzje"` — okna o tej samej nazwie menu (także z różnych wtyczek) trafiają do jednego menu
+rozwijanego na miejscu pierwszego z nich. Gdy użytkownik ma dostęp tylko do jednego okna z menu — zwykły przycisk.
+
+**Element w pasku narzędzi** (Sophia ≥ 0.8): `register` może zwrócić `toolbar: Komponent` (props `{ host }`) — np. pole
+wyszukiwania po prawej stronie paska narzędzi pod górnym paskiem. Klasa `toolbar-field` daje układ „etykieta, pole,
+przycisk-ikona”. Komponent sam sprawdza uprawnienia (`host.can`) i zwraca `null`, gdy ich brak.
+
+**Wygląd** (Sophia ≥ 0.8): pakiet API może mieć `async def theme()` zwracającą `{"css", "logo", "title", "favicon"}`
+(każde pole opcjonalne): adres arkusza stylów, logo w górnym pasku, nazwę aplikacji (pasek i tytuł karty) i ikonę
+karty. Sophia pyta o to bez logowania (`GET /api/theme`, także ekran logowania), więc te adresy muszą być publiczne
+(endpointy wtyczki bez `require_plugin`). Arkusz nadpisuje zmienne CSS rdzenia: `--bg`, `--surface`, `--ink`, `--muted`,
+`--line`, `--accent`, `--accent-ink`, `--danger`, `--edit` oraz paska: `--topbar-bg`, `--topbar-ink`, `--topbar-muted`,
+`--topbar-btn`, `--topbar-btn-ink`, `--topbar-btn-line`, `--topbar-line`, `--brand-logo-height`; nazwę obok logo ukrywa
+`.brand-name { display: none }`. Po zmianie wyglądu strona wtyczki wysyła `window.dispatchEvent(new Event("sophia-theme"))` —
+Sophia wczytuje go ponownie bez przeładowania. Wygrywa pierwsza włączona wtyczka z niepustą odpowiedzią.
 
 Menu panelu: wtyczka z kilkoma stronami ma jedną pozycję rozwijaną (`web.menu`, domyślnie nazwa wtyczki do „ — ”),
 a strony — krótkie tytuły (np. „Rejestr”, „Import”).

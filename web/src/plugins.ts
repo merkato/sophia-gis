@@ -6,7 +6,11 @@ import React, { useSyncExternalStore } from "react";
 import { request } from "./api";
 import type { User } from "./types";
 
-export interface PluginPage { id: string; title: string; capability?: string; toolbar?: boolean }
+export interface PluginPage {
+  id: string; title: string; capability?: string; toolbar?: boolean;
+  menu?: string;     // okna: nazwa menu rozwijanego w górnym pasku (okna o tej samej nazwie — w jednym menu)
+  order?: number;    // okna: kolejność w górnym pasku (rosnąco; brak = 500)
+}
 export interface PluginInfo {
   id: string; name: string; menu?: string; version: string; capabilities: string[];
   web: string | null;           // adres modułu ES (null = wtyczka bez interfejsu)
@@ -82,6 +86,8 @@ export interface PluginModule {
     windows?: Record<string, React.ComponentType<PluginWindowProps>>;
     /** Akcje w formularzu obiektów warstw z danej tabeli: { "schemat.tabela": (obiekt) => [akcje] }. */
     featureActions?: Record<string, FeatureActionsFn>;
+    /** Element w pasku narzędzi pod górnym paskiem (np. pole wyszukiwania); wtyczka sama sprawdza uprawnienia. Sophia ≥ 0.8. */
+    toolbar?: React.ComponentType<{ host: SophiaHost }>;
   };
 }
 
@@ -89,6 +95,7 @@ export interface LoadedPlugin {
   pages: Record<string, React.ComponentType<{ host: SophiaHost }>>;
   windows: Record<string, React.ComponentType<PluginWindowProps>>;
   featureActions: Record<string, FeatureActionsFn>;
+  toolbar: React.ComponentType<{ host: SophiaHost }> | null;
   host: SophiaHost;
 }
 const modules = new Map<string, Promise<LoadedPlugin>>();
@@ -108,6 +115,12 @@ export function featureActions(f: FeatureRef): FeatureAction[] {
     try { out.push(...(fn(f) ?? [])); } catch (e) { console.error(`Akcje wtyczki ${p.host.pluginId}:`, e); }
   }
   return out;
+}
+
+/** Elementy wtyczek w pasku narzędzi (w kolejności identyfikatorów wtyczek). */
+export function toolbarWidgets(): { id: string; Widget: React.ComponentType<{ host: SophiaHost }>; host: SophiaHost }[] {
+  return [...loaded.entries()].filter(([, p]) => p.toolbar).sort(([a], [b]) => a.localeCompare(b))
+    .map(([id, p]) => ({ id, Widget: p.toolbar!, host: p.host }));
 }
 
 /** Odświeża komponent, gdy załadowano kolejną wtyczkę (np. formularz otwarty przed załadowaniem). */
@@ -176,7 +189,7 @@ export function loadPlugin(p: PluginInfo, user: User, notify: (m: string) => voi
     m = (import(/* @vite-ignore */ p.web!) as Promise<PluginModule>)
       .then((mod) => {
         const r = mod.register(host);
-        const lp: LoadedPlugin = { pages: r.pages ?? {}, windows: r.windows ?? {}, featureActions: r.featureActions ?? {}, host };
+        const lp: LoadedPlugin = { pages: r.pages ?? {}, windows: r.windows ?? {}, featureActions: r.featureActions ?? {}, toolbar: r.toolbar ?? null, host };
         loaded.set(p.id, lp);
         loadedVersion += 1;
         listeners.forEach((fn) => fn());
