@@ -35,6 +35,11 @@ def _request(url: str, data: bytes | None, headers: dict, verify: bool, method: 
         raise ApiError(f"Brak połączenia z serwerem: {e.reason}") from e
 
 
+def get_json(url: str, verify: bool = True) -> dict | list:
+    """GET bez logowania (np. publiczny katalog podkładów)."""
+    return _request(url, None, {"Accept": "application/json"}, verify, method="GET")
+
+
 def login(base_url: str, user: str, password: str, verify: bool = True) -> str:
     body = json.dumps({"login": user, "password": password}).encode()
     res = _request(f"{base_url.rstrip('/')}/api/auth/login", body, {"Content-Type": "application/json"}, verify)

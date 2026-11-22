@@ -9,24 +9,19 @@ Oznaczenia: ✅ zrobione · ✔️ zrobione częściowo (co zostało — w plani
 
 ## Plan
 
-### ⬜ 1. Wydruki — do decyzji
-- ⬜ Podkład z katalogu w szablonie bez warstwy w projekcie (dziś wymóg; panel uprzedza) — może
-  ostrzeżenie w Diagnostyce Fii.
-- ⬜ Obrót wydruku (`map0:ROTATION`).
-
-### ⬜ 2. Do przetestowania (zrobione, nieprzetestowane w pełni)
+### ⬜ 1. Do przetestowania (zrobione, nieprzetestowane w pełni)
 - ⬜ Etykiety `zrodla`/`autor` na szablonie, który je ma (szablon projektu kolejowego ma tylko `title`).
 - ⬜ Zakładki Fii w QGIS: „Zakres danych”, „Narzędzia pobierania”, zapamiętane poświadczenia.
 - ⬜ Narzędzia edycji geometrii w przeglądarce na prawdziwych danych, cofanie (Ctrl+Z).
 
-### ⬜ 3. Drobne zaległości
+### ⬜ 2. Drobne zaległości
 - ⬜ **Pomiar** (długość, powierzchnia) na pasku narzędzi — był na liście ikon, nie powstał.
 - ⬜ **Limit wielkości plików per warstwa** (zdjęcia, dokumenty) — dziś globalne limity w konfiguracji API.
 - ⬜ Kolejne źródła narzędzi pobierania: PRG adresy, BDOT10k (nowy wpis w `SOURCES` i w `fia/tools.py`).
 - ⬜ **Wydajność mapy z filtrem zakresu danych** — kafle warstw z zakresem użytkownika renderują się
   wyraźnie wolniej (filtr `sophia_filter` w QGIS Server); do zbadania: indeksy, prostszy warunek, cache.
 
-### ⬜ 4. Graficzny edytor schematu bazy (WebUI) — plan z 15.11
+### ⬜ 3. Graficzny edytor schematu bazy (WebUI) — plan z 15.11
 Diagram tabel jak w narzędziach ERD: karty tabel przeciągane po płótnie, relacja = „sznurek”
 przeciągnięty z pola na pole. Działa na istniejących schematach danych (dziś `dane`, `rdlp`,
 `straznicy`) i na nowych. Panel administratora → **Baza danych**.
@@ -98,12 +93,12 @@ przeciągnięty z pola na pole. Działa na istniejących schematach danych (dzi�
   (`docs/user/zalaczniki.md`).
 - ✅ Sprzątanie plików osieroconych: kosz projektu, próg 7 dni, panel → Pliki, `python -m app.uploads`
   (`docs/SERVER.md`, 5b).
-- ⬜ Limit wielkości plików per warstwa → plan, punkt 3.
+- ⬜ Limit wielkości plików per warstwa → plan, punkt 2.
 
 ### ✔️ Pasek narzędzi
 - ✅ Górny pasek narzędzi edycji, wyszarzony bez warstwy edycyjnej; wybór warstwy z drzewa i z listy.
 - ✅ Ikony w stylu QGIS z podpowiedziami — własne SVG (`Icons.tsx`), bez grafik QGIS (GPL).
-- ⬜ Pomiar → plan, punkt 3.
+- ⬜ Pomiar → plan, punkt 2.
 
 ### ✅ Edycja geometrii
 Szkic w przeglądarce z przyciąganiem, geometrię liczy PostGIS w API: jedna transakcja, kontrola zakresu
@@ -123,7 +118,7 @@ danych, wpis do dziennika zmian. Opis: `docs/user/README.md`.
 
 ### ✅ Narzędzia pobierania
 - ✅ ULDK: działka i budynek z kliknięcia do warstwy projektu, mapowanie pól w Fii, karta wyniku
-  (`api/app/fetchers.py`, `fia/tools.py`, `docs/user/uldk.md`). Kolejne źródła → plan, punkt 3.
+  (`api/app/fetchers.py`, `fia/tools.py`, `docs/user/uldk.md`). Kolejne źródła → plan, punkt 2.
 
 ### ✅ Mapa, warstwy i podkłady
 - ✅ Mapa z podkładami także bez projektu i dla niezalogowanych; na liście projektów pozycja
@@ -141,7 +136,7 @@ danych, wpis do dziennika zmian. Opis: `docs/user/README.md`.
 - ✅ Raporty do PDF z filtrem zakresu użytkownika budują wtyczki na tym mechanizmie (np. załączniki
   sprawozdawcze, także paczka ZIP wielu PDF) — zamiast raportów z menedżera wydruków QGIS.
 
-### ✔️ Wydruki
+### ✅ Wydruki
 - ✅ Układ Sophii w przeglądarce: bieżący widok z podkładami i warstwami na A4/A3, tytuł, skala,
   podziałka, data, źródła (`web/src/print.ts`).
 - ✅ Szablony QGIS z panelu „Wydruk”: stałe skale, ramka na mapie, tytuł/opis do etykiet `tytul`/`opis`,
@@ -156,7 +151,12 @@ danych, wpis do dziennika zmian. Opis: `docs/user/README.md`.
   ostatniego postępu (45 s) zamiast stałych 60 s, najwyżej 5 min; w karcie w tle limit stoi (15.11,
   cfde0c1). Sprawdzone w przeglądarce: Schmettau A3, 200 dpi, 1:25 000 — 98 kafli w 5 s, z licznikiem.
 - ✅ Dokumentacja `docs/user/wydruki.md`: etykiety, legenda, mapa przeglądowa, postęp i limity.
-- ⬜ Podkład bez warstwy w projekcie, obrót → plan, punkt 1.
+- ✅ Obrót mapy szablonu (`map0:ROTATION`, pole „Obrót mapy”, obrócona ramka na mapie); sprawdzone GetPrint
+  na serwerze — treść obraca się zgodnie z zegarem, ramka w przeciwną stronę (22.11).
+- ✅ Podkłady z katalogu w szablonie: Fia → Wydruki → „Dodaj podkłady Sophii do projektu…” (WMTS, WMS, XYZ jako
+  „Tylko w QGIS”, grupa „Podkłady Sophii”); API dopasowuje także podkłady WMS. Fia → Diagnostyka: brak szablonów
+  (informacja), mapy szablonów z warstwami, których Sophia nie wydrukuje (ostrzeżenie). Wydruk bez szablonu —
+  układ Sophii (22.11).
 
 ### ✅ Wtyczki
 - ✅ System wtyczek (16.11): manifest `sophia-plugin.json`, ładowanie z `plugins/` (wolumen `/plugins`),

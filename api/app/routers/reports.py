@@ -8,6 +8,9 @@ tytuł i opis do etykiet o identyfikatorach `tytul` / `opis`. docs/user/wydruki.
 QGIS Server adresuje mapy szablonu kolejnością: map0 = pierwsza mapa układu. map0:LAYERS — pierwsza
 warstwa na spodzie (jak w GetMap); podkład z katalogu idzie więc na początek listy.
 
+map0:ROTATION — obrót mapy w stopniach (zgodnie z ruchem wskazówek zegara, jak w QGIS): treść mapy się obraca,
+ramka na kartce zostaje; zasięg (rozmiar × skala wokół środka) obraca się razem z nią.
+
 map0:EXTENT musi mieć proporcje ramki mapy szablonu — QGIS Server dopasowuje wysokość ramki do
 proporcji zasięgu (zasięg ekranu: ramka wychodzi poza kartkę albo się spłaszcza), patrz fit_extent.
 """
@@ -82,6 +85,11 @@ def project_basemap_layer(project: Project, kind: str, config: dict) -> str | No
             return lyr.wms_name
         if kind == "xyz" and p.get("type") == "xyz" and p.get("url", "").lower() == str(config.get("url", "")).lower():
             return lyr.wms_name
+        same_wms = (kind == "wms" and not p.get("tilematrixset") and p.get("type") != "xyz" and p.get("url")
+                    and _norm_url(p["url"]) == _norm_url(config.get("url", ""))
+                    and p.get("layers", "").lower() == str(config.get("layers", "")).lower())
+        if same_wms:
+            return lyr.wms_name
     return None
 
 
@@ -155,6 +163,7 @@ async def render_report(
     pk: str | None = Query(None, description="Klucz obiektu dla raportu z atlasem"),
     extent: str | None = Query(None, description="minx,miny,maxx,maxy w układzie projektu (środek widoku)"),
     scale: float | None = Query(None, gt=0, description="Skala mapy (mianownik); bez — cały zasięg extent"),
+    rotation: float | None = Query(None, ge=-360, le=360, description="Obrót mapy w stopniach, zgodnie z ruchem wskazówek zegara"),
     layers: str | None = Query(None, description="Widoczne warstwy (nazwy WMS) od spodu, przecinkami"),
     basemaps: str | None = Query(None, description="Id podkładów z katalogu (podkład, nakładki)"),
     dpi: int = Query(200, ge=72, le=400),
@@ -197,6 +206,8 @@ async def render_report(
             params["map0:EXTENT"] = ",".join(f"{v:.3f}" for v in fit_extent(box, report.map_mm, scale))
         if scale:
             params["map0:SCALE"] = str(round(scale))
+        if rotation and round(rotation, 2) % 360:
+            params["map0:ROTATION"] = f"{rotation:.2f}".rstrip("0").rstrip(".")
         requested = [n for n in (layers or "").split(",") if n]
         if set(requested) - allowed:
             raise HTTPException(status.HTTP_403_FORBIDDEN, "Brak dostępu do części warstw")

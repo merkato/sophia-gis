@@ -8,7 +8,7 @@ export const SCALES = [500, 1000, 2000, 2500, 5000, 10000, 25000, 50000, 100000,
 const STORE = "sophia.print";
 const SOPHIA = "";                                  // wartość listy: układ Sophii (bez szablonu QGIS)
 
-interface Saved { template?: string; paper?: Paper; orientation?: Orientation; dpi?: number; scale?: number | null }
+interface Saved { template?: string; paper?: Paper; orientation?: Orientation; dpi?: number; scale?: number | null; rotation?: number }
 function loadSaved(): Saved {
   try { return JSON.parse(localStorage.getItem(STORE) ?? "{}"); } catch { return {}; }
 }
@@ -26,7 +26,7 @@ export function PrintPanel({ config, basemaps, wmsLayers, layerNames, opacity, g
   wmsLayers: string[];                 // od spodu
   layerNames: string[];
   getView: () => { extent: number[]; center: number[] } | null;
-  onFrame: (sizeMeters: [number, number] | null) => void;   // ramka obszaru wydruku na mapie
+  onFrame: (frame: [number, number, number] | null) => void;   // ramka wydruku na mapie: szer., wys. [m], obrót [°]
   onClose: () => void;
 }) {
   const layouts = useMemo(() => config.reports.filter((r) => !r.layer_id), [config.reports]);
@@ -39,6 +39,7 @@ export function PrintPanel({ config, basemaps, wmsLayers, layerNames, opacity, g
   const [orientation, setOrientation] = useState<Orientation>(saved.orientation ?? "landscape");
   const [dpi, setDpi] = useState(saved.dpi ?? 150);
   const [scale, setScale] = useState<number | null>(saved.scale ?? null);
+  const [rotation, setRotation] = useState<number>(saved.rotation ?? 0);   // szablon QGIS: obrót mapy, ° zgodnie z zegarem
   const [info, setInfo] = useState<ReportInfo | null>(null);
   const [busy, setBusy] = useState(false);
   const [progress, setProgress] = useState<[number, number] | null>(null);
@@ -58,14 +59,15 @@ export function PrintPanel({ config, basemaps, wmsLayers, layerNames, opacity, g
     return () => { cancelled = true; };
   }, [isLayout, config.slug, template, basemaps]);
 
-  // ramka na mapie: rozmiar pola mapy wydruku w terenie (tylko przy stałej skali)
+  // ramka na mapie: rozmiar pola mapy wydruku w terenie (tylko przy stałej skali), obrócona jak mapa szablonu
+  const rot = isLayout ? rotation : 0;
   useEffect(() => {
-    onFrame(scale && mapMm ? [(mapMm[0] * scale) / 1000, (mapMm[1] * scale) / 1000] : null);
-  }, [scale, mapMm?.[0], mapMm?.[1]]);    // eslint-disable-line react-hooks/exhaustive-deps
+    onFrame(scale && mapMm ? [(mapMm[0] * scale) / 1000, (mapMm[1] * scale) / 1000, rot] : null);
+  }, [scale, mapMm?.[0], mapMm?.[1], rot]);    // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => () => onFrame(null), []);   // eslint-disable-line react-hooks/exhaustive-deps
 
   const remember = () => {
-    try { localStorage.setItem(STORE, JSON.stringify({ template, paper, orientation, dpi, scale })); } catch { /* */ }
+    try { localStorage.setItem(STORE, JSON.stringify({ template, paper, orientation, dpi, scale, rotation })); } catch { /* */ }
   };
 
   // źródła: podkład i nakładki z katalogu + atrybucje widocznych warstw projektu (jak w układzie Sophii)
@@ -87,6 +89,7 @@ export function PrintPanel({ config, basemaps, wmsLayers, layerNames, opacity, g
         basemaps: basemaps.map((b) => b.id).join(","),
       };
       if (scale) p.scale = String(scale);
+      if (rot) p.rotation = String(rot);
       if (info?.title_label) p.title = title;
       if (info?.note_label) p.note = note;
       if (info?.sources_label) p.sources = attributions().join("; ");
@@ -164,6 +167,15 @@ export function PrintPanel({ config, basemaps, wmsLayers, layerNames, opacity, g
             <option value={200}>wysoka (200)</option>{isLayout && <option value={300}>do druku (300)</option>}
           </select></label>
       </div>
+      {isLayout && (
+        <label className="field"><span>Obrót mapy (°)</span>
+          <span className="inline">
+            <input type="number" className="num" min={-180} max={180} step={1} value={rotation}
+              onChange={(e) => { const v = Number(e.target.value); setRotation(Number.isFinite(v) ? Math.max(-180, Math.min(180, v)) : 0); }}
+              title="Zgodnie z ruchem wskazówek zegara; północ na wydruku obróci się o ten kąt" />
+            {rotation !== 0 && <button type="button" onClick={() => setRotation(0)} title="Bez obrotu">0°</button>}
+          </span></label>
+      )}
       <p className="muted">
         {scale ? "Niebieska ramka na mapie pokazuje obszar wydruku — przesuń mapę, aby go ustawić."
           : "Wydruk obejmie cały widok mapy (skala dopasuje się do pola mapy)."}

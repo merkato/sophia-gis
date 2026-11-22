@@ -122,7 +122,7 @@ export default function App() {
     return next;
   });
   const treeSliders = useOpenSliders();
-  const [printFrame, setPrintFrame] = useState<[number, number] | null>(null);
+  const [printFrame, setPrintFrame] = useState<[number, number, number] | null>(null);
   const [editLayerId, setEditLayerId] = useState<string | null>(null);
   const [tool, setTool] = useState<Tool>("identify");
   const [selection, setSelection] = useState<Selection | null>(null);

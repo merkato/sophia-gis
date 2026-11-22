@@ -23,6 +23,8 @@ from qgis.PyQt.QtWidgets import (
     QInputDialog,
     QLabel,
     QLineEdit,
+    QListWidget,
+    QListWidgetItem,
     QMessageBox,
     QProgressDialog,
     QPushButton,
@@ -35,7 +37,7 @@ from qgis.PyQt.QtWidgets import (
     QWidget,
 )
 
-from . import checks, credentials, photosync, publish, rasters
+from . import basemap_sources, checks, credentials, photosync, publish, rasters
 from .scope_tab import ScopeTab
 from .tools import ToolsTab
 
@@ -121,7 +123,9 @@ class FiaDialog(QDialog):
 
     def _fill_layers(self):
         layer_cfg = self.cfg.get("layers", {})
-        vectors = [lyr for lyr in self.prj.mapLayers().values() if isinstance(lyr, QgsVectorLayer)]
+        # wektory i rastry z usług sieciowych (WMS/WMTS/XYZ — np. podkłady „Tylko w QGIS” do wydruków)
+        vectors = [lyr for lyr in self.prj.mapLayers().values()
+                   if isinstance(lyr, QgsVectorLayer) or (isinstance(lyr, QgsRasterLayer) and lyr.providerType() == "wms")]
         self.layer_table.blockSignals(True)
         self.layer_table.setRowCount(len(vectors))
         for row, lyr in enumerate(sorted(vectors, key=lambda x: x.name().lower())):
@@ -136,7 +140,7 @@ class FiaDialog(QDialog):
             att.setFlags(Qt.ItemFlag.ItemIsEnabled)
             att.setToolTip("Wykryte z projektu: pola z widżetem Załącznik i tabele w relacji")
             self.layer_table.setItem(row, 2, att)
-            self.layer_table.setItem(row, 3, _check_item(c.get("popup", True)))
+            self.layer_table.setItem(row, 3, _check_item(c.get("popup", True), isinstance(lyr, QgsVectorLayer)))
             self.layer_table.setItem(row, 4, _check_item(c.get("hidden", False)))
             self._update_layer_status(row)
         self.layer_table.blockSignals(False)
@@ -265,7 +269,86 @@ class FiaDialog(QDialog):
         lay.addWidget(QLabel("Raporty to wydruki z projektu. Wydruk z włączonym atlasem staje się raportem "
                              "dla wskazanego obiektu (np. karta działki z tabelą właścicieli)."))
         lay.addWidget(self.report_table)
+        bm = QPushButton("Dodaj podkłady Sophii do projektu…")
+        bm.clicked.connect(self.on_add_basemaps)
+        note = QLabel("QGIS Server drukuje tylko warstwy projektu. Żeby podkład albo nakładka z katalogu Sophii "
+                      "była na wydruku z szablonu, projekt musi mieć warstwę z tej samej usługi — przycisk dodaje "
+                      "wybrane podkłady jako warstwy „Tylko w QGIS” (adres portalu z zakładki Publikacja).")
+        note.setWordWrap(True)
+        lay.addWidget(note)
+        lay.addWidget(bm)
         return w
+
+    def on_add_basemaps(self):
+        """Podkłady z katalogu Sophii → warstwy projektu „Tylko w QGIS” (grupa „Podkłady Sophii”, wyłączone)."""
+        url = self.url.text().strip().rstrip("/")
+        try:
+            catalog = publish.get_json(f"{url}/api/basemaps", self.verify.isChecked())
+        except publish.ApiError as exc:
+            QMessageBox.warning(self, "Fia", f"Nie udało się pobrać katalogu podkładów z {url}:\n{exc}")
+            return
+        existing = [lyr for lyr in self.prj.mapLayers().values() if isinstance(lyr, QgsRasterLayer)]
+        crs = self.prj.crs().authid() or "EPSG:2180"
+        dlg = QDialog(self)
+        dlg.setWindowTitle("Podkłady Sophii")
+        lst = QListWidget()
+        for b in catalog:
+            src = basemap_sources.layer_source(b["kind"], b.get("config") or {}, crs)
+            have = next((lyr for lyr in existing if basemap_sources.matches(b["kind"], b.get("config") or {}, lyr.source())), None)
+            label = f"{b['name']}{' (nakładka)' if b.get('is_overlay') else ''}"
+            it = QListWidgetItem(label)
+            if src is None:
+                it.setText(f"{label} — warstwa projektu Sophii, nie wymaga dodawania")
+                it.setFlags(Qt.ItemFlag.NoItemFlags)
+            elif have is not None:
+                it.setText(f"{label} — już w projekcie („{have.name()}”)")
+                it.setFlags(Qt.ItemFlag.NoItemFlags)
+            else:
+                it.setFlags(Qt.ItemFlag.ItemIsEnabled | Qt.ItemFlag.ItemIsUserCheckable)
+                it.setCheckState(Qt.CheckState.Checked)
+                it.setData(Qt.ItemDataRole.UserRole, (b["name"], *src))
+            lst.addItem(it)
+        buttons = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
+        buttons.accepted.connect(dlg.accept)
+        buttons.rejected.connect(dlg.reject)
+        v = QVBoxLayout(dlg)
+        v.addWidget(QLabel("Zaznaczone podkłady trafią do grupy „Podkłady Sophii” (wyłączone w QGIS, ukryte w Sophii)."))
+        v.addWidget(lst)
+        v.addWidget(buttons)
+        if not catalog or dlg.exec() != QDialog.DialogCode.Accepted:
+            if not catalog:
+                QMessageBox.information(self, "Fia", "Katalog podkładów Sophii jest pusty.")
+            return
+        chosen = [lst.item(i).data(Qt.ItemDataRole.UserRole) for i in range(lst.count())
+                  if lst.item(i).flags() & Qt.ItemFlag.ItemIsUserCheckable and lst.item(i).checkState() == Qt.CheckState.Checked]
+        if not chosen:
+            return
+        self.cfg = self._collect()
+        root = self.prj.layerTreeRoot()
+        # na dole drzewa — pod warstwami projektu, jak podkład
+        group = root.findGroup("Podkłady Sophii") or root.insertGroup(len(root.children()), "Podkłady Sophii")
+        added, failed = [], []
+        QApplication.setOverrideCursor(Qt.CursorShape.WaitCursor)
+        try:
+            for name, provider, source in chosen:
+                lyr = QgsRasterLayer(source, name, provider)
+                if not lyr.isValid():
+                    failed.append(name)
+                    continue
+                props = lyr.serverProperties() if hasattr(lyr, "serverProperties") else lyr
+                props.setShortName(f"podklad-{slugify(name)}")
+                self.prj.addMapLayer(lyr, False)
+                group.addLayer(lyr).setItemVisibilityChecked(False)
+                self.cfg.setdefault("layers", {})[lyr.id()] = {"editable": False, "popup": False, "hidden": True}
+                added.append(name)
+        finally:
+            QApplication.restoreOverrideCursor()
+        save_config(self.cfg)
+        self._fill_layers()
+        msg = f"Dodano: {', '.join(added) or '—'}."
+        if failed:
+            msg += f"\nNie udało się wczytać (usługa niedostępna?): {', '.join(failed)}."
+        QMessageBox.information(self, "Fia", msg + "\nZapisz projekt i opublikuj go ponownie.")
 
     # ------------------------------------------------------------------ Diagnostyka
     def _build_diag_tab(self) -> QWidget:

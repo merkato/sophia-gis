@@ -41,6 +41,47 @@ def test_catalog_basemap_matches_project_layer():
     assert project_basemap_layer(project, "xyz", {"url": "https://tile.openstreetmap.org/{z}/{x}/{y}.png"}) == "osm"
 
 
+def test_catalog_wms_basemap_matches_project_layer():
+    wms = _raster("w", "bdot", "crs=EPSG%3A2180&format=image%2Fpng&layers=BDOT10k&styles"
+                  "&url=https%3A%2F%2Fmapy.geoportal.gov.pl%2Fwss%2Fservice%2FPZGIK%2FBDOT%2FWMS%2FTopograficzna")
+    project = SimpleNamespace(layers={"w": wms})
+    cfg = {"url": "https://mapy.geoportal.gov.pl/wss/service/PZGIK/BDOT/WMS/Topograficzna?", "layers": "BDOT10k"}
+    assert project_basemap_layer(project, "wms", cfg) == "bdot"
+    assert project_basemap_layer(project, "wms", {**cfg, "layers": "Inna"}) is None
+    assert project_basemap_layer(project, "wmts", {"url": cfg["url"], "layer": "BDOT10k"}) is None
+
+
+def test_fia_basemap_sources_match_catalog():
+    """Warstwy dodawane przez Fię („Dodaj podkłady Sophii”) muszą pasować do podkładów z katalogu."""
+    import importlib.util
+    from pathlib import Path
+
+    path = Path(__file__).resolve().parents[2] / "fia" / "basemap_sources.py"
+    if not path.is_file():   # testy w obrazie API bez katalogu fia
+        import pytest
+        pytest.skip("brak fia/basemap_sources.py")
+    spec = importlib.util.spec_from_file_location("basemap_sources", path)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    catalog = [
+        ("wmts", {"url": "https://mapy.geoportal.gov.pl/wss/service/PZGIK/ORTO/WMTS/StandardResolution", "layer": "ORTOFOTOMAPA",
+                  "matrix_set": "EPSG:2180", "format": "image/jpeg", "tile_grid": {"crs": "EPSG:2180"}}),
+        ("xyz", {"url": "https://tile.openstreetmap.org/{z}/{x}/{y}.png", "max_zoom": 19}),
+        ("wms", {"url": "https://mapy.geoportal.gov.pl/wss/service/PZGIK/BDOT/WMS/Topograficzna", "layers": "BDOT10k"}),
+    ]
+    layers = {}
+    for i, (kind, cfg) in enumerate(catalog):
+        provider, source = mod.layer_source(kind, cfg, "EPSG:2180")
+        assert provider == "wms"
+        layers[str(i)] = _raster(str(i), f"l{i}", source)
+    project = SimpleNamespace(layers=layers)
+    for i, (kind, cfg) in enumerate(catalog):
+        assert project_basemap_layer(project, kind, cfg) == f"l{i}"
+        assert mod.matches(kind, cfg, layers[str(i)].source)
+        assert not mod.matches(kind, {**cfg, "url": "https://inny.example/x"}, layers[str(i)].source)
+    assert mod.layer_source("sophia", {"project": "x", "layers": ["a"]}, "EPSG:2180") is None
+
+
 def test_label_text_strips_expressions():
     assert _label_text("Mapa [% env('PGPASSWORD') %] obszaru") == "Mapa  env('PGPASSWORD')  obszaru"
 

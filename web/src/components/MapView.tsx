@@ -75,7 +75,7 @@ interface Props {
   marked: string[];                                      // obiekty wybrane do połączenia (wyróżnione)
   onFetchClick?: (coordinate: number[]) => void;         // narzędzie pobierania (ULDK…)
   preview?: GeoJSONFeature["geometry"] | null;           // obrys pobranego obiektu przed dodaniem
-  printFrame?: [number, number] | null;                  // obszar wydruku [szer., wys.] w metrach, wokół środka widoku
+  printFrame?: [number, number, number] | null;          // obszar wydruku [szer., wys.] w metrach wokół środka widoku, obrót w ° (zegar)
   opacity: Record<string, number>;                       // krycie 0–100: "<slug>/<warstwa WMS>", "bm:<id>"
   mapRef: MutableRefObject<OlMap | null>;
 }
@@ -281,15 +281,18 @@ export function MapView(props: Props) {
     const update = () => {
       const c = view.getCenter();
       if (!c) return;
-      const [w, h] = printFrame;
-      f.setGeometry(polygonFromExtent([c[0] - w / 2, c[1] - h / 2, c[0] + w / 2, c[1] + h / 2]));
+      const [w, h, rot] = printFrame;
+      const g = polygonFromExtent([c[0] - w / 2, c[1] - h / 2, c[0] + w / 2, c[1] + h / 2]);
+      // QGIS obraca treść mapy zgodnie z zegarem — obszar w terenie obraca się przeciwnie (OL: dodatni kąt = przeciwnie)
+      if (rot) g.rotate((rot * Math.PI) / 180, c);
+      f.setGeometry(g);
     };
     update();
     src.addFeature(f);
     view.on("change:center", update);
     return () => { view.un("change:center", update); src.clear(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [printFrame?.[0], printFrame?.[1], config.slug]);
+  }, [printFrame?.[0], printFrame?.[1], printFrame?.[2], config.slug]);
 
   // --- podgląd obiektu z narzędzia pobierania
   const { preview } = props;

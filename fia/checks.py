@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 
-from qgis.core import Qgis, QgsDataSourceUri, QgsMapLayer, QgsProject, QgsRasterLayer, QgsVectorLayer
+from qgis.core import Qgis, QgsDataSourceUri, QgsLayoutItemMap, QgsMapLayer, QgsProject, QgsRasterLayer, QgsVectorLayer
 
 LIBRARY_DIR = "rasters"     # wspólna biblioteka: <katalog>/rasters  <->  /opt/sophia/data/rasters
 
@@ -153,4 +153,54 @@ def project_issues() -> list[tuple[str, str, str]]:
             ua, ub = QgsDataSourceUri(a.source()), QgsDataSourceUri(b.source())
             if (ua.service(), ua.database()) != (ub.service(), ub.database()):
                 out.append((rel.name(), "warning", "Relacja między różnymi bazami — portal jej nie obsłuży"))
+    out.extend(layout_issues())
+    return out
+
+
+def _unavailable(layer: QgsMapLayer | None, restricted: set[str]) -> str | None:
+    """Powód, dla którego QGIS Server Sophii nie narysuje warstwy (None — narysuje)."""
+    if layer is None:
+        return "usunięta z projektu"
+    if layer.name() in restricted:
+        return "wyłączona z WMS (Właściwości projektu → QGIS Server)"
+    if not layer.isValid():
+        return "nieprawidłowe źródło"
+    errors = [m for lvl, m in layer_issues(layer) if lvl == "error"]
+    return errors[0] if errors else None
+
+
+def layout_issues() -> list[tuple[str, str, str]]:
+    """Szablony wydruku: brak szablonów (info) i mapy szablonów pokazujące warstwy, których Sophia
+    nie wydrukuje (warning). Mapa główna (pierwsza) dostaje w Sophii warstwy włączone w przeglądarce —
+    dotyczy jej to tylko przy wydruku bez wybranych warstw; pozostałe mapy (np. przeglądowa) zawsze."""
+    prj = QgsProject.instance()
+    layouts = prj.layoutManager().printLayouts()
+    if not layouts:
+        msg = ("Brak szablonów wydruku — w Sophii dostępny będzie tylko układ Sophii "
+               "(bez etykiet, legendy i innych elementów szablonu QGIS)")
+        return [("Wydruki", "info", msg)]
+    restricted = set(prj.readListEntry("WMSRestrictedLayers", "/")[0])
+    themes = prj.mapThemeCollection()
+    out: list[tuple[str, str, str]] = []
+    for layout in layouts:
+        maps = [i for i in layout.items() if isinstance(i, QgsLayoutItemMap)]
+        if not maps:
+            out.append((layout.name(), "info", "Szablon bez mapy — Sophia wydrukuje go bez widoku mapy"))
+        for n, m in enumerate(maps):
+            if m.followVisibilityPreset() and m.followVisibilityPresetName():
+                name = m.followVisibilityPresetName()
+                if not themes.hasMapTheme(name):
+                    out.append((layout.name(), "warning", f"Mapa „{m.displayName()}” korzysta z nieistniejącego motywu „{name}”"))
+                    continue
+                layers = themes.mapThemeVisibleLayers(name)
+            elif m.keepLayerSet():
+                layers = m.layers()
+            else:
+                continue          # warstwy z widoku — w Sophii z przeglądarki
+            bad = [f"{lyr.name() if lyr else '?'} ({why})" for lyr in layers if (why := _unavailable(lyr, restricted))]
+            if bad:
+                kto = "mapa główna, gdy w Sophii nie wybrano warstw" if n == 0 else "zawsze"
+                out.append((layout.name(), "warning",
+                            f"Mapa „{m.displayName()}” pokazuje warstwy, których Sophia nie wydrukuje ({kto}): "
+                            + ", ".join(bad)))
     return out

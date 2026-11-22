@@ -9,7 +9,8 @@ na kartce. Do wyboru są dwa rodzaje wydruku:
 | Skąd | układ wydruku zapisany w projekcie QGIS | wbudowany w Sophię, nie wymaga konfiguracji |
 | Wygląd | dowolny: logo, legenda, siatka, kilka map, tabele… | tytuł, mapa, północ, skala z podziałką, data, źródła |
 | Papier | ten z szablonu | A4 / A3, pionowo lub poziomo |
-| Podkład z katalogu | gdy projekt ma warstwę z tej samej usługi (niżej) | zawsze |
+| Podkład z katalogu | gdy projekt ma warstwę z tej samej usługi (Fia dodaje ją jednym przyciskiem, niżej) | zawsze |
+| Obrót mapy | tak (pole „Obrót mapy”) | nie |
 | Wynik | PDF z QGIS Server | strona do druku / zapisu jako PDF |
 
 Wspólne ustawienia w panelu:
@@ -18,6 +19,9 @@ Wspólne ustawienia w panelu:
   1:10 000, 1:25 000, 1:50 000, 1:100 000, 1:250 000, 1:500 000. Środek wydruku = środek mapy.
 - **Tytuł** i **opis** — trafiają do etykiet szablonu (niżej) albo do nagłówka układu Sophii.
 - **Jakość** — 96 / 150 / 200 dpi (szablon QGIS także 300 dpi).
+- **Obrót mapy** (tylko szablon QGIS) — kąt w stopniach, zgodnie z ruchem wskazówek zegara, od −180° do 180°:
+  treść mapy głównej obraca się na kartce (ramka mapy zostaje), niebieska ramka na mapie obraca się tak
+  samo i pokazuje obszar w terenie. Strzałka północy powiązana z mapą główną obróci się razem z mapą.
 - Na wydruku są warstwy włączone w panelu warstw i wybrany podkład, w kolejności jak na ekranie,
   z **przezroczystością** ustawioną suwakiem ◐ (rastry, podkład). Każdy widzi tylko dane ze swojego
   zakresu ([uprawnienia](uprawnienia.md)).
@@ -83,22 +87,31 @@ usuwane (nie wykonują się na serwerze); wyrażenia w etykietach szablonu dzia�
 
 ### 4. Podkład z katalogu na wydruku z szablonu
 
-QGIS Server drukuje tylko warstwy zapisane w projekcie. Żeby wybrany w Sophii podkład (np.
-ortofotomapa z Geoportalu) był na wydruku z szablonu, **dodaj do projektu warstwę z tej samej
-usługi** — tak samo, jak dodajesz ją do pracy w QGIS:
+QGIS Server drukuje tylko warstwy zapisane w projekcie. Żeby wybrany w Sophii podkład albo nakładka (np.
+ortofotomapa z Geoportalu) była na wydruku z szablonu, projekt musi mieć **warstwę z tej samej usługi**:
 
-1. *Warstwa → Dodaj warstwę → WMS/WMTS*, ta sama usługa i warstwa co w katalogu podkładów Sophii
-   (np. `https://mapy.geoportal.gov.pl/wss/service/PZGIK/ORTO/WMTS/StandardResolution`, warstwa
-   `ORTOFOTOMAPA`, zestaw macierzy `EPSG:2180`),
-2. w Fii zaznacz ją jako **Tylko w QGIS** — w przeglądarce jest już w katalogu podkładów, nie
-   zdubluje się na liście warstw,
-3. opublikuj projekt.
+1. Fia → zakładka **Wydruki** → **Dodaj podkłady Sophii do projektu…** — Fia pobiera katalog podkładów
+   z portalu (adres z zakładki Publikacja), pokazuje, których brakuje w projekcie, i dodaje zaznaczone
+   (WMTS, WMS, XYZ) do grupy „Podkłady Sophii” na dole drzewa: wyłączone w QGIS i oznaczone
+   **Tylko w QGIS** (w przeglądarce są już w katalogu podkładów, nie zdublują się na liście warstw),
+2. zapisz i opublikuj projekt.
+
+Można też dodać warstwę ręcznie (*Warstwa → Dodaj warstwę → WMS/WMTS*, ta sama usługa i warstwa co
+w katalogu, np. `https://mapy.geoportal.gov.pl/wss/service/PZGIK/ORTO/WMTS/StandardResolution`, warstwa
+`ORTOFOTOMAPA`, zestaw macierzy `EPSG:2180`) i zaznaczyć ją w Fii jako **Tylko w QGIS**.
 
 Sophia dopasowuje warstwę po adresie usługi i nazwie warstwy i kładzie ją pod warstwami projektu.
 Gdy projekt nie ma takiej warstwy, panel uprzedza, że podkład się nie wydrukuje — wtedy wydrukuj
 w **Układzie Sophii**, który podkład z katalogu ma zawsze.
 
 ### 5. Sprawdzenie
+
+Fia → **Diagnostyka** podpowiada przed publikacją:
+- *informacja* — projekt nie ma szablonów wydruku (w Sophii będzie tylko układ Sophii),
+- *ostrzeżenie* — mapa szablonu z zablokowanymi warstwami albo motywem mapy pokazuje warstwy, których
+  Sophia nie wydrukuje (nieprawidłowe źródło, plik poza serwerem, warstwa wyłączona z WMS, usunięta).
+  Mapa główna dostaje w Sophii warstwy włączone w przeglądarce, więc jej to dotyczy tylko przy wydruku
+  bez wybranych warstw; mapy dodatkowe (np. przeglądowa) — zawsze.
 
 W QGIS: *Eksport do PDF* z układu (atlas wyłączony). W Sophii: panel **Wydruk** → szablon →
 skala → **Utwórz PDF**. Zmiany w szablonie są widoczne po ponownej publikacji projektu przez Fię.
