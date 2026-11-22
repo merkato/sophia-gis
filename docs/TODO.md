@@ -1,6 +1,6 @@
 # TO DO — Sophia (WebUI, API, Fia)
 
-Aktualizacja 22.11.2026. Na górze plan (kolejność = kolejność realizacji), niżej zrobione — tematycznie.
+Aktualizacja 22.11.2026 (wdrożona Sophia 0.8.2). Na górze plan (kolejność = kolejność realizacji), niżej zrobione — tematycznie.
 Tylko rdzeń Sophii i ogólne wtyczki z `sophia-plugins`; prace wtyczek branżowych (np. wyłączenia) — w ich repozytoriach.
 
 Oznaczenia: ✅ zrobione · ✔️ zrobione częściowo (co zostało — w planie) · ⬜ do zrobienia
@@ -15,18 +15,6 @@ Oznaczenia: ✅ zrobione · ✔️ zrobione częściowo (co zostało — w plani
 
 ### ⬜ 2. Drobne zaległości
 - ⬜ Kolejne źródła narzędzi pobierania: PRG adresy, BDOT10k (nowy wpis w `SOURCES` i w `fia/tools.py`).
-- ✅ **Wydajność mapy z filtrem zakresu danych** — analiza i zmiany 22.11 (wyłączenia, użytkownik z jednym
-  nadleśnictwem): render z filtrem +0–0,15 s na obraz, autoryzacja `/ows` ~4 ms, naprzemienni użytkownicy bez kary.
-  - ✅ obraz wektorów w 1:1 (`ImageWMS` `hidpi: false`, `ratio` 1,1) — wcześniej np. 3780×1458 px na HiDPI,
-    0,5–0,65 s przy każdym przesunięciu; teraz ok. 4× mniej pikseli,
-  - ✅ źródło narzutu filtra na warstwie użytków EGiB: QGIS sprawdza unikalność klucza widoku
-    (`checkPrimaryKeyUnicity`) przy każdej zmianie filtra — z filtrem przestrzennym 105 ms (bez 8 ms). Fia →
-    Diagnostyka: ostrzeżenie i przycisk „Wyłącz sprawdzanie unikalności klucza w widokach”,
-  - ✖ podzielone granice zakresu (`ST_Subdivide`) — sprawdzone i odrzucone: na danych produkcji filtr na całej
-    granicy kosztuje 1–3 ms (PostGIS cache'uje przygotowaną geometrię), a pocięcie granic całego kraju 20 s,
-  - ✅ dziennik czasów `/ows` w Caddy + `scripts/server/ows-report.sh` (mediana, p95, rozmiar, błędy),
-  - ✅ strojenie QGIS Server przy starcie z CPU i pamięci kontenera (`config/qgis-start.sh`, nadpisanie
-    `SOPHIA_QGIS_*` w `.env`) — działa tak samo na serwerze RDLP o innej liczbie rdzeni.
 
 ### ⬜ 3. Graficzny edytor schematu bazy (WebUI) — plan z 15.11
 Diagram tabel jak w narzędziach ERD: karty tabel przeciągane po płótnie, relacja = „sznurek”
@@ -195,6 +183,19 @@ danych, wpis do dziennika zmian. Opis: `docs/user/README.md`.
   paczka mLas; cały zakres albo bieżący widok; zestawienia innych wtyczek; dziennik pobrań), **`wyglad`**
   1.0.1 (motywy Sophia / Grafit / Lasy Państwowe, edytor motywów, logo PNG/WEBP, ikona karty, wyłączalna
   nazwa, motyw i panel warstw dla projektu).
+
+### ✅ Wydajność mapy z filtrem zakresu danych
+Analiza i zmiany 22.11, wdrożone (wyłączenia, użytkownik z jednym nadleśnictwem): render z filtrem +0–0,15 s na obraz, autoryzacja `/ows` ~4 ms, naprzemienni użytkownicy bez kary.
+- ✅ obraz wektorów w 1:1 (`ImageWMS` `hidpi: false`, `ratio` 1,1) — wcześniej np. 3780×1458 px na HiDPI,
+  0,5–0,65 s przy każdym przesunięciu; teraz ok. 4× mniej pikseli,
+- ✅ źródło narzutu filtra na warstwie użytków EGiB: QGIS sprawdza unikalność klucza widoku
+  (`checkPrimaryKeyUnicity`) przy każdej zmianie filtra — z filtrem przestrzennym 105 ms (bez 8 ms). Fia →
+  Diagnostyka: ostrzeżenie i przycisk „Wyłącz sprawdzanie unikalności klucza w widokach”,
+- ✖ podzielone granice zakresu (`ST_Subdivide`) — sprawdzone i odrzucone: na danych produkcji filtr na całej
+  granicy kosztuje 1–3 ms (PostGIS cache'uje przygotowaną geometrię), a pocięcie granic całego kraju 20 s,
+- ✅ dziennik czasów `/ows` w Caddy + `scripts/server/ows-report.sh` (mediana, p95, rozmiar, błędy),
+- ✅ strojenie QGIS Server przy starcie z CPU i pamięci kontenera (`config/qgis-start.sh`, nadpisanie
+  `SOPHIA_QGIS_*` w `.env`) — działa tak samo na serwerze RDLP o innej liczbie rdzeni.
 
 ### ✅ Serwer i wdrożenie
 - ✅ `config/pg_service.conf` poza gitem, w repo `pg_service.conf.example` (d5478d1). Plik musi być
