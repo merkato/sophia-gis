@@ -90,7 +90,7 @@ usuwane (nie wykonują się na serwerze); wyrażenia w etykietach szablonu dzia�
 QGIS Server drukuje tylko warstwy zapisane w projekcie. Żeby wybrany w Sophii podkład albo nakładka (np.
 ortofotomapa z Geoportalu) była na wydruku z szablonu, projekt musi mieć **warstwę z tej samej usługi**:
 
-1. Fia → zakładka **Wydruki** → **Dodaj podkłady Sophii do projektu…** — Fia pobiera katalog podkładów
+1. Fia → zakładka **Raporty** → **Dodaj podkłady Sophii do projektu…** — Fia pobiera katalog podkładów
    z portalu (adres z zakładki Publikacja), pokazuje, których brakuje w projekcie, i dodaje zaznaczone
    (WMTS, WMS, XYZ) do grupy „Podkłady Sophii” na dole drzewa: wyłączone w QGIS i oznaczone
    **Tylko w QGIS** (w przeglądarce są już w katalogu podkładów, nie zdublują się na liście warstw),

@@ -23,7 +23,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, s
 from fastapi.responses import FileResponse
 from psycopg import sql
 
-from .. import photos
+from .. import photos, storage
 from ..config import get_settings
 from ..db import layer_conn
 from ..permissions import ProjectContext, load_project_context
@@ -75,17 +75,20 @@ def _require_field_edit(ctx: ProjectContext, layer_id: str) -> None:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Brak uprawnienia do edycji warstwy")
 
 
-async def _read_limited(file: UploadFile) -> bytes:
-    limit = get_settings().max_photo_mb * 1024 * 1024
+def _mb(v: float) -> str:
+    return f"{v:g}".replace(".", ",")
+
+
+async def _read_limited(file: UploadFile, limit_mb: float) -> bytes:
+    limit = int(limit_mb * 1024 * 1024)
     data = await file.read(limit + 1)
     if len(data) > limit:
-        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                            f"Zdjęcie większe niż {get_settings().max_photo_mb} MB")
+        raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, f"Zdjęcie większe niż {_mb(limit_mb)} MB")
     return data
 
 
-async def _store_photo(ctx: ProjectContext, lyr: LayerDef, file: UploadFile) -> tuple[str, photos.Photo]:
-    data = await _read_limited(file)
+async def _store_photo(ctx: ProjectContext, lyr: LayerDef, field: str, file: UploadFile) -> tuple[str, photos.Photo]:
+    data = await _read_limited(file, await storage.limit_mb(ctx.slug, f"{lyr.id}:{field}", "photo"))
     try:
         photo = await asyncio.to_thread(photos.process_photo, data)
     except photos.PhotoError as e:
@@ -107,18 +110,18 @@ async def _store_file(ctx: ProjectContext, lyr: LayerDef, f: FieldDef, file: Upl
         photos.check_extension(f, name)
     except photos.PhotoError as e:
         raise HTTPException(status.HTTP_415_UNSUPPORTED_MEDIA_TYPE, str(e)) from e
-    s = get_settings()
+    limit_mb = await storage.limit_mb(ctx.slug, f"{lyr.id}:{f.name}", "file")
     rel = photos.new_file_path(lyr.pg.table if lyr.pg else lyr.id, name)
     dest = _uploads(ctx) / rel
     dest.parent.mkdir(parents=True, exist_ok=True)
-    sha, size, limit = hashlib.sha256(), 0, s.max_attachment_mb * 1024 * 1024
+    sha, size, limit = hashlib.sha256(), 0, int(limit_mb * 1024 * 1024)
     try:
         with dest.open("wb") as out:
             while chunk := await file.read(1024 * 1024):
                 size += len(chunk)
                 if size > limit:
                     raise HTTPException(status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                                        f"Plik większy niż {s.max_attachment_mb} MB")
+                                        f"Plik większy niż {_mb(limit_mb)} MB")
                 sha.update(chunk)
                 out.write(chunk)
         if size == 0:
@@ -204,10 +207,10 @@ async def upload_photo(slug: str, layer_id: str, file: UploadFile = File(...), f
     _require_right(ctx, photo=True)
     if parent_layer is None:
         _require_field_edit(ctx, layer_id)
-        rel, photo = await _store_photo(ctx, lyr, file)
+        rel, photo = await _store_photo(ctx, lyr, field, file)
         return _photo_meta(rel, photo)
     ctx.require(layer_id, "insert")
-    rel, photo = await _store_photo(ctx, lyr, file)
+    rel, photo = await _store_photo(ctx, lyr, field, file)
     try:
         feature = await _insert_child(ctx, user, lyr, field, rel, parent_layer, parent_pk, crs,
                                       (photo.lon, photo.lat) if photo.lon is not None else None)

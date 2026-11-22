@@ -167,6 +167,14 @@ export interface AdminPlugin {
 }
 export interface PluginAccessEntry { capability: string; group_id?: number | null; user_id?: number | null }
 
+/** Przechowywanie plików w projekcie (GET/PUT /api/admin/projects/{id}/storage). */
+export interface StorageLimit { max_mb: number; source: "webui" | "fia"; updated_at: string; updated_by: string | null }
+export interface StorageSet {
+  id: string; source: "layer" | "plugin"; title: string; kind: "photo" | "file"; default_mb: number;
+  layer_id?: string; layer?: string; field?: string; plugin?: string; limit?: StorageLimit;
+}
+export interface ProjectStorage { global: { photo: number; file: number }; sets: StorageSet[]; orphans: ({ id: string } & StorageLimit)[] }
+
 export const adminApi = {
   users: () => request<AdminUser[]>("/api/admin/users"),
   createUser: (u: UserInput) => request<{ id: number }>("/api/admin/users", json("POST", u)),
@@ -192,6 +200,9 @@ export const adminApi = {
   projectAccess: (id: number) => request<ProjectAccess>(`/api/admin/projects/${id}/access`),
   setProjectAccess: (id: number, a: ProjectAccess) => request(`/api/admin/projects/${id}/access`, json("PUT", a)),
   projectScope: (id: number) => request<ProjectScopeInfo>(`/api/admin/projects/${id}/scope`),
+  projectStorage: (id: number) => request<ProjectStorage>(`/api/admin/projects/${id}/storage`),
+  setProjectStorage: (id: number, limits: Record<string, number | null>) =>
+    request<ProjectStorage>(`/api/admin/projects/${id}/storage`, json("PUT", { limits })),
   uploads: (minAgeDays: number) => request<UploadsOverview>(`/api/admin/uploads?min_age_days=${minAgeDays}`),
   cleanupUploads: (id: number, minAgeDays: number) =>
     request<{ moved: number; size: number }>(`/api/admin/uploads/${id}/cleanup?min_age_days=${minAgeDays}`, { method: "POST" }),

@@ -342,3 +342,7 @@ ul.plain li { padding: 4px 0; }
   white-space: pre; pointer-events: none; box-shadow: 0 1px 4px rgba(0,0,0,.3); }
 .measure-label.done { background: #e8590c; }
 .measure-label.hint { background: rgba(29, 36, 48, .7); font-size: 11px; }
+
+/* --- przechowywanie plików (panel administratora → Projekty) */
+.storage-editor input.num { width: 130px; }
+.storage-editor input.invalid { border-color: var(--danger); }

@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { adminApi, type UserInput } from "../api";
 import type { AdminProject, AdminUser, Basemap, Group, ProjectAccess } from "../types";
 import { AccessEditor } from "./AccessEditor";
+import { StorageEditor } from "./StorageEditor";
 import { UploadsTab } from "./UploadsTab";
 import { BasemapEditor } from "./BasemapEditor";
 import { PluginPageView, PluginsTab } from "./PluginsTab";
@@ -236,6 +237,7 @@ function ProjectsTab({ run, onChanged }: { run: Run; onChanged: () => void }) {
   const [files, setFiles] = useState<{ file_name: string; registered: boolean }[]>([]);
   const [groups, setGroups] = useState<Group[]>([]);
   const [access, setAccess] = useState<{ project: AdminProject; data: ProjectAccess } | null>(null);
+  const [storageOf, setStorageOf] = useState<AdminProject | null>(null);
 
   const load = useCallback(() => run(async () => {
     const [p, f, g] = await Promise.all([adminApi.projects(), adminApi.projectFiles(), adminApi.groups()]);
@@ -279,7 +281,9 @@ function ProjectsTab({ run, onChanged }: { run: Run; onChanged: () => void }) {
                 <td><input type="number" className="num" defaultValue={p.sort_order} onBlur={(e) => Number(e.target.value) !== p.sort_order && update(p, { sort_order: Number(e.target.value) })} /></td>
                 <td className="muted">{p.file_name}</td>
                 <td className="row-actions">
-                  <button onClick={() => run(async () => setAccess({ project: p, data: await adminApi.projectAccess(p.id) }))}>Grupy i zakres…</button>
+                  <button onClick={() => { setAccess(null); setStorageOf(p); }}
+                    title="Zbiory plików projektu (pola „Załącznik”, wtyczki) i limity wielkości plików">Przechowywanie plików…</button>
+                  <button onClick={() => run(async () => { setStorageOf(null); setAccess({ project: p, data: await adminApi.projectAccess(p.id) }); })}>Grupy i zakres…</button>
                   <button className="danger" title="Usuwa projekt z menu; plik zostaje na serwerze"
                     onClick={() => confirm(`Usunąć „${p.title}” z portalu? Plik projektu zostanie na serwerze.`) && run(() => adminApi.deleteProject(p.id)).then(() => { load(); onChanged(); })}>Usuń</button>
                 </td>
@@ -304,6 +308,10 @@ function ProjectsTab({ run, onChanged }: { run: Run; onChanged: () => void }) {
           onChange={(data) => setAccess((a) => a && { ...a, data })}
           onSave={() => run(() => adminApi.setProjectAccess(access.project.id, access.data)).then((ok) => { if (ok) { setAccess(null); onChanged(); } })}
           onCancel={() => setAccess(null)} />
+      )}
+      {storageOf && (
+        <StorageEditor key={storageOf.id} project={storageOf} onClose={() => setStorageOf(null)}
+          onError={(m) => { run(async () => { throw new Error(m); }); }} />
       )}
     </div>
   );

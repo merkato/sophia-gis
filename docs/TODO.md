@@ -14,10 +14,16 @@ Oznaczenia: ✅ zrobione · ✔️ zrobione częściowo (co zostało — w plani
 - ⬜ Narzędzia edycji geometrii w przeglądarce na prawdziwych danych, cofanie (Ctrl+Z).
 
 ### ⬜ 2. Drobne zaległości
-- ⬜ **Limit wielkości plików per warstwa** (zdjęcia, dokumenty) — dziś globalne limity w konfiguracji API.
 - ⬜ Kolejne źródła narzędzi pobierania: PRG adresy, BDOT10k (nowy wpis w `SOURCES` i w `fia/tools.py`).
-- ⬜ **Wydajność mapy z filtrem zakresu danych** — kafle warstw z zakresem użytkownika renderują się
-  wyraźnie wolniej (filtr `sophia_filter` w QGIS Server); do zbadania: indeksy, prostszy warunek, cache.
+- ⬜ **Wydajność mapy z filtrem zakresu danych** — analiza 22.11 (wyłączenia, użytkownik z jednym nadleśnictwem):
+  render w QGIS Server z filtrem +0–0,15 s na obraz (tylko filtr przestrzenny — granice do 17 tys. wierzchołków),
+  autoryzacja `/ows` ~4 ms, naprzemienni użytkownicy bez kary. Główny koszt: jeden obraz wektorów na cały widok
+  w 2× na HiDPI (np. 3780×1458 px, 0,5–0,65 s przy każdym przesunięciu, bez cache). Decyzje (ankieta 22.11):
+  - ⬜ obraz wektorów w 1:1 (bez 2× HiDPI) i mniejszy zapas wokół widoku (`ImageWMS` `hidpi: false`, `ratio`),
+  - ⬜ podzielone granice wymiaru zakresu w rdzeniu (`ST_Subdivide`, indeks; odświeżanie przy publikacji
+    i na żądanie) — filtr przestrzenny po kawałkach zamiast całej granicy,
+  - ⬜ dziennik czasów `/ows` w Caddy (czas, rozmiar, bez tokenów; rotacja) + skrypt raportu (mediana, p95),
+  - ⬜ strojenie QGIS Server pod 6 rdzeni (liczba procesów FastCGI, cache projektów).
 
 ### ⬜ 3. Graficzny edytor schematu bazy (WebUI) — plan z 15.11
 Diagram tabel jak w narzędziach ERD: karty tabel przeciągane po płótnie, relacja = „sznurek”
@@ -83,7 +89,7 @@ przeciągnięty z pola na pole. Działa na istniejących schematach danych (dzi�
 - ✅ Rekordy powiązane: tabela podrzędna jest galerią zdjęć/dokumentów tylko przy ≤ 3 widocznych polach
   poza kluczami i załącznikiem — inaczej zwykła lista (np. lustracje).
 
-### ✔️ Zdjęcia, dokumenty i pliki
+### ✅ Zdjęcia, dokumenty i pliki
 - ✅ Zdjęcia, także z aparatu telefonu: pole „Załącznik” (wariant A) albo tabela zdjęć w relacji
   (wariant B), HEIC → JPEG, miniatury, EXIF, galeria, pobieranie do QGIS przez Fię (08a7116,
   `docs/user/zdjecia.md`).
@@ -91,7 +97,9 @@ przeciągnięty z pola na pole. Działa na istniejących schematach danych (dzi�
   (`docs/user/zalaczniki.md`).
 - ✅ Sprzątanie plików osieroconych: kosz projektu, próg 7 dni, panel → Pliki, `python -m app.uploads`
   (`docs/SERVER.md`, 5b).
-- ⬜ Limit wielkości plików per warstwa → plan, punkt 2.
+- ✅ Limity wielkości plików per zbiór (pole „Załącznik”, zbiory wtyczek — `upload_sets`): Fia → Pliki (przenoszone
+  na serwer przy publikacji), panel → Projekty → „Przechowywanie plików…”; tylko niższe od globalnych
+  (`app/storage.py`, `portal.upload_limits`) (22.11).
 
 ### ✅ Pasek narzędzi
 - ✅ Górny pasek narzędzi edycji, wyszarzony bez warstwy edycyjnej; wybór warstwy z drzewa i z listy.
@@ -154,7 +162,7 @@ danych, wpis do dziennika zmian. Opis: `docs/user/README.md`.
 - ✅ Dokumentacja `docs/user/wydruki.md`: etykiety, legenda, mapa przeglądowa, postęp i limity.
 - ✅ Obrót mapy szablonu (`map0:ROTATION`, pole „Obrót mapy”, obrócona ramka na mapie); sprawdzone GetPrint
   na serwerze — treść obraca się zgodnie z zegarem, ramka w przeciwną stronę (22.11).
-- ✅ Podkłady z katalogu w szablonie: Fia → Wydruki → „Dodaj podkłady Sophii do projektu…” (WMTS, WMS, XYZ jako
+- ✅ Podkłady z katalogu w szablonie: Fia → Raporty → „Dodaj podkłady Sophii do projektu…” (WMTS, WMS, XYZ jako
   „Tylko w QGIS”, grupa „Podkłady Sophii”); API dopasowuje także podkłady WMS. Fia → Diagnostyka: brak szablonów
   (informacja), mapy szablonów z warstwami, których Sophia nie wydrukuje (ostrzeżenie). Wydruk bez szablonu —
   układ Sophii (22.11).

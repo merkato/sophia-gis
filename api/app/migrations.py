@@ -90,6 +90,18 @@ MIGRATIONS: list[tuple[str, str]] = [
         CREATE UNIQUE INDEX IF NOT EXISTS plugin_access_uniq
             ON portal.plugin_access (plugin_id, capability, coalesce(group_id, 0), coalesce(user_id, 0));
     """),
+    ("upload_limits", """
+        -- Limity wielkości plików w projekcie (app/storage.py): niższe niż globalne, per zbiór plików
+        CREATE TABLE IF NOT EXISTS portal.upload_limits (
+            project_id  int NOT NULL REFERENCES portal.projects(id) ON DELETE CASCADE,
+            set_id      text NOT NULL,                 -- <id_warstwy>:<pole> albo plugin:<wtyczka>:<id>
+            max_mb      numeric(8, 1) NOT NULL CHECK (max_mb > 0),
+            source      text NOT NULL DEFAULT 'webui' CHECK (source IN ('webui', 'fia')),
+            updated_at  timestamptz NOT NULL DEFAULT now(),
+            updated_by  text,
+            PRIMARY KEY (project_id, set_id)
+        );
+    """),
 ]
 
 

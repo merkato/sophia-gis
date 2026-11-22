@@ -13,7 +13,7 @@ from typing import Literal
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
 from pydantic import BaseModel
 
-from .. import uploads
+from .. import storage, uploads
 from ..config import get_settings
 from ..db import layer_conn, portal_conn
 from ..qgsproject import get_project
@@ -302,6 +302,47 @@ async def project_scope(project_id: int):
                       "codes": [v["code"] for v in values], "layers": rules}}
 
 
+# ------------------------------------------------------------------------------ przechowywanie plików
+
+async def _storage_sets(project_id: int) -> tuple[dict, list[dict]]:
+    row = await _exec("SELECT id, slug, file_name FROM portal.projects WHERE id=%s", (project_id,))
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Nieznany projekt")
+    path = (get_settings().projects_dir / row["file_name"]).resolve()
+    sets = storage.layer_sets(get_project(path)) if path.exists() else []
+    return row, sets + await storage.plugin_sets(row["slug"])
+
+
+@router.get("/projects/{project_id}/storage")
+async def project_storage(project_id: int):
+    """Zbiory plików projektu (pola „Załącznik” warstw, zbiory wtyczek) z limitami: domyślny = globalny,
+    ustawiony — z panelu albo z Fii."""
+    row, sets = await _storage_sets(project_id)
+    limits = await storage.project_limits(row["slug"])
+    return {
+        "global": {k: storage.global_mb(k) for k in storage.KINDS},
+        "sets": [{**s, "default_mb": storage.global_mb(s["kind"]), **({"limit": limits[s["id"]]} if s["id"] in limits else {})}
+                 for s in sets],
+        "orphans": [{"id": k, **v} for k, v in limits.items() if k not in {s["id"] for s in sets}],
+    }
+
+
+class StorageIn(BaseModel):
+    limits: dict[str, float | None]
+
+
+@router.put("/projects/{project_id}/storage")
+async def set_project_storage(project_id: int, body: StorageIn, admin: CurrentUser = Depends(require_admin)):
+    """Limity zbiorów (komplet): puste = domyślny (globalny); wpisy spoza listy znikają."""
+    _, sets = await _storage_sets(project_id)
+    try:
+        limits = storage.clean_limits(body.limits, {s["id"]: s["kind"] for s in sets})
+    except ValueError as exc:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc
+    await storage.save_limits(project_id, limits, "webui", admin.login)
+    return await project_storage(project_id)
+
+
 def _validate_project_file(file_name: str):
     root = get_settings().projects_dir.resolve()
     path = (root / file_name).resolve()
@@ -375,8 +416,9 @@ async def publish_project(
     if not zipfile.is_zipfile(tmp):
         tmp.unlink()
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Uszkodzony plik .qgz")
+    cfg = None
     if portal_json:
-        json.loads(portal_json)  # walidacja składni
+        cfg = json.loads(portal_json)  # walidacja składni
         (target_dir / f"{slug}.portal.json").write_text(portal_json, "utf-8")
     tmp.replace(target_dir / f"{slug}.qgz")
 
@@ -386,4 +428,17 @@ async def publish_project(
         """INSERT INTO portal.projects (slug, title, file_name, owner_id) VALUES (%s, %s, %s, %s)
            ON CONFLICT (slug) DO UPDATE SET title = EXCLUDED.title, file_name = EXCLUDED.file_name""",
         (slug, title, file_name, None if user.is_admin else user.id))
-    return {"ok": True, "file_name": file_name}
+    # limity plików ustawione w Fii -> serwer (nadpisują wpisy z panelu dla tych zbiorów)
+    warnings: list[str] = []
+    if isinstance(cfg, dict) and isinstance(cfg.get("upload_limits"), dict):
+        pid = (await _exec("SELECT id FROM portal.projects WHERE slug=%s", (slug,)))["id"]
+        sets = {s["id"]: s["kind"] for s in storage.layer_sets(get_project(get_settings().projects_dir / file_name))}
+        given = {k: v for k, v in cfg["upload_limits"].items() if k in sets}
+        warnings += [f"Limit plików dla nieznanego pola pominięty: {k}" for k in cfg["upload_limits"] if k not in sets]
+        try:
+            limits = storage.clean_limits(given, sets)
+        except ValueError as exc:
+            warnings.append(f"Limity plików z Fii nie zapisane: {exc}")
+        else:
+            await storage.save_limits(pid, limits, "fia", user.login, replace_source="fia")
+    return {"ok": True, "file_name": file_name, **({"warnings": warnings} if warnings else {})}

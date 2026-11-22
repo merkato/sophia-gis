@@ -94,6 +94,9 @@ async def notatki(user: CurrentUser = Depends(require_plugin("przyklad", "przykl
   Grupy nadal decydują o roli (przeglądanie / edycja); administrator i właściciel projektu widzą wszystko.
   Filtr działa jak zakres z grup: lista obiektów, formularze, edycja, powiązane, zdjęcia i mapa (QGIS Server).
   Funkcja jest wołana przy każdym żądaniu do projektu — trzymaj wynik w krótkiej pamięci podręcznej.
+- Opcjonalnie `async def upload_sets(project_slug)` (Sophia ≥ 0.8.2) — **zbiory plików** wtyczki w projekcie:
+  `[{"id", "title", "kind": "photo" | "file"}]`. Pojawiają się w panelu → Projekty → Przechowywanie plików z limitem
+  (domyślnie globalnym); wtyczka odczytuje go przez `await app.storage.limit_mb(slug, f"plugin:<id>:{id}", kind)`.
 - Zależności Pythona: tylko biblioteki obecne w obrazie API Sophii (FastAPI, psycopg, lxml, pyproj, Pillow, WeasyPrint, pyogrio…).
 - **PDF**: `app.pdf.html_to_pdf(html, title=…, author=…)` — dokument z HTML i CSS jako **PDF/A-2b** (czcionki
   osadzone, gotowy do podpisu elektronicznego). Strona, nagłówki, stopki i „Strona X z Y” w CSS (`@page`,

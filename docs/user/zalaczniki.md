@@ -98,8 +98,22 @@ Wszystko jak przy zdjęciach ([zdjecia.md](zdjecia.md)):
   i są w kopii zapasowej,
 - **Fia → Pobierz zdjęcia z serwera** pobiera także dokumenty do folderu projektu — QGIS otwiera je
   z formularza (ścieżka względna),
-- limit wielkości pliku: 50 MB,
+- limit wielkości pliku: globalnie 50 MB (dokumenty) i 40 MB (zdjęcia) — w projekcie można go obniżyć dla
+  każdego pola osobno (niżej),
 - usunięcie dokumentu w WebUI nie kasuje pliku z dysku serwera.
+
+## Limit wielkości plików w projekcie
+
+Każde pole „Załącznik” warstwy PostGIS to **zbiór plików** z własnym limitem wielkości jednego pliku. Domyślnie
+obowiązuje limit globalny serwera (zdjęcia 40 MB, dokumenty 50 MB — `MAX_PHOTO_MB`, `MAX_ATTACHMENT_MB`); w projekcie
+można go tylko **obniżyć**:
+
+- **Fia → zakładka Pliki** — limit (MB) przy każdym polu; „domyślny” = globalny. Przy publikacji limity trafiają na
+  serwer i zastępują ustawienia z panelu dla tych pól (pól bez limitu w Fii publikacja nie zmienia),
+- **panel administratora → Projekty → Przechowywanie plików…** — lista zbiorów projektu (pola warstw i zbiory
+  wtyczek) z limitem i źródłem (Fia / panel); puste pole = globalny, zmiany po **Zapisz**.
+
+Plik większy niż limit Sophia odrzuca z komunikatem „Zdjęcie/Plik większy niż … MB”.
 
 ## Zmiana względem wcześniejszej wersji
 

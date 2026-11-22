@@ -16,6 +16,7 @@ from qgis.PyQt.QtWidgets import (
     QCheckBox,
     QDialog,
     QDialogButtonBox,
+    QDoubleSpinBox,
     QFileDialog,
     QFormLayout,
     QHBoxLayout,
@@ -87,6 +88,7 @@ class FiaDialog(QDialog):
         self.tabs.addTab(self._build_layers_tab(), "Warstwy")
         self.tabs.addTab(self._build_rasters_tab(), "Rastry")
         self.tabs.addTab(self._build_reports_tab(), "Raporty")
+        self.tabs.addTab(self._build_files_tab(), "Pliki")
         self.tools_tab = ToolsTab(self.cfg.get("tools", []))
         self.tabs.addTab(self.tools_tab, "Narzędzia pobierania")
         self.scope_tab = ScopeTab(self.cfg.get("scope") or {}, self.cfg.get("layers", {}))
@@ -350,6 +352,59 @@ class FiaDialog(QDialog):
             msg += f"\nNie udało się wczytać (usługa niedostępna?): {', '.join(failed)}."
         QMessageBox.information(self, "Fia", msg + "\nZapisz projekt i opublikuj go ponownie.")
 
+    # ------------------------------------------------------------------ Pliki (limity wielkości)
+    def _build_files_tab(self) -> QWidget:
+        """Pola „Załącznik” warstw PostGIS z limitem wielkości pliku (MB). 0 = limit globalny serwera.
+        Przy publikacji limity trafiają na serwer (panel → Projekty → Przechowywanie plików)."""
+        w = QWidget()
+        self.files_table = QTableWidget(0, 4)
+        self.files_table.setHorizontalHeaderLabels(["Warstwa", "Pole", "Rodzaj", "Limit pliku (MB)"])
+        self.files_table.horizontalHeader().setSectionResizeMode(0, QHeaderView.ResizeMode.Stretch)
+        self.files_table.setSelectionMode(QAbstractItemView.SelectionMode.NoSelection)
+        limits = self.cfg.get("upload_limits", {})
+        rows = []
+        for lyr in sorted(self.prj.mapLayers().values(), key=lambda x: x.name().lower()):
+            if not isinstance(lyr, QgsVectorLayer) or lyr.providerType() != "postgres":
+                continue
+            for idx, fld in enumerate(lyr.fields()):
+                setup = lyr.editorWidgetSetup(idx)
+                if setup.type() == "ExternalResource" and not checks.holds_urls(lyr, idx):
+                    rows.append((lyr, fld.name(), "zdjęcia" if checks.is_photo_config(setup.config() or {}) else "dokumenty"))
+        self.files_table.setRowCount(len(rows))
+        for row, (lyr, field, kind) in enumerate(rows):
+            for col, text in enumerate((lyr.name(), field, kind)):
+                it = QTableWidgetItem(text)
+                it.setFlags(Qt.ItemFlag.ItemIsEnabled)
+                if col == 0:
+                    it.setData(Qt.ItemDataRole.UserRole, f"{lyr.id()}:{field}")
+                self.files_table.setItem(row, col, it)
+            spin = QDoubleSpinBox()
+            spin.setRange(0, 10000)
+            spin.setDecimals(1)
+            spin.setSingleStep(1)
+            spin.setSpecialValueText("domyślny (serwer)")
+            spin.setValue(float(limits.get(f"{lyr.id()}:{field}") or 0))
+            self.files_table.setCellWidget(row, 3, spin)
+        lay = QVBoxLayout(w)
+        note = QLabel("Limit wielkości jednego pliku wgrywanego w Sophii do pola „Załącznik” (zdjęcia, dokumenty). "
+                      "„Domyślny” = limit globalny serwera; limit można tylko obniżyć — wyższy serwer pominie. "
+                      "Przy publikacji limity trafiają na serwer i zastępują ustawienia z panelu administratora "
+                      "(Projekty → Przechowywanie plików) dla tych pól.")
+        note.setWordWrap(True)
+        lay.addWidget(note)
+        lay.addWidget(self.files_table)
+        if not rows:
+            lay.addWidget(QLabel("Projekt nie ma pól z widżetem „Załącznik” w warstwach PostGIS."))
+        return w
+
+    def _upload_limits(self) -> dict:
+        out = {}
+        for row in range(self.files_table.rowCount()):
+            mb = self.files_table.cellWidget(row, 3).value()
+            if mb > 0:
+                out[self.files_table.item(row, 0).data(Qt.ItemDataRole.UserRole)] = round(mb, 1)
+        return out
+
     # ------------------------------------------------------------------ Diagnostyka
     def _build_diag_tab(self) -> QWidget:
         w = QWidget()
@@ -450,6 +505,7 @@ class FiaDialog(QDialog):
             if self.raster_table.item(r, 1).checkState() == Qt.CheckState.Checked
         ]
         cfg["tools"] = self.tools_tab.value()
+        cfg["upload_limits"] = self._upload_limits()
         cfg["reports"] = [
             {"layout": self.report_table.item(r, 0).text(), "title": self.report_table.item(r, 1).text(),
              "enabled": self.report_table.item(r, 2).checkState() == Qt.CheckState.Checked}
@@ -462,7 +518,8 @@ class FiaDialog(QDialog):
         return cfg
 
     def _portal_json(self, cfg: dict) -> dict:
-        return {k: cfg[k] for k in ("version", "layers", "raster_groups", "reports", "tools", "scope", "map") if k in cfg}
+        return {k: cfg[k] for k in ("version", "layers", "raster_groups", "reports", "tools", "scope", "map", "upload_limits")
+                if k in cfg}
 
     def on_save(self):
         self.cfg = self._collect()
@@ -570,5 +627,6 @@ class FiaDialog(QDialog):
         QMessageBox.information(
             self, "Fia",
             f"Opublikowano jako {res.get('file_name')}.\n"
-            f"Pamiętaj o nadaniu grupom dostępu do projektu w panelu administracyjnym.\n\n"
+            + "".join(f"Uwaga: {w}\n" for w in res.get("warnings") or [])
+            + "Pamiętaj o nadaniu grupom dostępu do projektu w panelu administracyjnym.\n\n"
             f"{self.url.text().rstrip('/')}/?p={self.cfg['slug']}")

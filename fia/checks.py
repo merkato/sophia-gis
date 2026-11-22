@@ -44,20 +44,20 @@ def _resource_field_issues(layer: QgsVectorLayer) -> list[tuple[str, str]]:
             continue
         cfg = setup.config() or {}
         name = fld.name()
-        if _holds_urls(layer, idx):
+        if holds_urls(layer, idx):
             continue                    # pole z adresami internetowymi: WebUI pokazuje je jako linki
         if fld.isNumeric():
             out.append(("error", f"Pole „{name}”: widżet Załącznik wymaga pola tekstowego"))
         if int(cfg.get("RelativeStorage") or 0) != 1:
             out.append(("warning", (f"Pole „{name}”: ustaw „Ścieżka względna do projektu” — "
                                     "inaczej WebUI nie znajdzie zdjęć")))
-        if not _is_photo(cfg) and not str(cfg.get("FileWidgetFilter") or "").strip():
+        if not is_photo_config(cfg) and not str(cfg.get("FileWidgetFilter") or "").strip():
             out.append(("info", f"Pole „{name}”: brak filtra plików — WebUI przyjmie każdy typ "
                                 "(poza wykonywalnymi). Ustaw np. „PDF (*.pdf);;GML (*.gml)”."))
     return out
 
 
-def _holds_urls(layer: QgsVectorLayer, idx: int) -> bool:
+def holds_urls(layer: QgsVectorLayer, idx: int) -> bool:
     """Pole „Załącznik” użyte na adresy internetowe (wartości http/https), nie na pliki."""
     try:
         values = [str(v) for v in layer.uniqueValues(idx, 50) if v not in (None, "") and str(v) != "NULL"]
@@ -66,7 +66,7 @@ def _holds_urls(layer: QgsVectorLayer, idx: int) -> bool:
     return bool(values) and all(v.strip().lower().startswith(("http://", "https://")) for v in values)
 
 
-def _is_photo(cfg: dict) -> bool:
+def is_photo_config(cfg: dict) -> bool:
     flt = str(cfg.get("FileWidgetFilter") or "").lower()
     return str(cfg.get("DocumentViewer")) == "1" or any(e in flt for e in IMAGE_EXT)
 
@@ -76,7 +76,7 @@ def _resource_kinds(layer: QgsVectorLayer) -> list[str]:
     for idx, fld in enumerate(layer.fields()):
         setup = layer.editorWidgetSetup(idx)
         if setup.type() == "ExternalResource":
-            kind = "link" if _holds_urls(layer, idx) else "zdjęcie" if _is_photo(setup.config() or {}) else "plik"
+            kind = "link" if holds_urls(layer, idx) else "zdjęcie" if is_photo_config(setup.config() or {}) else "plik"
             kinds.append(f"{kind} ({fld.name()})")
     return kinds
 
