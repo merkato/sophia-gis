@@ -4,4 +4,4 @@
 # Dziennik: wolumen caddy_data, /data/logs/ows.log* (rotacja co 50 MB, 10 plików) — proxy/Caddyfile.
 set -eu
 cd "$(dirname "$0")/../.."
-docker compose exec -T proxy sh -c 'cat /data/logs/ows.log* 2>/dev/null || true' | python3 scripts/server/ows_report.py "$@"
+docker compose exec -T proxy sh -c 'cat /data/logs/ows.log* 2>/dev/null || true' </dev/null | python3 scripts/server/ows_report.py "$@"
