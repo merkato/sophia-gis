@@ -141,7 +141,7 @@ export function Toolbar({ config, editLayerId, onEditLayer, tool, onTool, canDel
             <ToolButton icon={DrawIcon} label={geom ? DRAW_LABEL[geom] : "Dodaj obiekt"} active={tool === "draw"}
               disabled={!geom || !layer?.perms.insert} onClick={() => onTool("draw")} />
           )}
-          <ToolButton icon={IconVertex} label="Narzędzie wierzchołków (zmiana geometrii)" active={tool === "modify"}
+          <ToolButton icon={IconVertex} label="Narzędzie wierzchołków: przeciągnij wierzchołek; klik na krawędzi dodaje; najedź na wierzchołek i Delete (albo Alt+klik) usuwa" active={tool === "modify"}
             disabled={!geom || !layer?.perms.update} onClick={() => onTool("modify")} />
           <ToolButton icon={IconMove} label="Przesuń obiekt (przeciągnij)" active={tool === "move"}
             disabled={!geom || !layer?.perms.update} onClick={() => onTool("move")} />

@@ -14,7 +14,7 @@ Oznaczenia: ✅ zrobione · ✔️ zrobione częściowo (co zostało — w plani
 
 ### ⬜ 2. Drobne zaległości
 - ⬜ Kolejne źródła narzędzi pobierania: PRG adresy, BDOT10k (nowy wpis w `SOURCES` i w `fia/tools.py`).
-- ⬜ Przyciąganie i kontrola topologii w edycji — **od początku, na każdej warstwie edycyjnej** (ustalenia 23.11):
+- ✔️ Przyciąganie i kontrola topologii w edycji — **od początku, na każdej warstwie edycyjnej** (ustalenia 23.11):
   - przyciąganie do węzłów (i krawędzi) istniejących geometrii: warstwy edycyjnej i wskazanych warstw odniesienia
     (np. kontur → działki, użytki, inne kontury; użytek → działki, inne użytki; działka z dnia decyzji → działki);
     zestaw warstw i tolerancja z ustawień przyciągania projektu QGIS, przełącznik w aplikacji;
@@ -23,7 +23,7 @@ Oznaczenia: ✅ zrobione · ✔️ zrobione częściowo (co zostało — w plani
   - usuwanie wierzchołków wygodniej niż Alt+klik (np. zaznaczenie + Delete);
   - nakładka działek z powiatów (KIEG, WMS) jako warstwa odniesienia — podgląd; przyciąganie tylko do danych
     wektorowych (rejestr EGiB / ULDK w bazie).
-  - **Plan realizacji (0.9.0, w toku od 23.11 — każdy etap osobnym commitem):**
+  - **Plan realizacji (0.9.0, 23.11 — etapy 1–5 ✔️ zrobione, do testu po wdrożeniu):**
     1. API: ustawienia przyciągania z projektu QGIS (`<snapping-settings>`: włączone, tryb, tolerancja i jednostka,
        warstwy w trybie zaawansowanym; „unikaj nakładania” — `avoidIntersectionsLayers`) → `config.snapping`.
     2. Mapa: warstwy odniesienia — obiekty wskazanych warstw z bieżącego widoku (API features, limit) w niewidocznym

@@ -424,6 +424,7 @@ export function MapView(props: Props) {
       format.writeGeometryObject(f.getGeometry()!) as unknown as GeoJSONFeature["geometry"];
 
     let clickKey: EventsKey | null = null;
+    let vertexKey: ((e: KeyboardEvent) => void) | null = null;
 
     if (tool === "identify") {
       const handler = async (evt: { coordinate: number[] }) => {
@@ -606,6 +607,15 @@ export function MapView(props: Props) {
         }
       });
       interactions.push(modify);
+      // Delete (albo Backspace) usuwa wierzchołek pod kursorem — obok Alt+klik; Modify zgłasza modifyend jak przy
+      // przeciągnięciu (zapis). Poza polami formularza.
+      vertexKey = (e: KeyboardEvent) => {
+        if (e.key !== "Delete" && e.key !== "Backspace") return;
+        const t = e.target as HTMLElement | null;
+        if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.tagName === "SELECT" || t.isContentEditable)) return;
+        if (modify.removePoint()) e.preventDefault();
+      };
+      document.addEventListener("keydown", vertexKey);
     }
 
     // Przyciąganie do wierzchołków i krawędzi obiektów warstwy edycyjnej i warstw odniesienia (ustawienia z projektu
@@ -635,6 +645,7 @@ export function MapView(props: Props) {
       interactions.forEach((i) => map.removeInteraction(i));
       dropLabels?.();
       document.removeEventListener("keydown", onKey);
+      if (vertexKey) document.removeEventListener("keydown", vertexKey);
       if (clickKey) unByKey(clickKey);
       selectRef.current = null;
     };

@@ -70,8 +70,9 @@ Przy rysowaniu obiektu, części i pierścienia oraz przy przeciąganiu wierzcho
 | przerywany prostokąt ze strzałką | **Zaznacz obiekt** warstwy edycyjnej | Zaznacz obiekty |
 | zielony punkt / linia / poligon z gwiazdką | **Dodaj obiekt** — ikona zależy od typu geometrii warstwy | Dodaj obiekt punktowy / liniowy / poligonowy |
 | tabela z zielonym plusem | **Dodaj rekord** — dla tabel bez geometrii | Dodaj rekord |
-| poligon z czerwonym węzłem | **Narzędzie wierzchołków** — przeciąganie wierzchołków, klik na krawędzi dodaje wierzchołek, **Alt+klik** usuwa; zwykłe kliknięcie otwiera obiekt | Narzędzie wierzchołków |
+| poligon z czerwonym węzłem | **Narzędzie wierzchołków** — przeciąganie wierzchołków, klik na krawędzi dodaje wierzchołek, **najechanie na wierzchołek i Delete** (albo **Alt+klik**) usuwa; zwykłe kliknięcie otwiera obiekt | Narzędzie wierzchołków |
 | poligon ze strzałkami | **Przesuń obiekt** — przeciągnij cały obiekt | Przesuń obiekt |
+| czerwony magnes i „▾” | **Przyciąganie** — wł./wył. przyciągania do wierzchołków i krawędzi warstwy edycyjnej i warstw odniesienia; „▾” — wybór warstw (domyślnie z ustawień przyciągania projektu QGIS, wybór zapamiętany w przeglądarce). Obiekty warstw odniesienia ładują się w dużej skali (od ok. 1:15 000). Przy zapisie obiekt warstwy z opcją QGIS „unikaj nakładania” nie może nachodzić na inne (szerzej niż 2 cm) — miejsca nakładania widać na mapie na czerwono | Przyciąganie / Unikaj nakładania |
 | poligon i łuk ze strzałką | **Obróć obiekt** — przeciągnij wokół środka, **Shift** = co 15° | Obróć obiekt |
 | dwa poligony, kopia na zielono | **Kopiuj obiekt** — przeciągnij kopię w nowe miejsce | Kopiuj i wklej / Duplikuj obiekt |
 | poligon z czerwoną linią na granicy | **Przekształć obiekt** — linia, która dwa razy przecina granicę | Przekształć obiekty |
