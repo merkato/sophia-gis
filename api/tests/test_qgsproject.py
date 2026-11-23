@@ -187,8 +187,35 @@ def test_parse_snapping():
       <properties><Digitizing><TopologicalEditing type="int">1</TopologicalEditing></Digitizing></properties>
     </qgis>""")
     s = parse_snapping(root, layers)
-    assert (s.enabled, s.tolerance_px, s.vertex, s.segment) == (True, 15.0, True, False)
+    assert (s.enabled, s.tolerance_px, s.vertex, s.segment) == (True, 12.0, True, False)   # tolerancja warstwy (tryb zaawansowany)
     assert s.layers == ["dz"] and s.avoid_overlap == ["kontur"] and s.topological and not s.all_layers
     s = parse_snapping(etree.fromstring('<qgis><snapping-settings enabled="0" mode="2" type="3" tolerance="5" unit="2"/></qgis>'), layers)
     assert not s.enabled and s.all_layers and sorted(s.layers) == ["dz", "kontur", "uzytek"] and s.tolerance_px == 12.0
     assert parse_snapping(etree.fromstring("<qgis/>"), layers).enabled is False
+
+
+def test_parse_snapping_qgis4():
+    """QGIS 4: typ i tolerancja dla każdej warstwy, „unikaj nakładania” we właściwościach projektu (properties name=…)."""
+    from app.qgsproject import LayerDef, parse_snapping
+
+    layers = {i: LayerDef(id=i, name=i, short_name=None, type="vector", provider="postgres", crs="EPSG:2180",
+                          geometry_type="Polygon", display_expression=None) for i in ("dz", "kontur")}
+    root = etree.fromstring("""<qgis version="4.2.0">
+      <snapping-settings enabled="1" mode="3" type="1" tolerance="12" unit="1">
+        <individual-layer-settings>
+          <layer-setting id="dz" enabled="1" type="3" tolerance="15" units="1"/>
+          <layer-setting id="kontur" enabled="1" type="1" tolerance="10" units="1"/>
+        </individual-layer-settings>
+      </snapping-settings>
+      <properties>
+        <properties name="Digitizing">
+          <properties name="AvoidIntersectionsList" type="QStringList"><value>kontur</value><value>obca</value></properties>
+          <properties name="AvoidIntersectionsMode" type="int">0</properties>
+        </properties>
+      </properties>
+    </qgis>""")
+    s = parse_snapping(root, layers)
+    assert s.layers == ["dz", "kontur"] and s.segment and s.tolerance_px == 15.0
+    assert s.avoid_overlap == ["kontur"] and not s.topological
+    root.find(".//properties[@name='AvoidIntersectionsMode']").text = "1"
+    assert sorted(parse_snapping(root, layers).avoid_overlap) == ["dz", "kontur"]

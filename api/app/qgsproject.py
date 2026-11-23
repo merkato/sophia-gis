@@ -238,6 +238,17 @@ def _tolerance_px(tol: str | None, unit: str | None) -> float:
     return min(max(t, 2.0), 40.0) if (unit or "1") == "1" else 12.0
 
 
+def _project_prop(root: etree._Element, *path: str) -> etree._Element | None:
+    """Właściwość projektu z <properties>: stary zapis (<Digitizing><X>…) i nowy (QGIS 4: <properties name="Digitizing">
+    <properties name="X">…)."""
+    el = root.find("./properties")
+    for name in path:
+        if el is None:
+            return None
+        el = next((c for c in el if c.tag == name or c.get("name") == name), None)
+    return el
+
+
 def parse_snapping(root: etree._Element, layers: dict[str, LayerDef]) -> SnappingDef:
     s = SnappingDef()
     el = root.find(".//snapping-settings")
@@ -250,11 +261,24 @@ def parse_snapping(root: etree._Element, layers: dict[str, LayerDef]) -> Snappin
             s.all_layers = True
             s.layers = [lid for lid, lyr in layers.items() if lyr.type == "vector" and lyr.geometry_type]
         elif mode in ("3", "4"):
-            for ls in el.findall("./individual-layer-settings/layer-setting"):
-                if ls.get("enabled") == "1" and ls.get("id") in layers:
-                    s.layers.append(ls.get("id"))
-    s.avoid_overlap = [e.get("id") for e in root.findall("./avoidIntersectionsLayers/layer") if e.get("id") in layers]
-    s.topological = root.findtext("./properties/Digitizing/TopologicalEditing") in ("1", "true")
+            enabled = [ls for ls in el.findall("./individual-layer-settings/layer-setting")
+                       if ls.get("enabled") == "1" and ls.get("id") in layers]
+            s.layers = [ls.get("id") for ls in enabled]
+            if enabled:                     # tryb zaawansowany: typ i tolerancja ustawione dla każdej warstwy
+                s.segment = any(_snap_types(ls.get("type"))[1] for ls in enabled)
+                s.tolerance_px = max(_tolerance_px(ls.get("tolerance"), ls.get("units")) for ls in enabled)
+    # „unikaj nakładania”: 0 — lista warstw (gdy podana), 1 — każda edytowana warstwa poligonowa, 2 — lista warstw
+    listed = [e.get("id") for e in root.findall("./avoidIntersectionsLayers/layer")]
+    lst = _project_prop(root, "Digitizing", "AvoidIntersectionsList")
+    if lst is not None:
+        listed += [v.text for v in lst.findall("value") if v.text]
+    mode_el = _project_prop(root, "Digitizing", "AvoidIntersectionsMode")
+    if mode_el is not None and (mode_el.text or "").strip() == "1":
+        s.avoid_overlap = [lid for lid, lyr in layers.items() if lyr.geometry_type == "Polygon"]
+    else:
+        s.avoid_overlap = list(dict.fromkeys(lid for lid in listed if lid in layers))
+    topo = _project_prop(root, "Digitizing", "TopologicalEditing")
+    s.topological = topo is not None and (topo.text or "").strip() in ("1", "true")
     return s
 
 
