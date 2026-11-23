@@ -17,7 +17,9 @@ import PointerInteraction from "ol/interaction/Pointer";
 import { getCenter } from "ol/extent";
 import { click } from "ol/events/condition";
 import { ScaleLine, defaults as defaultControls } from "ol/control";
-import { Circle, Fill, Stroke, Style } from "ol/style";
+import { Circle, Fill, Stroke, Style, Text } from "ol/style";
+import type { FeatureLike } from "ol/Feature";
+import type { MapFocus } from "../plugins";
 import { unByKey } from "ol/Observable";
 import type { EventsKey } from "ol/events";
 import type Feature from "ol/Feature";
@@ -78,6 +80,7 @@ interface Props {
   marked: string[];                                      // obiekty wybrane do połączenia (wyróżnione)
   onFetchClick?: (coordinate: number[]) => void;         // narzędzie pobierania (ULDK…)
   preview?: GeoJSONFeature["geometry"] | null;           // obrys pobranego obiektu przed dodaniem
+  compare?: MapFocus["compare"] | null;                  // porównanie geometrii z wtyczki (EPSG:4326)
   printFrame?: [number, number, number] | null;          // obszar wydruku [szer., wys.] w metrach wokół środka widoku, obrót w ° (zegar)
   opacity: Record<string, number>;                       // krycie 0–100: "<slug>/<warstwa WMS>", "bm:<id>"
   mapRef: MutableRefObject<OlMap | null>;
@@ -117,7 +120,24 @@ const ringStyle = new Style({
   image: new Circle({ radius: 5, fill: new Fill({ color: "#d9363e" }), stroke: new Stroke({ color: "#fff", width: 1.5 }) }),
 });
 
-const DRAW_TYPE = { Point: "Point", Line: "LineString", Polygon: "Polygon" } as const;
+// porównanie geometrii: historyczna — szara, przerywana; aktualna — pomarańczowa; uwaga — czerwona; podpis w środku
+const COMPARE_COLORS = { historyczna: ["#6b7380", "rgba(107,115,128,0.18)", [9, 6]], aktualna: ["#e8590c", "rgba(232,89,12,0.06)", undefined],
+  uwaga: ["#d9363e", "rgba(217,54,62,0.15)", undefined] } as const;
+const compareStyle = (f: FeatureLike) => {
+  const kind = (f.get("kind") as keyof typeof COMPARE_COLORS) || "aktualna";
+  const [stroke, fill, dash] = COMPARE_COLORS[kind] ?? COMPARE_COLORS.aktualna;
+  const label = f.get("label") as string | undefined;
+  return new Style({
+    stroke: new Stroke({ color: stroke, width: kind === "historyczna" ? 3 : 2.5, lineDash: dash ? [...dash] : undefined }),
+    fill: new Fill({ color: fill }),
+    image: new Circle({ radius: 6, fill: new Fill({ color: stroke }), stroke: new Stroke({ color: "#fff", width: 2 }) }),
+    text: label ? new Text({ text: label, font: "600 12px system-ui, sans-serif", overflow: true,
+      fill: new Fill({ color: stroke }), stroke: new Stroke({ color: "rgba(255,255,255,0.9)", width: 3 }),
+      offsetY: kind === "historyczna" ? -14 : 0 }) : undefined,
+  });
+};
+
+const DRAW_TYPE ={ Point: "Point", Line: "LineString", Polygon: "Polygon" } as const;
 
 export function MapView(props: Props) {
   const { config, wmsLayers, editLayerId, tool, reloadToken, mapRef } = props;
@@ -131,6 +151,7 @@ export function MapView(props: Props) {
   const tileLayersRef = useRef(new Map<string, TileLayer<TileWMS>>());
   const editSourceRef = useRef(new VectorSource<Feature<Geometry>>());
   const previewSourceRef = useRef(new VectorSource<Feature<Geometry>>());
+  const compareSourceRef = useRef(new VectorSource<Feature<Geometry>>());
   const frameSourceRef = useRef(new VectorSource<Feature<Geometry>>());
   const selectRef = useRef<Select | null>(null);
   const editLayerRef = useRef<VectorLayer | null>(null);
@@ -173,6 +194,7 @@ export function MapView(props: Props) {
           source: editSourceRef.current,
           style: (f) => (markedRef.current.has(String(f.getId())) ? markStyle : editStyle),
         }),
+        new VectorLayer({ source: compareSourceRef.current, style: compareStyle, declutter: true }),
         new VectorLayer({ source: previewSourceRef.current, style: previewStyle }),
         new VectorLayer({ source: frameSourceRef.current, style: frameStyle }),
       ],
@@ -331,6 +353,22 @@ export function MapView(props: Props) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preview]);
+
+  // --- porównanie geometrii (z wtyczki): historyczne pod aktualnymi, żeby obrys aktualnych był czytelny
+  const { compare } = props;
+  useEffect(() => {
+    const src = compareSourceRef.current;
+    src.clear();
+    if (!compare?.length) return;
+    const order = { historyczna: 0, uwaga: 1, aktualna: 2 } as const;
+    [...compare].sort((a, b) => order[a.kind ?? "aktualna"] - order[b.kind ?? "aktualna"]).forEach((c, i) => {
+      const f = format.readFeature({ type: "Feature", geometry: c.geometry, properties: { label: c.label, kind: c.kind ?? "aktualna" } },
+        { dataProjection: "EPSG:4326", featureProjection: config.crs }) as Feature<Geometry>;
+      f.setId(`cmp${i}`);
+      src.addFeature(f);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [compare, config.crs]);
 
   // --- narzędzia
   useEffect(() => {

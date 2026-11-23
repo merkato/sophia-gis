@@ -62,6 +62,11 @@ export interface MapFocus {
   raster?: { url: string; extent: [number, number, number, number]; crs: string; label?: string };
   /** Po pokazaniu: warstwa z tabeli widoczna i wybrana do edycji; `defaults` — pola nowych obiektów tej warstwy. Sophia ≥ 0.8.5. */
   edit?: { table: string; defaults?: Record<string, unknown> };
+  /** Porównanie geometrii (EPSG:4326): np. działka historyczna i działki aktualne w tym miejscu. Mapa przybliża się
+   * do wszystkich; `kind` — styl: „historyczna” (szara, przerywana), „aktualna” (wyraźna), „uwaga” (czerwona);
+   * `label` — podpis na mapie. W panelu warstw „Porównanie geometrii” (ukryj / usuń). Łączy się z `draw` / `edit`
+   * (rysowanie na tle porównania). Sophia ≥ 0.8.6. */
+  compare?: { geometry: { type: string; coordinates: unknown }; label?: string; kind?: "historyczna" | "aktualna" | "uwaga" }[];
   project?: string;                                 // slug projektu; brak = bieżący
   targets?: { table: string; pk: string }[];        // „schemat.tabela” + klucz główny obiektu
   geometry?: { type: string; coordinates: unknown } | null;   // EPSG:4326

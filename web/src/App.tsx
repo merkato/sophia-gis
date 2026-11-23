@@ -10,6 +10,7 @@ import { AttributeTable } from "./components/AttributeTable";
 import { PrintPanel } from "./components/PrintPanel";
 import GeoJSON from "ol/format/GeoJSON";
 import { transformExtent } from "ol/proj";
+import { createEmpty, extend as extendExtent, isEmpty as isEmptyExtent } from "ol/extent";
 import { Toolbar } from "./components/Toolbar";
 import { FetchCard } from "./components/FetchCard";
 import { AdminPanel } from "./components/AdminPanel";
@@ -158,6 +159,7 @@ export default function App() {
   const [focusGeom, setFocusGeom] = useState<GeoJSONFeature["geometry"] | null>(null);
   // obraz z pliku pokazany przez wtyczkę (host.showOnMap({ raster })) — do zmiany projektu albo usunięcia w panelu
   const [fileRaster, setFileRaster] = useState<(NonNullable<MapFocus["raster"]> & { visible: boolean }) | null>(null);
+  const [compare, setCompare] = useState<{ items: NonNullable<MapFocus["compare"]>; label?: string; visible: boolean } | null>(null);
 
   /**
    * Każda zmiana obiektu w formularzu (kliknięcie na mapie, lista rekordów, powiązane,
@@ -266,6 +268,7 @@ export default function App() {
     setSelection(null);
     setFocusGeom(null);
     setFileRaster(null);
+    setCompare(null);
     setEditLayerId(null);
     setTool("identify");
     api.project(slug)
@@ -364,6 +367,18 @@ export default function App() {
         }
       });
       return;
+    }
+    if (f.compare?.length) {   // porównanie geometrii: osobna warstwa nad projektem, przybliżenie do wszystkich
+      const fmt = new GeoJSON();
+      const ext = createEmpty();
+      f.compare.forEach((c) => {
+        const g = fmt.readGeometry(c.geometry, { dataProjection: "EPSG:4326", featureProjection: config.crs });
+        if (g) extendExtent(ext, g.getExtent());
+      });
+      setCompare({ items: f.compare, label: f.label, visible: true });
+      if (!isEmptyExtent(ext)) map.getView().fit(ext, { padding: [80, 80, 80, 80], maxZoom: 18, duration: 300 });
+      if (f.label && !f.edit && !f.draw) setMessage(f.label);
+      if (!f.edit && !f.raster && !f.draw) return;   // porównanie z rysowaniem: np. działka historyczna na tle aktualnych
     }
     if (f.raster) {   // obraz z pliku: na mapę pod warstwy projektu, przybliżenie do jego zasięgu
       const r = f.raster;
@@ -757,6 +772,23 @@ export default function App() {
               </div>
             </section>
           )}
+          {compare && (
+            <section className="file-raster" title="Geometrie pokazane z okna wtyczki do porównania — tylko w tej karcie">
+              <h3>Porównanie geometrii</h3>
+              <div className="tree-row">
+                <label>
+                  <input type="checkbox" checked={compare.visible}
+                    onChange={() => setCompare((c) => (c ? { ...c, visible: !c.visible } : c))} />
+                  {compare.label ?? `obiekty (${compare.items.length})`}
+                </label>
+                <button className="link" title="Usuń z mapy" onClick={() => setCompare(null)}>✕</button>
+              </div>
+              <div className="compare-legend muted">
+                <span><i className="cmp historyczna" /> historyczna</span>
+                <span><i className="cmp aktualna" /> aktualna</span>
+              </div>
+            </section>
+          )}
           <BasemapSwitcher basemaps={basemaps} baseId={baseId} overlayIds={overlayIds}
             onBase={chooseBase} onToggleOverlay={toggleOverlay}
             opacityOf={(b) => opacity[`bm:${b.id}`] ?? Math.round(b.opacity * 100)}
@@ -770,6 +802,7 @@ export default function App() {
               reloadToken={reloadToken} mapRef={mapRef}
               basemaps={basemaps} baseId={baseId} overlayIds={overlayIds}
               fileRaster={fileRaster?.visible ? fileRaster : null}
+              compare={compare?.visible ? compare.items : null}
               onIdentify={openFeature}
               onFetchClick={fetchAt}
               preview={fetchTool ? fetchState.result?.geometry ?? null : selection?.cutFrom ? selection.feature.geometry : focusGeom}

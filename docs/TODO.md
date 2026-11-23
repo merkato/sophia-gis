@@ -110,6 +110,9 @@ przeciągnięty z pola na pole. Działa na istniejących schematach danych (dzi�
 - ✅ Obraz z pliku z wtyczki (0.8.5): `host.showOnMap({ raster, edit })` — obraz (np. GeoTIFF przetworzony przez wtyczkę)
   nad podkładami z przybliżeniem do zasięgu, „Obraz z pliku” w panelu warstw; warstwa z tabeli widoczna i w edycji
   z polami nowych obiektów. Ramka „Usługi zewnętrzne” wokół podkładów i nakładek (0.8.4).
+- ✔️ Porównanie geometrii z wtyczki (0.8.6): `host.showOnMap({ compare })` — geometrie historyczne (szare, przerywane)
+  i aktualne (pomarańczowe) z podpisami na osobnej warstwie, „Porównanie geometrii” w panelu warstw z legendą;
+  łączy się z rysowaniem / edycją (np. działka z dnia decyzji na tle działek aktualnych).
 
 ### ✅ Edycja geometrii
 Szkic w przeglądarce z przyciąganiem, geometrię liczy PostGIS w API: jedna transakcja, kontrola zakresu

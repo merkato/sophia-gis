@@ -134,6 +134,11 @@ np. GeoTIFF przetworzony przez wtyczkę) nad podkładami, pod warstwami projektu
 w panelu warstw pojawia się „Obraz z pliku” (ukryj / usuń). `edit: { table, defaults }` — warstwa z tabeli staje się
 widoczna i wybrana do edycji; nowe obiekty tej warstwy dostają pola `defaults`. Przykład (wtyczka wyłączeń):
 `host.showOnMap({ raster: {…}, edit: { table: "wylaczenia.kontur", defaults: { znak_sprawy } } })`.
+Sophia ≥ 0.8.6: `compare: [{ geometry, kind, label }]` — porównanie geometrii (EPSG:4326) na osobnej warstwie nad
+projektem: `kind` „historyczna” (szara, przerywana), „aktualna” (pomarańczowa), „uwaga” (czerwona), `label` — podpis
+na mapie. Mapa przybliża się do wszystkich; w panelu warstw „Porównanie geometrii” (ukryj / usuń). Łączy się
+z `draw` i `edit` — np. rysowanie działki z dnia decyzji na tle działek aktualnych:
+`host.showOnMap({ newTab: true, compare: [{ geometry, kind: "aktualna", label: "123/4" }], draw: { table, defaults } })`.
 
 `newTab: true` otwiera mapę w nowej karcie (panel administracji zostaje na miejscu; obiekt przekazywany przez
 pamięć przeglądarki, więc geometria może być duża).
