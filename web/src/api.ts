@@ -18,7 +18,10 @@ export async function request<T>(path: string, init: RequestInit = {}): Promise<
     let msg = res.statusText;
     try {
       const body = await res.json();
-      msg = typeof body.detail === "string" ? body.detail : JSON.stringify(body.detail);
+      const d = body.detail;
+      msg = typeof d === "string" ? d : typeof d?.message === "string" ? d.message : JSON.stringify(d);
+      // kontrola topologii (nakładanie): miejsce błędu na mapie — App pokazuje je jako „uwaga”
+      if (d && typeof d === "object" && d.overlap) window.dispatchEvent(new CustomEvent("sophia-topology", { detail: d }));
     } catch { /* odpowiedź nie-JSON */ }
     throw new ApiError(res.status, msg);
   }

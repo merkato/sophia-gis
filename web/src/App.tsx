@@ -443,6 +443,18 @@ export default function App() {
     if (!inside) view.fit(ext, { padding: [60, 60, 60, 60], maxZoom: Math.max(view.getZoom() ?? 0, 14), duration: 300 });
   };
 
+  // kontrola topologii przy zapisie (API: nakładanie na inne obiekty warstwy) — miejsce błędu na mapie na czerwono
+  useEffect(() => {
+    const on = (e: Event) => {
+      const d = (e as CustomEvent).detail as { message?: string; overlap?: MapFocus["compare"] };
+      if (!d?.overlap?.length) return;
+      setCompare({ items: d.overlap, label: "Nakładanie (błąd zapisu)", visible: true });
+      if (d.message) setMessage(d.message);
+    };
+    window.addEventListener("sophia-topology", on);
+    return () => window.removeEventListener("sophia-topology", on);
+  }, []);
+
   // przyciąganie: wybór użytkownika albo ustawienia projektu QGIS (warstwa edycyjna zawsze, gdy włączone)
   const snapState = useMemo(() => snapChoice ?? {
     on: true, layers: config?.snapping?.enabled ? config.snapping.layers : [],
@@ -805,6 +817,7 @@ export default function App() {
               <div className="compare-legend muted">
                 <span><i className="cmp historyczna" /> historyczna</span>
                 <span><i className="cmp aktualna" /> aktualna</span>
+                {compare.items.some((c) => c.kind === "uwaga") && <span><i className="cmp uwaga" /> błąd</span>}
               </div>
             </section>
           )}

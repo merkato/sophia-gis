@@ -238,6 +238,7 @@ button.block, .reports .button { display: block; width: 100%; text-align: left; 
 .cmp { display: inline-block; width: 18px; height: 10px; }
 .cmp.historyczna { border: 2px dashed #6b7380; background: rgba(107, 115, 128, 0.18); }
 .cmp.aktualna { border: 2px solid #e8590c; }
+.cmp.uwaga { border: 2px solid #d9363e; background: rgba(217, 54, 62, 0.25); }
 .basemaps .tree-row label { gap: 8px; }
 /* --- przezroczystość rastrów i podkładów */
 .opacity-btn { font-size: 14px; }

@@ -276,6 +276,7 @@ async def create_feature(slug: str, layer_id: str, body: FeatureIn, crs: str = "
                 pk=sql.Literal(pk))
             cut = await _set_geometry(conn, ctx, lyr, cut_from, _as_column_type(lyr, sql.SQL("ST_Difference({}, {})").format(
                 col(T, lyr.pg.geometry_column), hole)), srid)
+        await check_overlap(conn, ctx, lyr, pk)   # po wycięciu dziury (wypełniony pierścień nie nachodzi na obiekt)
         row = await _fetch_one(conn, None, lyr, pk, srid, None)
     feature = _row_to_feature(row)
     await _audit(ctx, layer_id, pk, "insert", None, feature)
@@ -307,6 +308,8 @@ async def update_feature(slug: str, layer_id: str, pk: str, body: FeatureIn, crs
                 t=_table(lyr), s=sql.SQL(", ").join(sets), k=sql.Identifier(lyr.pg.key), pk=sql.Literal(pk)))
             if not await in_scope(conn, ctx, lyr, pk, "edit"):
                 raise _scope_error(ctx, lyr)
+            if body.geometry is not None:
+                await check_overlap(conn, ctx, lyr, pk)
         new = await _fetch_one(conn, None, lyr, pk, srid, None)
     await _audit(ctx, layer_id, pk, "update", _row_to_feature(old), _row_to_feature(new))
     return _row_to_feature(new)
@@ -579,6 +582,35 @@ async def _pick(conn, ctx: ProjectContext, lyr: LayerDef, where: sql.Composable,
     return row["pk"] if row else None
 
 
+OVERLAP_TOLERANCE_M = 0.01      # część wspólna węższa niż 2 cm (bufor do środka 1 cm znika) — nie jest nakładaniem
+
+
+async def check_overlap(conn, ctx: ProjectContext, lyr: LayerDef, pk: str) -> None:
+    """Kontrola topologii przy zapisie: obiekt warstwy z listy „unikaj nakładania” projektu QGIS nie może nachodzić
+    na inne obiekty tej warstwy (szerzej niż 2 cm). Błąd 409 z miejscami nakładania (EPSG:4326) do pokazania na mapie;
+    wyjątek w transakcji wycofuje zapis."""
+    snap = getattr(ctx.project, "snapping", None)
+    if snap is None or lyr.id not in snap.avoid_overlap or lyr.geometry_type != "Polygon" or not lyr.pg.geometry_column:
+        return
+    g, k = sql.Identifier(lyr.pg.geometry_column), sql.Identifier(lyr.pg.key)
+    rows = await (await conn.execute(sql.SQL("""
+        SELECT o.{k}::text AS pk, ST_AsGeoJSON(ST_Transform(x.czesc, 4326), 7)::json AS geometry,
+               round(ST_Area(x.czesc)::numeric, 2) AS m2
+          FROM {t} AS o
+          JOIN (SELECT {g} AS geom FROM {t} WHERE {k}::text = {pk}) AS n ON o.{g} && n.geom
+          CROSS JOIN LATERAL (SELECT ST_CollectionExtract(ST_Intersection(o.{g}, n.geom), 3) AS czesc) AS x
+         WHERE o.{k}::text <> {pk} AND ST_SRID(n.geom) <> 4326 AND ST_Intersects(o.{g}, n.geom)
+           AND NOT ST_IsEmpty(ST_Buffer(x.czesc, {tol}))
+         LIMIT 5""").format(k=k, g=g, t=_table(lyr), pk=sql.Literal(pk), tol=sql.Literal(-OVERLAP_TOLERANCE_M)))).fetchall()
+    if rows:
+        razem = sum(float(r["m2"]) for r in rows)
+        raise HTTPException(status.HTTP_409_CONFLICT, {
+            "message": f"Obiekt nachodzi na {len(rows)}{'+' if len(rows) == 5 else ''} inny(ch) obiekt(y) warstwy "
+                       f"„{lyr.name}” ({razem:.2f} m²) — popraw granicę (miejsca zaznaczone na mapie na czerwono)",
+            "overlap": [{"geometry": r["geometry"], "kind": "uwaga", "label": f"{float(r['m2']):.1f} m²"} for r in rows],
+            "with": [r["pk"] for r in rows]})
+
+
 async def _set_geometry(conn, ctx: ProjectContext, lyr: LayerDef, pk: str, expr: sql.Composable, srid: int):
     """UPDATE geometrii wyrażeniem nad wierszem (alias T) + kontrola zakresu; zwraca (stary, nowy)."""
     old = await _fetch_one(conn, ctx, lyr, pk, srid, "view")
@@ -588,6 +620,7 @@ async def _set_geometry(conn, ctx: ProjectContext, lyr: LayerDef, pk: str, expr:
         t=_table(lyr), a=sql.Identifier(*T), g=sql.Identifier(lyr.pg.geometry_column), e=expr, pk=_pk_is(lyr, pk)))
     if not await in_scope(conn, ctx, lyr, pk, "edit"):
         raise _scope_error(ctx, lyr)
+    await check_overlap(conn, ctx, lyr, pk)
     return _row_to_feature(old), _row_to_feature(await _fetch_one(conn, None, lyr, pk, srid, None))
 
 
