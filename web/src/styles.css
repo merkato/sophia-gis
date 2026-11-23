@@ -61,6 +61,14 @@ button.block, .reports .button { display: block; width: 100%; text-align: left; 
 .toolbar .tool:hover:not(:disabled) { background: color-mix(in srgb, var(--accent) 10%, transparent); border-color: var(--line); }
 .toolbar .tool.active { background: color-mix(in srgb, var(--accent) 20%, transparent); border-color: var(--accent); }
 .toolbar .tool:disabled { opacity: .35; filter: grayscale(1); cursor: default; }
+.toolbar .tool.snap-more { width: 16px; margin-left: -2px; font-size: 11px; color: var(--muted); }
+.snap-pop { position: fixed; z-index: 1200; width: 290px; max-height: 60vh; overflow: auto; padding: 8px 10px;
+  background: var(--surface); color: var(--ink); border: 1px solid var(--line); border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, .18); font-size: 13px; }
+.snap-pop label { display: flex; gap: 8px; align-items: center; padding: 3px 0; }
+.snap-pop .snap-head { font-weight: 600; margin-bottom: 4px; }
+.snap-pop .snap-foot { font-size: 12px; margin-top: 6px; border-top: 1px solid var(--line); padding-top: 6px; }
+.snap-pop .snap-foot .link { margin-left: 4px; }
 .toolbar .sep { width: 1px; height: 24px; background: var(--line); margin: 0 6px; flex: none; }
 .toolbar .scope-badge { margin-left: auto; flex: none; font-size: 12px; padding: 3px 10px; border-radius: 12px;
   border: 1px solid var(--line); color: var(--muted); white-space: nowrap; max-width: 40%; overflow: hidden; text-overflow: ellipsis; }

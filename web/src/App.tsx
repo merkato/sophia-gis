@@ -159,6 +159,8 @@ export default function App() {
   const [focusGeom, setFocusGeom] = useState<GeoJSONFeature["geometry"] | null>(null);
   // obraz z pliku pokazany przez wtyczkę (host.showOnMap({ raster })) — do zmiany projektu albo usunięcia w panelu
   const [fileRaster, setFileRaster] = useState<(NonNullable<MapFocus["raster"]> & { visible: boolean }) | null>(null);
+  // przyciąganie: wybór użytkownika dla projektu (przeglądarka); brak wyboru = ustawienia projektu QGIS
+  const [snapChoice, setSnapChoice] = useState<{ on: boolean; layers: string[] } | null>(null);
   const [compare, setCompare] = useState<{ items: NonNullable<MapFocus["compare"]>; label?: string; visible: boolean } | null>(null);
 
   /**
@@ -276,6 +278,11 @@ export default function App() {
         await ensureProjection(cfg.crs);
         setConfig(cfg);
         setVisible(initialVisibility(cfg.tree));
+        try {
+          const saved = JSON.parse(localStorage.getItem(`sophia-snap-${cfg.slug}`) ?? "null");
+          setSnapChoice(saved && typeof saved.on === "boolean" && Array.isArray(saved.layers)
+            ? { on: saved.on, layers: saved.layers.filter((id: string) => cfg.layers[id]) } : null);
+        } catch { setSnapChoice(null); }
       })
       .catch((e) => {
         setConfig(null);
@@ -434,6 +441,15 @@ export default function App() {
     const visible = view.calculateExtent(map.getSize());
     const inside = ext[0] >= visible[0] && ext[1] >= visible[1] && ext[2] <= visible[2] && ext[3] <= visible[3];
     if (!inside) view.fit(ext, { padding: [60, 60, 60, 60], maxZoom: Math.max(view.getZoom() ?? 0, 14), duration: 300 });
+  };
+
+  // przyciąganie: wybór użytkownika albo ustawienia projektu QGIS (warstwa edycyjna zawsze, gdy włączone)
+  const snapState = useMemo(() => snapChoice ?? {
+    on: true, layers: config?.snapping?.enabled ? config.snapping.layers : [],
+  }, [snapChoice, config]);
+  const saveSnap = (next: { on: boolean; layers: string[] }) => {
+    setSnapChoice(next);
+    try { if (config) localStorage.setItem(`sophia-snap-${config.slug}`, JSON.stringify(next)); } catch { /* bez pamięci */ }
   };
 
   // tabela atrybutów (okno na środku ekranu) — jedna naraz
@@ -737,7 +753,10 @@ export default function App() {
         fetchToolId={fetchToolId} onFetchTool={startFetchTool}
         onOpenTable={() => editLayerId && setTableLayerId(editLayerId)}
         onPrint={mapConfig ? () => setShowPrint(true) : null}
-        widgets={widgets.map(({ id, Widget, host }) => <Widget key={id} host={host} />)} />
+        widgets={widgets.map(({ id, Widget, host }) => <Widget key={id} host={host} />)}
+        snap={config ? { on: snapState.on, layers: snapState.layers,
+          onToggle: () => saveSnap({ ...snapState, on: !snapState.on }),
+          onLayers: (layers) => saveSnap({ ...snapState, layers }) } : undefined} />
 
       <div className="body">
         {sidebarOpen && <aside className="sidebar">
@@ -803,7 +822,7 @@ export default function App() {
               basemaps={basemaps} baseId={baseId} overlayIds={overlayIds}
               fileRaster={fileRaster?.visible ? fileRaster : null}
               compare={compare?.visible ? compare.items : null}
-              snapLayers={config?.snapping?.enabled ? config.snapping.layers : []}
+              snapOn={snapState.on} snapLayers={snapState.layers}
               snapTolerance={config?.snapping?.tolerance_px} snapSegment={config?.snapping?.segment}
               onIdentify={openFeature}
               onFetchClick={fetchAt}

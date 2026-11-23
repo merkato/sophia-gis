@@ -1,10 +1,10 @@
-import type { ComponentType, ReactNode, SVGProps } from "react";
+import { useEffect, useRef, useState, type ComponentType, type ReactNode, type SVGProps } from "react";
 import type { LayerInfo, ProjectConfig } from "../types";
 import type { Tool } from "./MapView";
 import {
   GEOMETRY_ICON, IconAddPolygon, IconAddRecord, IconDelete, IconEdit, IconFetchBuilding, IconFetchParcel, IconIdentify,
   IconDeletePart, IconDeleteRing, IconFillRing, IconLayers, IconMeasureArea, IconMeasureLength, IconMerge, IconMove, IconPrint, IconRing, IconSelect, IconSplit,
-  IconAddPart, IconCopy, IconReshape, IconRotate, IconTable, IconUndo, IconVertex,
+  IconAddPart, IconCopy, IconReshape, IconRotate, IconSnap, IconTable, IconUndo, IconVertex,
 } from "./Icons";
 
 const DRAW_LABEL = { Point: "Dodaj obiekt punktowy", Line: "Dodaj obiekt liniowy", Polygon: "Dodaj obiekt poligonowy" };
@@ -20,12 +20,68 @@ function ToolButton({ icon: Icon, label, active, disabled, onClick }: {
   );
 }
 
+/** Przyciąganie: przełącznik (magnes) i lista warstw odniesienia — okienko w stałym położeniu pod przyciskiem
+ * (pasek przewija się poziomo, więc okienko nie może być w nim zagnieżdżone). */
+function SnapControl({ config, on, layers, onToggle, onLayers }: {
+  config: ProjectConfig; on: boolean; layers: string[];
+  onToggle: () => void; onLayers: (ids: string[]) => void;
+}) {
+  const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
+  const ref = useRef<HTMLButtonElement>(null);
+  useEffect(() => {
+    if (!pos) return;
+    const close = (e: MouseEvent) => {
+      const t = e.target as HTMLElement;
+      if (!t.closest(".snap-pop") && t !== ref.current) setPos(null);
+    };
+    document.addEventListener("mousedown", close);
+    return () => document.removeEventListener("mousedown", close);
+  }, [pos]);
+  const candidates = Object.values(config.layers)
+    .filter((l) => l.type === "vector" && l.geometry_type && l.source_table)
+    .sort((a, b) => a.name.localeCompare(b.name, "pl"));
+  const s = config.snapping;
+  const label = on
+    ? `Przyciąganie włączone (${s?.tolerance_px ?? 12} px): warstwa edycyjna${layers.length ? ` + ${layers.length} odniesienia` : ""}`
+    : "Przyciąganie wyłączone";
+  return (
+    <>
+      <ToolButton icon={IconSnap} label={label} active={on} onClick={onToggle} />
+      <button ref={ref} type="button" className="tool snap-more" title="Warstwy, do których przyciągać"
+        aria-label="Warstwy przyciągania" aria-expanded={!!pos}
+        onClick={() => {
+          if (pos) { setPos(null); return; }
+          const r = ref.current!.getBoundingClientRect();
+          setPos({ left: Math.min(r.left, window.innerWidth - 300), top: r.bottom + 4 });
+        }}>▾</button>
+      {pos && (
+        <div className="snap-pop" style={{ left: pos.left, top: pos.top }}>
+          <div className="snap-head">Przyciągaj do (oprócz warstwy edycyjnej)</div>
+          {candidates.length === 0 && <p className="muted">Brak warstw wektorowych.</p>}
+          {candidates.map((l) => (
+            <label key={l.id}>
+              <input type="checkbox" checked={layers.includes(l.id)}
+                onChange={() => onLayers(layers.includes(l.id) ? layers.filter((x) => x !== l.id) : [...layers, l.id])} />
+              {l.name}
+            </label>
+          ))}
+          <div className="snap-foot muted">
+            {s?.enabled ? "Domyślnie: ustawienia przyciągania z projektu QGIS." : "Projekt QGIS nie ma włączonego przyciągania — wybór tylko w tej przeglądarce."}
+            {" "}Obiekty warstw odniesienia ładują się w dużej skali (od ok. 1:15 000).
+            {s && <button type="button" className="link" onClick={() => onLayers(s.enabled ? s.layers : [])}>przywróć z projektu</button>}
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
 /**
  * Pasek narzędzi pod paskiem tytułu (jak paski „Digitalizacja” i „Atrybuty” w QGIS).
  * Narzędzia edycji są zawsze widoczne; bez aktywnej warstwy edycyjnej są wyszarzone.
  */
 export function Toolbar({ config, editLayerId, onEditLayer, tool, onTool, canDelete, onDelete, onNewRecord, onUndo,
-  sidebarOpen, onToggleSidebar, fetchToolId, onFetchTool, onOpenTable, onPrint, widgets }: {
+  sidebarOpen, onToggleSidebar, fetchToolId, onFetchTool, onOpenTable, onPrint, widgets, snap }: {
   config: ProjectConfig | null;
   editLayerId: string | null;
   onEditLayer: (id: string | null) => void;
@@ -42,6 +98,7 @@ export function Toolbar({ config, editLayerId, onEditLayer, tool, onTool, canDel
   onOpenTable: () => void;         // tabela atrybutów warstwy edycyjnej
   onPrint: (() => void) | null;    // wydruk widoku mapy (null = mapa jeszcze niegotowa)
   widgets?: ReactNode[];           // elementy wtyczek (np. pole wyszukiwania) — po prawej
+  snap?: { on: boolean; layers: string[]; onToggle: () => void; onLayers: (ids: string[]) => void };   // przyciąganie
 }) {
   const editable: LayerInfo[] = Object.values(config?.layers ?? {})
     .filter((l) => l.perms.insert || l.perms.update || l.perms.delete)
@@ -111,6 +168,13 @@ export function Toolbar({ config, editLayerId, onEditLayer, tool, onTool, canDel
           <ToolButton icon={IconDeletePart} label={layer && geom && !layer.multi
             ? "Usuń część — warstwa nie ma obiektów wieloczęściowych" : "Usuń część obiektu wieloczęściowego (kliknij część)"}
             active={tool === "delpart"} disabled={!geom || !layer?.multi || !layer?.perms.update} onClick={() => onTool("delpart")} />
+          {snap && geom && (
+            <>
+              <span className="sep" />
+              <SnapControl config={config} on={snap.on} layers={snap.layers} onToggle={snap.onToggle} onLayers={snap.onLayers} />
+              <span className="sep" />
+            </>
+          )}
           <ToolButton icon={IconDelete} label="Usuń zaznaczony obiekt" disabled={!canDelete} onClick={onDelete} />
           <ToolButton icon={IconTable} label={layer ? `Otwórz tabelę atrybutów: ${layer.name}` : "Otwórz tabelę atrybutów"}
             disabled={!layer} onClick={onOpenTable} />

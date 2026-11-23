@@ -295,3 +295,12 @@ export const IconFetchBuilding = (p: P) => (
 );
 
 export const GEOMETRY_ICON = { Point: IconAddPoint, Line: IconAddLine, Polygon: IconAddPolygon } as const;
+
+/** Magnes — przyciąganie do wierzchołków i krawędzi (włączone / wyłączone). */
+export const IconSnap = (p: P) => (
+  <Svg {...p}>
+    <path d="M5 4h4v8a3 3 0 0 0 6 0V4h4v8a7 7 0 0 1-14 0z" fill={C.red} fillOpacity=".85" stroke="#8c1d22" strokeWidth="1.2" />
+    <path d="M5 4h4v3H5zM15 4h4v3h-4z" fill="#e7ecf2" stroke={C.line} strokeWidth="1.1" />
+    <circle cx="12" cy="20.5" r="1.6" fill={C.blue} stroke="#fff" strokeWidth=".8" />
+  </Svg>
+);
