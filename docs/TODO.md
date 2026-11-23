@@ -14,8 +14,15 @@ Oznaczenia: ✅ zrobione · ✔️ zrobione częściowo (co zostało — w plani
 
 ### ⬜ 2. Drobne zaległości
 - ⬜ Kolejne źródła narzędzi pobierania: PRG adresy, BDOT10k (nowy wpis w `SOURCES` i w `fia/tools.py`).
-- ⬜ Przyciąganie w edycji (ustawienia z projektu QGIS i przełącznik w aplikacji, inne warstwy) i usuwanie
-  wierzchołków (dziś tylko Alt+klik) — do ustalenia.
+- ⬜ Przyciąganie i kontrola topologii w edycji — **od początku, na każdej warstwie edycyjnej** (ustalenia 23.11):
+  - przyciąganie do węzłów (i krawędzi) istniejących geometrii: warstwy edycyjnej i wskazanych warstw odniesienia
+    (np. kontur → działki, użytki, inne kontury; użytek → działki, inne użytki; działka z dnia decyzji → działki);
+    zestaw warstw i tolerancja z ustawień przyciągania projektu QGIS, przełącznik w aplikacji;
+  - kontrola topologii przy zapisie (nakładanie z innymi obiektami warstwy, wyjście poza obiekt nadrzędny
+    w tolerancji) — komunikat z miejscem błędu na mapie;
+  - usuwanie wierzchołków wygodniej niż Alt+klik (np. zaznaczenie + Delete);
+  - nakładka działek z powiatów (KIEG, WMS) jako warstwa odniesienia — podgląd; przyciąganie tylko do danych
+    wektorowych (rejestr EGiB / ULDK w bazie).
 
 ### ⬜ 3. Graficzny edytor schematu bazy (WebUI) — plan z 15.11
 Diagram tabel jak w narzędziach ERD: karty tabel przeciągane po płótnie, relacja = „sznurek”
