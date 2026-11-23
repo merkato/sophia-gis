@@ -108,4 +108,13 @@ async def project_config(slug: str, user: CurrentUser | None = Depends(optional_
              "source_name": SOURCES[t.source].name}
             for t in p.tools if t.source in SOURCES and t.layer_id in layers and layers[t.layer_id]["perms"]["insert"]
         ],
+        # przyciąganie z projektu QGIS: warstwy odniesienia tylko widoczne dla użytkownika i wektorowe PostGIS
+        # (obiekty pobierane z API dla bieżącego widoku); „unikaj nakładania” — kontrola przy zapisie
+        "snapping": {
+            "enabled": p.snapping.enabled, "tolerance_px": p.snapping.tolerance_px,
+            "vertex": p.snapping.vertex, "segment": p.snapping.segment, "all_layers": p.snapping.all_layers,
+            "layers": [lid for lid in p.snapping.layers if lid in layers and layers[lid].get("geometry_type")
+                       and p.layers[lid].pg is not None],
+            "avoid_overlap": [lid for lid in p.snapping.avoid_overlap if lid in layers],
+        },
     }

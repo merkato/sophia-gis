@@ -23,6 +23,15 @@ Oznaczenia: ✅ zrobione · ✔️ zrobione częściowo (co zostało — w plani
   - usuwanie wierzchołków wygodniej niż Alt+klik (np. zaznaczenie + Delete);
   - nakładka działek z powiatów (KIEG, WMS) jako warstwa odniesienia — podgląd; przyciąganie tylko do danych
     wektorowych (rejestr EGiB / ULDK w bazie).
+  - **Plan realizacji (0.9.0, w toku od 23.11 — każdy etap osobnym commitem):**
+    1. API: ustawienia przyciągania z projektu QGIS (`<snapping-settings>`: włączone, tryb, tolerancja i jednostka,
+       warstwy w trybie zaawansowanym; „unikaj nakładania” — `avoidIntersectionsLayers`) → `config.snapping`.
+    2. Mapa: warstwy odniesienia — obiekty wskazanych warstw z bieżącego widoku (API features, limit) w niewidocznym
+       źródle; `Snap` na warstwie edycyjnej i odniesienia; tolerancja w pikselach.
+    3. Pasek narzędzi: przełącznik przyciągania (wł./wył., zapamiętany) i lista warstw odniesienia.
+    4. Kontrola topologii przy zapisie (API): nakładanie na inne obiekty warstwy z listy „unikaj nakładania”
+       (> tolerancja) — błąd z geometrią miejsca, mapa pokazuje je na czerwono (warstwa porównania „uwaga”).
+    5. Usuwanie wierzchołka: kliknięcie wierzchołka w trybie zmiany wierzchołków + Delete (obok Alt+klik).
 
 ### ⬜ 3. Graficzny edytor schematu bazy (WebUI) — plan z 15.11
 Diagram tabel jak w narzędziach ERD: karty tabel przeciągane po płótnie, relacja = „sznurek”

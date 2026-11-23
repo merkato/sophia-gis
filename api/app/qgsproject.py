@@ -208,6 +208,57 @@ def parse_tools(cfg: dict, layers: dict[str, LayerDef]) -> list[ToolDef]:
 
 
 @dataclass
+class SnappingDef:
+    """Ustawienia przyciągania z projektu QGIS (Projekt → Opcje przyciągania) i „unikaj nakładania”."""
+    enabled: bool = False
+    tolerance_px: float = 12.0
+    vertex: bool = True                 # do wierzchołków
+    segment: bool = True                # do krawędzi
+    layers: list[str] = field(default_factory=list)          # warstwy, do których przyciągamy (id); puste = edycyjna
+    all_layers: bool = False            # tryb „wszystkie warstwy”
+    avoid_overlap: list[str] = field(default_factory=list)   # warstwy z kontrolą nakładania (QGIS: unikaj przecięć)
+    topological: bool = False           # edycja topologiczna (QGIS) — informacyjnie
+
+
+def _snap_types(v: str | None) -> tuple[bool, bool]:
+    """(wierzchołki, krawędzie). QGIS ≥ 3.12 zapisuje flagi (1 wierzchołek, 2 krawędź, …), starsze — 1 / 2 / 3; wartości
+    2 i 3 znaczą w nich co innego, więc: 1 — same wierzchołki, inne — wierzchołki i krawędzie (wierzchołki zawsze)."""
+    try:
+        return True, int(v or 3) != 1
+    except ValueError:
+        return True, True
+
+
+def _tolerance_px(tol: str | None, unit: str | None) -> float:
+    """Tolerancja w pikselach ekranu: QGIS zapisuje też jednostki mapy (unit 0/2) — wtedy wartość domyślna."""
+    try:
+        t = float(tol or 12)
+    except ValueError:
+        t = 12.0
+    return min(max(t, 2.0), 40.0) if (unit or "1") == "1" else 12.0
+
+
+def parse_snapping(root: etree._Element, layers: dict[str, LayerDef]) -> SnappingDef:
+    s = SnappingDef()
+    el = root.find(".//snapping-settings")
+    if el is not None:
+        s.enabled = el.get("enabled") == "1"
+        s.tolerance_px = _tolerance_px(el.get("tolerance"), el.get("unit"))
+        s.vertex, s.segment = _snap_types(el.get("type"))
+        mode = el.get("mode", "2")          # 1 — warstwa aktywna, 2 — wszystkie warstwy, 3 — zaawansowany (lista)
+        if mode == "2":
+            s.all_layers = True
+            s.layers = [lid for lid, lyr in layers.items() if lyr.type == "vector" and lyr.geometry_type]
+        elif mode in ("3", "4"):
+            for ls in el.findall("./individual-layer-settings/layer-setting"):
+                if ls.get("enabled") == "1" and ls.get("id") in layers:
+                    s.layers.append(ls.get("id"))
+    s.avoid_overlap = [e.get("id") for e in root.findall("./avoidIntersectionsLayers/layer") if e.get("id") in layers]
+    s.topological = root.findtext("./properties/Digitizing/TopologicalEditing") in ("1", "true")
+    return s
+
+
+@dataclass
 class Project:
     title: str
     crs: str
@@ -220,6 +271,7 @@ class Project:
     mtime: float
     tools: list[ToolDef] = field(default_factory=list)
     scope: ScopeDef | None = None
+    snapping: SnappingDef = field(default_factory=SnappingDef)
 
     def layer_by_wms_name(self, name: str) -> LayerDef | None:
         return next((lyr for lyr in self.layers.values() if lyr.wms_name == name), None)
@@ -534,6 +586,7 @@ def load_project(path: Path) -> Project:
         mtime=path.stat().st_mtime,
         tools=parse_tools(cfg, layers),
         scope=resolve_scope(cfg, layer_cfg, layers, relations),
+        snapping=parse_snapping(root, layers),
     )
 
 

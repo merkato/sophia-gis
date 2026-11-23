@@ -168,3 +168,27 @@ def test_split_policies():
     assert pol == {"id": "DefaultValue", "nazwa": "Duplicate", "pow": "GeometryRatio", "nr": "Duplicate"}
     assert {f.name: f.duplicate_policy for f in fields} == {
         "id": "Duplicate", "nazwa": "Duplicate", "pow": "Duplicate", "nr": "UnsetField"}
+
+
+def test_parse_snapping():
+    from app.qgsproject import LayerDef, parse_snapping
+
+    layers = {i: LayerDef(id=i, name=i, short_name=None, type="vector", provider="postgres", crs="EPSG:2180",
+                          geometry_type="polygon", display_expression=None) for i in ("dz", "kontur", "uzytek")}
+    root = etree.fromstring("""<qgis>
+      <snapping-settings enabled="1" mode="3" type="1" tolerance="15" unit="1">
+        <individual-layer-settings>
+          <layer-setting id="dz" enabled="1" type="1" tolerance="12" units="1"/>
+          <layer-setting id="uzytek" enabled="0" type="1" tolerance="12" units="1"/>
+          <layer-setting id="obca" enabled="1" type="1" tolerance="12" units="1"/>
+        </individual-layer-settings>
+      </snapping-settings>
+      <avoidIntersectionsLayers><layer id="kontur"/></avoidIntersectionsLayers>
+      <properties><Digitizing><TopologicalEditing type="int">1</TopologicalEditing></Digitizing></properties>
+    </qgis>""")
+    s = parse_snapping(root, layers)
+    assert (s.enabled, s.tolerance_px, s.vertex, s.segment) == (True, 15.0, True, False)
+    assert s.layers == ["dz"] and s.avoid_overlap == ["kontur"] and s.topological and not s.all_layers
+    s = parse_snapping(etree.fromstring('<qgis><snapping-settings enabled="0" mode="2" type="3" tolerance="5" unit="2"/></qgis>'), layers)
+    assert not s.enabled and s.all_layers and sorted(s.layers) == ["dz", "kontur", "uzytek"] and s.tolerance_px == 12.0
+    assert parse_snapping(etree.fromstring("<qgis/>"), layers).enabled is False
