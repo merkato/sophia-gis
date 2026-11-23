@@ -1,7 +1,9 @@
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+import psycopg
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 
 from . import __version__, plugins
 from .config import get_settings
@@ -39,6 +41,16 @@ async def lifespan(_: FastAPI):
 
 app = FastAPI(title="Sophia API", version=__version__, lifespan=lifespan,
               docs_url="/api/docs", openapi_url="/api/openapi.json")
+
+
+
+# odrzucenie zapisu przez bazę (ograniczenia, wyzwalacze z RAISE) — komunikat bazy zamiast błędu 500
+@app.exception_handler(psycopg.errors.IntegrityError)
+@app.exception_handler(psycopg.errors.RaiseException)
+async def db_rejected(_: Request, e: psycopg.Error) -> JSONResponse:
+    msg = (e.diag.message_primary if e.diag else None) or str(e).splitlines()[0]
+    return JSONResponse({"detail": f"Baza danych odrzuciła zapis: {msg}"}, status_code=409)
+
 
 # photos przed features: klucz obiektu może zawierać „/” ({pk:path}), więc ogólna trasa obiektu
 # przechwyciłaby …/features/{pk}/files/{field}, gdyby była sprawdzana wcześniej

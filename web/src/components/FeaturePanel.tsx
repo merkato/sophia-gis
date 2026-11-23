@@ -96,8 +96,14 @@ export const FeaturePanel = forwardRef<FeaturePanelHandle, Props>(function Featu
       setError(`Wymagane pola: ${missing.map((f) => f.alias ?? f.name).join(", ")}`);
       return false;
     }
-    const props = Object.fromEntries(
-      editableFields.map((f) => [f.name, values[f.name] ?? null]));
+    // nowy obiekt: pola wypełnione z góry, których nie ma w formularzu (ukryte, klucz naturalny — np. identyfikator
+    // działki ustawiony przez wtyczkę, klucz obcy rekordu powiązanego), idą do zapisu razem z polami formularza
+    const preset = isNew ? Object.fromEntries(Object.entries(feature?.properties ?? {}).filter(([k, v]) =>
+      v != null && v !== "" && (k === layer.primary_key || layer.fields.some((f) => f.name === k && f.editable)))) : {};
+    const props = {
+      ...preset,
+      ...Object.fromEntries(editableFields.map((f) => [f.name, values[f.name] ?? null])),
+    };
     setBusy(true);
     setError(null);
     try {

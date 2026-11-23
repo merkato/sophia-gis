@@ -38,3 +38,15 @@ def test_slash_in_feature_key():
     assert params == {"slug": "p", "layer_id": "l", "pk": pk, "field": "foto"}
     name, params = _endpoint(app, "POST", f"{base}/split")
     assert name is not None and "pk" not in params
+
+
+def test_writable_values_natural_key():
+    # nowy obiekt może dostać klucz naturalny (np. identyfikator działki z wtyczki); zmiana obiektu — nigdy
+    from app.qgsproject import FieldDef, LayerDef, PgSource
+    lyr = LayerDef(id="h", name="h", short_name=None, type="vector", provider="postgres", crs=None, geometry_type="Polygon",
+                   pg=PgSource("service=x", "s", "t", "geom", "teryt", 2180, "MultiPolygon", None),
+                   fields=[FieldDef("teryt", widget="Hidden"), FieldDef("zrodlo"), FieldDef("dodano", editable=False)])
+    props = {"teryt": "146301_1.0001.1", "zrodlo": "ULDK"}
+    assert features._writable_values(lyr, props, with_key=True) == props
+    assert features._writable_values(lyr, props) == {"zrodlo": "ULDK"}
+    assert features._writable_values(lyr, {"teryt": "", "zrodlo": "ULDK"}, with_key=True) == {"zrodlo": "ULDK"}

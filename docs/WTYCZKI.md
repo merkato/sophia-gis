@@ -128,7 +128,8 @@ host.showOnMap({
 Ten sam obiekt można podać w adresie: `?p=<slug>&obiekt=<schemat.tabela>:<klucz>` (link do wysłania).
 `host.startDraw({ project, table: "schemat.tabela", defaults: { pole: wartość }, geometry, label })` (Sophia ≥ 0.3) —
 przybliża mapę i włącza rysowanie w warstwie z tej tabeli; po narysowaniu formularz ma wypełnione `defaults`
-(warstwa bez geometrii: od razu formularz).
+(warstwa bez geometrii: od razu formularz). Sophia ≥ 0.9.2: pola z `defaults`, których nie ma w formularzu
+(ukryte, klucz naturalny tabeli — np. identyfikator działki), też trafiają do zapisu nowego obiektu.
 Sophia ≥ 0.8.5: `raster: { url, extent: [minx, miny, maxx, maxy], crs: "EPSG:2180", label }` — obraz (PNG/WEBP/JPEG,
 np. GeoTIFF przetworzony przez wtyczkę) nad podkładami, pod warstwami projektu; mapa przybliża się do zasięgu,
 w panelu warstw pojawia się „Obraz z pliku” (ukryj / usuń). `edit: { table, defaults }` — warstwa z tabeli staje się

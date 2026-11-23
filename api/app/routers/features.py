@@ -86,12 +86,17 @@ def _row_to_feature(row: dict) -> dict:
             "properties": row.get("__props") or {}}
 
 
-def _writable_values(lyr: LayerDef, props: dict[str, Any]) -> dict[str, Any]:
+def _writable_values(lyr: LayerDef, props: dict[str, Any], with_key: bool = False) -> dict[str, Any]:
+    """Pola do zapisu. with_key (nowy obiekt): podana wartość klucza trafia do INSERT — klucz naturalny
+    (np. identyfikator działki z wtyczki); pusty klucz zostaje dla domyślnej wartości z bazy (serial)."""
     allowed = {f.name: f for f in lyr.fields if f.editable and f.name != lyr.pg.key}
     unknown = set(props) - set(allowed) - {lyr.pg.key}
     if unknown:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, f"Pola niedozwolone: {sorted(unknown)}")
-    return {k: v for k, v in props.items() if k in allowed}
+    values = {k: v for k, v in props.items() if k in allowed}
+    if with_key and props.get(lyr.pg.key) not in (None, ""):
+        values[lyr.pg.key] = props[lyr.pg.key]
+    return values
 
 
 def _geom_sql(lyr: LayerDef, geometry: dict, in_srid: int, multi: bool = True) -> sql.Composable:
@@ -247,7 +252,7 @@ async def create_feature(slug: str, layer_id: str, body: FeatureIn, crs: str = "
     if cut_from is not None:
         lyr = _editable_geometry(ctx, layer_id, "insert", "update", kinds=("Polygon",))
     srid = _srid(crs)
-    values = _writable_values(lyr, body.properties)
+    values = _writable_values(lyr, body.properties, with_key=True)
     _autofill_scope(ctx, lyr, values)
 
     cols = [sql.Identifier(k) for k in values]
