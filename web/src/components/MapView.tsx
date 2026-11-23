@@ -81,6 +81,10 @@ interface Props {
   onFetchClick?: (coordinate: number[]) => void;         // narzędzie pobierania (ULDK…)
   preview?: GeoJSONFeature["geometry"] | null;           // obrys pobranego obiektu przed dodaniem
   compare?: MapFocus["compare"] | null;                  // porównanie geometrii z wtyczki (EPSG:4326)
+  snapOn?: boolean;                                      // przyciąganie włączone (domyślnie tak)
+  snapLayers?: string[];                                 // warstwy odniesienia (id) — oprócz warstwy edycyjnej
+  snapTolerance?: number;                                // tolerancja w pikselach (domyślnie 12)
+  snapSegment?: boolean;                                 // także do krawędzi (domyślnie tak)
   printFrame?: [number, number, number] | null;          // obszar wydruku [szer., wys.] w metrach wokół środka widoku, obrót w ° (zegar)
   opacity: Record<string, number>;                       // krycie 0–100: "<slug>/<warstwa WMS>", "bm:<id>"
   mapRef: MutableRefObject<OlMap | null>;
@@ -137,7 +141,11 @@ const compareStyle = (f: FeatureLike) => {
   });
 };
 
-const DRAW_TYPE ={ Point: "Point", Line: "LineString", Polygon: "Polygon" } as const;
+// narzędzia, w których działa przyciąganie; warstwy odniesienia ładowane tylko w dużej skali (≤ 4 m/piksel)
+const SNAP_TOOLS = ["draw", "modify", "split", "ring", "fillring", "addpart", "reshape"];
+const SNAP_MAX_RESOLUTION = 4;
+
+const DRAW_TYPE = { Point: "Point", Line: "LineString", Polygon: "Polygon" } as const;
 
 export function MapView(props: Props) {
   const { config, wmsLayers, editLayerId, tool, reloadToken, mapRef } = props;
@@ -152,6 +160,7 @@ export function MapView(props: Props) {
   const editSourceRef = useRef(new VectorSource<Feature<Geometry>>());
   const previewSourceRef = useRef(new VectorSource<Feature<Geometry>>());
   const compareSourceRef = useRef(new VectorSource<Feature<Geometry>>());
+  const snapRefSourceRef = useRef(new VectorSource<Feature<Geometry>>());   // obiekty warstw odniesienia (niewidoczne)
   const frameSourceRef = useRef(new VectorSource<Feature<Geometry>>());
   const selectRef = useRef<Select | null>(null);
   const editLayerRef = useRef<VectorLayer | null>(null);
@@ -370,6 +379,40 @@ export function MapView(props: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [compare, config.crs]);
 
+  // --- warstwy odniesienia do przyciągania: obiekty z bieżącego widoku (API), tylko w narzędziach edycji
+  const snapOn = props.snapOn ?? true;
+  const snapTolerance = props.snapTolerance ?? 12;
+  const snapSegment = props.snapSegment ?? true;
+  const snapKey = (props.snapLayers ?? []).filter((id) => id !== editLayerId && config.layers[id]?.geometry_type).join(",");
+  const snapping = snapOn && !!editLayerId && SNAP_TOOLS.includes(tool);
+  useEffect(() => {
+    const map = mapRef.current;
+    const src = snapRefSourceRef.current;
+    src.clear();
+    if (!map || !snapping || !snapKey) return;
+    const ids = snapKey.split(",");
+    let cancelled = false;
+    let seq = 0;
+    const load = async () => {
+      const my = ++seq;
+      if ((map.getView().getResolution() ?? Infinity) > SNAP_MAX_RESOLUTION) { src.clear(); return; }
+      const extent = map.getView().calculateExtent(map.getSize());
+      const parts = await Promise.all(ids.map((id) => api.features(config.slug, id, extent, crs).catch(() => null)));
+      if (cancelled || my !== seq) return;
+      src.clear();
+      for (const fc of parts) {
+        if (!fc) continue;
+        const feats = format.readFeatures({ type: "FeatureCollection", features: fc.features }) as Feature<Geometry>[];
+        feats.forEach((f) => f.setId(undefined));   // klucze z różnych warstw mogłyby się powtarzać
+        src.addFeatures(feats);
+      }
+    };
+    load().catch(console.error);
+    map.on("moveend", load);
+    return () => { cancelled = true; map.un("moveend", load); src.clear(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [snapping, snapKey, config.slug, reloadToken]);
+
   // --- narzędzia
   useEffect(() => {
     const map = mapRef.current;
@@ -565,9 +608,11 @@ export function MapView(props: Props) {
       interactions.push(modify);
     }
 
-    // Przyciąganie do wierzchołków i krawędzi obiektów warstwy edycyjnej
-    if (layerInfo && ["draw", "modify", "split", "ring", "fillring", "addpart", "reshape"].includes(tool)) {
-      interactions.push(new Snap({ source }));
+    // Przyciąganie do wierzchołków i krawędzi obiektów warstwy edycyjnej i warstw odniesienia (ustawienia z projektu
+    // QGIS, przełącznik w pasku narzędzi); najpierw odniesienia — Snap dodany później ma pierwszeństwo (edycyjna)
+    if (layerInfo && snapOn && SNAP_TOOLS.includes(tool)) {
+      if (snapKey) interactions.push(new Snap({ source: snapRefSourceRef.current, pixelTolerance: snapTolerance, edge: snapSegment }));
+      interactions.push(new Snap({ source, pixelTolerance: snapTolerance, edge: snapSegment }));
     }
 
     // Etykieta powierzchni i obwodu (długości) przy rysowaniu i zmianie wierzchołków
@@ -594,7 +639,7 @@ export function MapView(props: Props) {
       selectRef.current = null;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tool, editLayerId, config.slug, wmsLayers]);
+  }, [tool, editLayerId, config.slug, wmsLayers, snapOn, snapKey, snapTolerance, snapSegment]);
 
   // --- pomiar długości i powierzchni (niezależny od warstwy edycyjnej; działa też bez projektu)
   useEffect(() => {

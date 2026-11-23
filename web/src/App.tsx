@@ -803,6 +803,8 @@ export default function App() {
               basemaps={basemaps} baseId={baseId} overlayIds={overlayIds}
               fileRaster={fileRaster?.visible ? fileRaster : null}
               compare={compare?.visible ? compare.items : null}
+              snapLayers={config?.snapping?.enabled ? config.snapping.layers : []}
+              snapTolerance={config?.snapping?.tolerance_px} snapSegment={config?.snapping?.segment}
               onIdentify={openFeature}
               onFetchClick={fetchAt}
               preview={fetchTool ? fetchState.result?.geometry ?? null : selection?.cutFrom ? selection.feature.geometry : focusGeom}

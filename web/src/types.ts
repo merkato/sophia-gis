@@ -93,6 +93,18 @@ export interface ProjectConfig {
   tools: ToolInfo[];
   scope: { label: string; codes: string[] | null } | null;   // codes null = cały obszar
   rights: { photos: boolean; files: boolean };
+  snapping?: SnappingInfo;            // Sophia ≥ 0.9: ustawienia przyciągania z projektu QGIS
+}
+
+/** Przyciąganie z projektu QGIS: warstwy odniesienia (id), tolerancja w pikselach, „unikaj nakładania”. */
+export interface SnappingInfo {
+  enabled: boolean;
+  tolerance_px: number;
+  vertex: boolean;
+  segment: boolean;
+  all_layers: boolean;
+  layers: string[];
+  avoid_overlap: string[];
 }
 
 /** Narzędzie pobierania z Fii (np. działka z ULDK -> warstwa projektu). */
