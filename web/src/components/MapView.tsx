@@ -468,9 +468,11 @@ export function MapView(props: Props) {
     if (tool === "identify") {
       const handler = async (evt: { coordinate: number[] }) => {
         const wms = wmsRef.current!;
+        // kolejność jak na mapie od góry (wmsLayers: od spodu) — otwieramy obiekt z najwyżej narysowanej warstwy
         const queryable = Object.values(config.layers)
           .filter((l) => l.popup && l.type === "vector" && wmsLayers.includes(l.wms_name))
-          .map((l) => l.wms_name);
+          .map((l) => l.wms_name)
+          .sort((a, b) => wmsLayers.indexOf(b) - wmsLayers.indexOf(a));
         if (!queryable.length) return;
         const url = wms.getFeatureInfoUrl(evt.coordinate, map.getView().getResolution()!, crs, {
           INFO_FORMAT: "application/json", QUERY_LAYERS: queryable.join(","), FEATURE_COUNT: 10,
@@ -480,13 +482,17 @@ export function MapView(props: Props) {
         const res = await fetch(url, { credentials: "same-origin" });
         if (!res.ok) return;
         const fc = await res.json();
-        const first = fc.features?.[0];
-        if (!first?.id) return;
-        // QGIS zwraca id w postaci "<nazwa_wms>.<pk>"
-        const id = String(first.id);
-        const dot = id.lastIndexOf(".");
-        const lyr = Object.values(config.layers).find((l) => l.wms_name === id.slice(0, dot));
-        if (lyr) cbRef.current.onIdentify(lyr.id, id.slice(dot + 1));
+        // QGIS zwraca id w postaci "<nazwa_wms>.<pk>"; klucz może zawierać kropki (np. „ULDK:140506_2.0029.126/4”),
+        // więc warstwę rozpoznajemy po nazwie WMS (featureType albo przedrostek id), a nie po ostatniej kropce
+        const hits = ((fc.features ?? []) as { id?: unknown; featureType?: string }[]).flatMap((f) => {
+          if (f.id == null) return [];
+          const id = String(f.id);
+          const lyr = Object.values(config.layers).find((l) =>
+            l.wms_name && (f.featureType ? f.featureType === l.wms_name : id.startsWith(`${l.wms_name}.`)));
+          return lyr && id.startsWith(`${lyr.wms_name}.`) ? [{ lyr, pk: id.slice(lyr.wms_name.length + 1) }] : [];
+        });
+        const hit = queryable.map((n) => hits.find((x) => x.lyr.wms_name === n)).find(Boolean);
+        if (hit) cbRef.current.onIdentify(hit.lyr.id, hit.pk);
       };
       clickKey = map.on("singleclick", handler as never) as EventsKey;
     }
