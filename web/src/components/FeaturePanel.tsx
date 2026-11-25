@@ -202,7 +202,7 @@ export const FeaturePanel = forwardRef<FeaturePanelHandle, Props>(function Featu
             <div key={row[0][0].name} className="field-row">
             {row.map(([f, span]) => (
             <label key={f.name} className={`field${missing.has(f.name) ? " missing" : ""}`} style={{ flex: `${span} 1 0` }}>
-              <span>{f.alias ?? f.name}{f.not_null && f.editable ? " *" : ""}</span>
+              <span>{f.alias ?? f.name}{f.not_null && f.editable && canEdit ? " *" : ""}</span>
               <FieldInput field={f} value={values[f.name]} readOnly={!canEdit}
                 source={{ slug: config.slug, layerId, version: config.version, pk: pk === null ? null : String(pk), crs: config.crs,
                   canPhotos: config.rights?.photos ?? false, canFiles: config.rights?.files ?? false }}
