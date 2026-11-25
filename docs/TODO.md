@@ -135,6 +135,8 @@ Do zrobienia: etap 8 na serwerze po wdrożeniu (wymaga montowania `data/rasters`
 - ✔️ Pasek: narzędzia edycji dopiero po wybraniu warstwy edycyjnej i tylko te, na które pozwalają prawa i typ geometrii.
 - ✔️ Zakładki formularza wyglądają jak zakładki (nie jak linki); sama „Atrybuty” — bez paska zakładek.
 - ✔️ `host.onFeatureChange` — wtyczki dostają zapis / usunięcie obiektu (odświeżenie okien).
+- ✔️ 0.10.10: PDF/A-2b z obrazami — WeasyPrint ustawiał /Interpolate true (niedozwolone, ISO 19005-2 6.2.8);
+  `app.pdf` wymusza `image-rendering: crisp-edges`. Sprawdzone veraPDF: Załączniki 1 i 3 (z danymi i ze zdjęciami) — zgodne.
 - ✔️ 0.10.9: identyfikacja na mapie — warstwa rozpoznawana po nazwie WMS (klucze z kropkami, np. działki „ULDK:…126/4”,
   nie blokują już kliknięcia); otwierany obiekt z najwyżej narysowanej warstwy.
 - ✔️ 0.10.8: `host.highlight` — trwałe podświetlenie obiektu przez wtyczkę (zaznaczony liść drzewa decyzji), bez formularza.

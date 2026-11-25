@@ -30,3 +30,13 @@ def test_pdfa_from_html():
 def test_external_resources_blocked():
     pdf = html_to_pdf('<img src="http://example.invalid/x.png"><p>żółć</p>')
     assert pdf.startswith(b"%PDF")
+
+
+PNG_1PX = ("data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNk+M9QDwADhgGAWjR9awAAAABJRU5ErkJggg==")
+
+
+def test_pdfa_images_not_interpolated():
+    """PDF/A (ISO 19005-2, 6.2.8): obraz bez wygładzania — /Interpolate false (WeasyPrint domyślnie true)."""
+    pdf = html_to_pdf(f'<img src="{PNG_1PX}" style="width: 50mm">')
+    assert b"/Interpolate true" not in pdf
+    assert b"/Interpolate false" in pdf
