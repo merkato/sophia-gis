@@ -178,6 +178,13 @@ export default function App() {
     if (config) emitFeatureChange({ project: config.slug, layerId, table: config.layers[layerId]?.source_table ?? null, pk, action });
   };
 
+  /** Rezygnacja z nowego obiektu: szkic znika z mapy, a z nim etykieta pomiaru i podpowiedź rysowania
+   *  (narzędzie wraca do zaznaczania — jak po zapisie). */
+  const dropNewSketch = () => {
+    setReloadToken((t) => t + 1);
+    if (tool === "draw") { setTool("select"); setMessage(null); }
+  };
+
   const resolvePending = async (choice: "save" | "discard" | "cancel") => {
     const action = pending;
     setPending(null);
@@ -185,7 +192,7 @@ export default function App() {
     if (choice === "save") {
       if (await panelRef.current?.save()) action();   // błąd zapisu widać w formularzu
     } else if (choice === "discard") {
-      if (selection?.isNew) setReloadToken((t) => t + 1);   // usuń szkic z mapy
+      if (selection?.isNew) dropNewSketch();   // usuń szkic z mapy
       action();
     } else {
       setReloadToken((t) => t + 1);   // zdejmij zaznaczenie / szkic klikniętego obiektu
@@ -935,8 +942,8 @@ export default function App() {
                 featureChanged(selection.layerId, String(selection.feature.id), "delete");
                 setSelection(null); setReloadToken((t) => t + 1);
               }}
-              onClose={() => guard(() => { if (selection.isNew) setReloadToken((t) => t + 1); setSelection(null); })}
-              onCancel={() => { setReloadToken((t) => t + 1); setSelection(null); }}
+              onClose={() => guard(() => { if (selection.isNew) dropNewSketch(); setSelection(null); })}
+              onCancel={() => { dropNewSketch(); setSelection(null); }}
               zIndex={formZ} onFocus={raiseForm}
               onOpenRelated={openFeature}
               onNewRelated={(layerId, props) => startDrawing(layerId, props)}
