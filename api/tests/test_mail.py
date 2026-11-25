@@ -52,6 +52,8 @@ def test_send_mail(smtp):
     assert msg["To"] == "a@x.pl, b@x.pl" and msg["Subject"] == "Temat"
     assert "powiadomienia@webgis.example.pl" in msg["From"] and "Treść ąę" in msg.get_content()
     assert logged[0][0] == "wylaczenia" and logged[0][3] is True
+    asyncio.run(mail.send_mail(["a@x.pl"], "T", "x", from_name="Moduł Wyłączenia z produkcji leśnej"))
+    assert "Wy" in str(sent[-1]["From"]) and "powiadomienia@webgis.example.pl" in str(sent[-1]["From"])
 
 
 def test_send_mail_errors(smtp, monkeypatch):

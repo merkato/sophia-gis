@@ -111,10 +111,11 @@ def _send_sync(msg: EmailMessage) -> None:
             pass
 
 
-def build_message(to: list[str], subject: str, text: str, html: str | None = None) -> EmailMessage:
+def build_message(to: list[str], subject: str, text: str, html: str | None = None,
+                  from_name: str | None = None) -> EmailMessage:
     s = get_settings()
     msg = EmailMessage()
-    msg["From"] = formataddr((s.smtp_from_name or "Sophia WebGIS", s.smtp_from))
+    msg["From"] = formataddr((from_name or s.smtp_from_name or "Sophia WebGIS", s.smtp_from))
     msg["To"] = ", ".join(to)
     msg["Subject"] = subject
     msg["Message-ID"] = make_msgid(domain=(s.smtp_from or "sophia").split("@")[-1])
@@ -124,8 +125,10 @@ def build_message(to: list[str], subject: str, text: str, html: str | None = Non
     return msg
 
 
-async def send_mail(to: list[str], subject: str, text: str, *, html: str | None = None, plugin: str | None = None) -> None:
-    """Wysyła jedną wiadomość do listy adresów; błąd — MailError (zapisany w dzienniku)."""
+async def send_mail(to: list[str], subject: str, text: str, *, html: str | None = None, plugin: str | None = None,
+                    from_name: str | None = None) -> None:
+    """Wysyła jedną wiadomość do listy adresów; błąd — MailError (zapisany w dzienniku). `from_name` — nazwa
+    nadawcy widoczna u odbiorcy (np. nazwa modułu; adres zawsze SMTP_FROM), domyślnie SMTP_FROM_NAME."""
     to = [t for t in dict.fromkeys(a.strip() for a in to) if t]
     if not to:
         raise MailError("Brak adresatów (użytkownicy bez adresu e-mail?)")
@@ -133,7 +136,7 @@ async def send_mail(to: list[str], subject: str, text: str, *, html: str | None 
         raise MailError("Wysyłka e-mail nie jest skonfigurowana (SMTP_HOST, SMTP_FROM w .env)")
     error = None
     try:
-        await asyncio.to_thread(_send_sync, build_message(to, subject, text, html))
+        await asyncio.to_thread(_send_sync, build_message(to, subject, text, html, from_name))
     except (OSError, smtplib.SMTPException) as e:
         error = f"{type(e).__name__}: {e}"
     async with portal_conn() as conn:
