@@ -26,6 +26,27 @@ class Settings(BaseSettings):
 
     qgis_server_url: str = "http://qgis:80/"
 
+    # Powiadomienia e-mail (app/mail.py): lekki Postfix z docker-compose (SMTP_HOST=mail, port 587, bez logowania)
+    # albo dowolny serwer SMTP. Puste SMTP_HOST — wysyłka wyłączona.
+    smtp_host: str | None = None
+    smtp_port: int = 587
+    smtp_user: str | None = None
+    smtp_password: str | None = None
+    smtp_starttls: bool = False
+    smtp_ssl: bool = False
+    smtp_from: str | None = None                # np. powiadomienia@webgis.example.pl
+    smtp_from_name: str | None = None           # nazwa nadawcy (domyślnie „Sophia WebGIS”)
+    # Adres aplikacji w linkach w wiadomościach (np. https://webgis.example.pl); puste — z SITE_ADDRESS
+    public_url: str | None = None
+    site_address: str | None = None
+
+    @property
+    def base_url(self) -> str:
+        if self.public_url:
+            return self.public_url.rstrip("/")
+        site = (self.site_address or "localhost").strip()
+        return site if site.startswith("http") else f"https://{site}"
+
     # Wtyczki: <plugins_dir>/<id>/sophia-plugin.json (data/… na hoście: plugins/, scripts/server/plugin.sh)
     plugins_dir: Path = Path("/plugins")
 

@@ -92,6 +92,8 @@ export function PluginsTab({ run, onChanged }: { run: Run; onChanged: () => void
                       <option value="">— brak —</option>
                       {projects.map((pr) => <option key={pr.slug} value={pr.slug}>{pr.title} ({pr.slug})</option>)}
                     </select>
+                  : f.type === "users"
+                  ? <UsersSetting users={users} value={cfg.values[f.id] ?? ""} onChange={(v) => set(f.id, v)} run={run} />
                   : <input value={cfg.values[f.id] ?? ""} onChange={(e) => set(f.id, e.target.value)} />}
                 {f.description && <small className="muted">{f.description}</small>}
               </label>
@@ -152,4 +154,30 @@ export class PluginBoundary extends Component<{ name: string; children: ReactNod
   render() {
     return this.state.error ? <div className="error">Błąd wtyczki „{this.props.name}”: {this.state.error}</div> : this.props.children;
   }
+}
+
+/** Ustawienie wtyczki typu „users” (np. odbiorcy powiadomień e-mail): lista kont z adresem e-mail; wartość —
+ *  identyfikatory po przecinku. Konta bez adresu są nieaktywne (adres ustawia się w „Użytkownicy”). */
+function UsersSetting({ users, value, onChange, run }: {
+  users: AdminUser[]; value: string; onChange: (v: string) => void; run: Run;
+}) {
+  const ids = value.split(",").map((x) => Number(x.trim())).filter((n) => n > 0);
+  const toggle = (id: number) => onChange((ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]).join(","));
+  const sorted = [...users].sort((a, b) => Number(!!b.email) - Number(!!a.email) || a.login.localeCompare(b.login, "pl"));
+  return (
+    <div className="users-setting">
+      {sorted.map((u) => (
+        <label key={u.id} className={u.email ? "" : "muted"} title={u.email ? u.email : "Brak adresu e-mail w koncie"}>
+          <input type="checkbox" checked={ids.includes(u.id)} disabled={!u.email && !ids.includes(u.id)}
+            onChange={() => toggle(u.id)} />
+          {u.full_name || u.login} <span className="muted">{u.email || "— brak e-mail"}</span>
+        </label>
+      ))}
+      <button type="button" disabled={!ids.length} title="Wiadomość testowa do zaznaczonych (sprawdzenie poczty)"
+        onClick={() => run(async () => {
+          const r = await adminApi.mailTest(ids);
+          alert(`Wysłano wiadomość testową do: ${r.sent_to.join(", ")}`);
+        })}>Wyślij wiadomość testową</button>
+    </div>
+  );
 }

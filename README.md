@@ -28,6 +28,7 @@ docker compose up -d --build
 ```
 
 Portal: `https://<SITE_ADDRESS>/`, dokumentacja API: `https://<SITE_ADDRESS>/api/docs`.
+Instalacja u klienta — sieć, wpisy DNS, konfiguracja przy starcie, poczta: [docs/ADMIN_IT.md](docs/ADMIN_IT.md).
 Konto administratora tworzy się przy pierwszym starcie z `ADMIN_LOGIN` / `ADMIN_PASSWORD`.
 
 ## Przygotowanie projektu QGIS

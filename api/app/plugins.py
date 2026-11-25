@@ -119,7 +119,7 @@ def read_manifest(path: Path) -> Plugin:
     plugin.pages = [p for p in web.get("pages") or [] if isinstance(p, dict) and p.get("id")]
     plugin.windows = [w for w in web.get("windows") or [] if isinstance(w, dict) and w.get("id")]
     plugin.settings = [s for s in m.get("settings") or [] if isinstance(s, dict) and s.get("id")
-                       and s.get("type", "text") in ("text", "project")]
+                       and s.get("type", "text") in ("text", "project", "users")]
     try:
         from .protection import parse_rules
         plugin.protected = parse_rules(m.get("protected"), pid)

@@ -83,6 +83,21 @@ services:
     build: ./web
     restart: unless-stopped
 
+  # Lekki Postfix tylko do wysyłki powiadomień (app/mail.py) — bez portów publicznych; podpis DKIM (klucz
+  # generowany przy pierwszym starcie w data/mail-dkim). Włączenie: COMPOSE_PROFILES=mail w .env (docs/SERVER.md).
+  mail:
+    image: boky/postfix:v5.2.1-alpine
+    restart: unless-stopped
+    profiles: ["mail"]
+    environment:
+      ALLOWED_SENDER_DOMAINS: ${MAIL_DOMAIN:-}
+      POSTFIX_myhostname: ${MAIL_HOSTNAME:-}
+      DKIM_AUTOGENERATE: "true"
+      DKIM_SELECTOR: ${MAIL_DKIM_SELECTOR:-sophia}
+      INBOUND_DEBUGGING: "0"
+    volumes:
+      - ./data/mail-dkim:/etc/opendkim/keys
+
   proxy:
     image: caddy:2.8
     restart: unless-stopped

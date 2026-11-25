@@ -164,7 +164,7 @@ export interface AdminPlugin {
   requires: Record<string, string>; capabilities: { id: string; title?: string }[];
   pages: { id: string; title: string; capability?: string }[];
   error: string | null; enabled: boolean; settings: Record<string, unknown>;
-  settings_schema: { id: string; title?: string; type?: "text" | "project"; description?: string }[];
+  settings_schema: { id: string; title?: string; type?: "text" | "project" | "users"; description?: string }[];
   migrations: { applied: string[]; pending: string[] };
   access: (PluginAccessEntry & { group_name: string | null; login: string | null })[];
 }
@@ -205,6 +205,8 @@ export const adminApi = {
     `/api/admin/projects/${id}/unlock`, { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ hours, reason }) }),
   lockProtected: (id: number) => request<void>(`/api/admin/projects/${id}/unlock`, { method: "DELETE" }),
+  mailTest: (userIds: number[]) => request<{ sent_to: string[] }>("/api/admin/mail/test", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user_ids: userIds }) }),
   setProjectAccess: (id: number, a: ProjectAccess) => request(`/api/admin/projects/${id}/access`, json("PUT", a)),
   projectScope: (id: number) => request<ProjectScopeInfo>(`/api/admin/projects/${id}/scope`),
   projectStorage: (id: number) => request<ProjectStorage>(`/api/admin/projects/${id}/storage`),

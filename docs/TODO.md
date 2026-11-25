@@ -135,6 +135,12 @@ Do zrobienia: etap 8 na serwerze po wdrożeniu (wymaga montowania `data/rasters`
 - ✔️ Pasek: narzędzia edycji dopiero po wybraniu warstwy edycyjnej i tylko te, na które pozwalają prawa i typ geometrii.
 - ✔️ Zakładki formularza wyglądają jak zakładki (nie jak linki); sama „Atrybuty” — bez paska zakładek.
 - ✔️ `host.onFeatureChange` — wtyczki dostają zapis / usunięcie obiektu (odświeżenie okien).
+- ✔️ 0.10.1: „Anuluj” nowego obiektu zdejmuje szkic, etykietę pomiaru i podpowiedź rysowania.
+- ✔️ 0.10.2: powiadomienia e-mail — `app.mail` (SMTP z `.env`, dziennik `portal.mail_log`), lekki Postfix w
+  docker-compose (profil „mail”, DKIM), ustawienie wtyczki typu „users” z wiadomością testową, `docs/ADMIN_IT.md`
+  (sieć, DNS: A, SPF, DKIM, DMARC, PTR; `.env` przy starcie; sprawdzenie).
+- ✔️ 0.10.2: pola tak/nie jako TAK / NIE (tabele, rekordy powiązane, pola logiczne bez widżetu „Pole wyboru”); daty
+  w tabeli bez „T00:00:00+00:00”; kolumna „Akcje” w tabeli atrybutów — akcje wtyczek dla wiersza (jak w formularzu).
 
 ### ⬜ 4. Graficzny edytor schematu bazy (WebUI) — plan z 15.11
 Diagram tabel jak w narzędziach ERD: karty tabel przeciągane po płótnie, relacja = „sznurek”

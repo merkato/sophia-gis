@@ -65,8 +65,10 @@ przyciskiem w przeglądarce.
 - `sophia`, `requires` — warunki wersji (`>=1.0`, `<2`, `==1.2`, kilka po przecinku). Niespełnione →
   wtyczka nie ładuje się, panel pokazuje powód.
 - `settings` (opcjonalnie) — pola ustawień w panelu administratora:
-  `[{"id": "projekt", "title": "Projekt mapy", "type": "project", "description": "…"}]`; typy `text`
-  i `project` (lista projektów). Odczyt w API wtyczki: `await get_settings_for("<id>")` (`app.plugins`).
+  `[{"id": "projekt", "title": "Projekt mapy", "type": "project", "description": "…"}]`; typy `text`,
+  `project` (lista projektów) i `users` (Sophia ≥ 0.10.2: wybór użytkowników, wartość — identyfikatory po
+  przecinku; np. odbiorcy powiadomień: `app.mail.user_emails(app.mail.parse_user_ids(wartość))`,
+  `await app.mail.send_mail(adresy, temat, treść, plugin="<id>")`, dziennik `portal.mail_log`). Odczyt w API wtyczki: `await get_settings_for("<id>")` (`app.plugins`).
 - `protected` (opcjonalnie, Sophia ≥ 0.10) — **obiekty chronione** w tabelach wtyczki, np. dane z importu, które
   zmienia tylko kolejny import:
   `[{"table": "egib.v_dzialka", "field": "zrodlo", "values": ["EGiB"], "message": "Działka z importu GML — …"}]`.

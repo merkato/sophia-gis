@@ -40,6 +40,8 @@ wskazać w panelu OVH już przy reinstalacji.
 
 Od teraz: `ssh sophia`.
 
+Instalacja u klienta (sieć, wpisy DNS domeny, `.env` przy starcie, poczta): **[ADMIN_IT.md](ADMIN_IT.md)**.
+
 ## 2. Serwer: pierwsza konfiguracja
 
 ```powershell
@@ -108,6 +110,15 @@ ich konfiguracja w `docker-compose.yml`:
   ```
 
 Pliki zmienione w ostatniej aktualizacji pokazuje `git diff --stat HEAD@{1} HEAD`.
+
+### Poczta (powiadomienia e-mail)
+
+Wtyczki wysyłają powiadomienia przez `app.mail` na adresy z kont użytkowników (odbiorców wskazuje się
+w ustawieniach wtyczki — typ „users”). Konfiguracja w `.env` (`SMTP_*`): lekki Postfix z `docker-compose.yml`
+(usługa `mail`, profil „mail”: `COMPOSE_PROFILES=mail`, `MAIL_DOMAIN`, `MAIL_HOSTNAME`; klucz DKIM generowany przy
+pierwszym starcie w `data/mail-dkim/`) albo dowolny serwer SMTP. Wpisy DNS (SPF, DKIM, DMARC, PTR) i sprawdzenie —
+[ADMIN_IT.md](ADMIN_IT.md), punkty 3–5. Po zmianie `.env`: `docker compose up -d mail api`. Wiadomość testowa:
+Panel → Wtyczki → Ustawienia → „Wyślij wiadomość testową”; dziennik: `GET /api/admin/mail/log`.
 
 ### Wtyczki
 

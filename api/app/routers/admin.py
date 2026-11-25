@@ -165,6 +165,34 @@ async def list_projects_admin():
                           ORDER BY p.sort_order, p.title""")
 
 
+# ------------------------------------------------------------------------------ powiadomienia e-mail
+
+class MailTestIn(BaseModel):
+    user_ids: list[int] = Field(min_length=1, max_length=50)
+
+
+@router.post("/mail/test")
+async def mail_test(body: MailTestIn, admin: CurrentUser = Depends(require_admin)):
+    """Wiadomość testowa do wskazanych użytkowników (adresy z kont) — sprawdzenie konfiguracji SMTP."""
+    from .. import mail
+    to = await mail.user_emails(body.user_ids)
+    if not to:
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Wskazani użytkownicy nie mają adresu e-mail w koncie")
+    s = get_settings()
+    try:
+        await mail.send_mail([e for _, e in to], "Sophia WebGIS — wiadomość testowa",
+                             f"Wiadomość testowa z {s.base_url}, wysłana przez {admin.login}.\n"
+                             "Jeśli ją widzisz, powiadomienia e-mail działają.", plugin="admin")
+    except mail.MailError as e:
+        raise HTTPException(status.HTTP_502_BAD_GATEWAY, f"Wysyłka nie powiodła się: {e}") from e
+    return {"sent_to": [e for _, e in to]}
+
+
+@router.get("/mail/log")
+async def mail_log():
+    return await _all("SELECT at, plugin, recipients, subject, ok, error FROM portal.mail_log ORDER BY at DESC LIMIT 100")
+
+
 # ------------------------------------------------------------------------------ bezpiecznik obiektów chronionych
 
 class UnlockIn(BaseModel):

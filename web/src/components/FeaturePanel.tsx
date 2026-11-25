@@ -268,7 +268,7 @@ function shown(field: { widget: string; widget_config: Record<string, unknown> |
     const hit = entries.find(([, val]) => String(val) === String(v));
     if (hit) return hit[0];
   }
-  if (field.widget === "CheckBox") return v === true || v === "true" || v === 1 ? "tak" : "nie";
+  if (field.widget === "CheckBox" || typeof v === "boolean") return v === true || v === "true" || v === 1 ? "TAK" : "NIE";
   if (field.widget === "DateTime" && typeof v === "string") return v.slice(0, 10).split("-").reverse().join(".");
   return String(v);
 }

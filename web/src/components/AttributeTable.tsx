@@ -3,10 +3,20 @@ import { api } from "../api";
 import type { FieldDef, GeoJSONFeature, ProjectConfig } from "../types";
 import { fileName, isUrl } from "./Files";
 import { useFloatingWindow } from "./FloatingWindow";
+import { featureActions, usePluginsVersion } from "../plugins";
 
 const PAGE = 100;
 
 type Labels = Record<string, Map<string, string>>;   // pole relacyjne -> wartość -> etykieta
+
+/** Data / znacznik czasu z bazy (np. 2026-03-23T00:00:00+00:00) — „2026-03-23”, z godziną, gdy nie jest północ. */
+function isoDate(s: string): string | null {
+  const m = /^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2})/.exec(s);
+  if (!m) return null;
+  if (m[2] === "00:00") return m[1];
+  const d = new Date(s);
+  return Number.isNaN(d.getTime()) ? `${m[1]} ${m[2]}` : d.toLocaleString("pl-PL", { dateStyle: "short", timeStyle: "short" });
+}
 
 function loadHidden(key: string): Set<string> {
   try { return new Set(JSON.parse(localStorage.getItem(key) ?? "[]")); } catch { return new Set(); }
@@ -15,10 +25,14 @@ function saveHidden(key: string, s: Set<string>) {
   try { localStorage.setItem(key, JSON.stringify([...s])); } catch { /* brak storage */ }
 }
 
-/** Wartość komórki tak, jak w formularzu: etykiety list wartości i słowników, nazwy plików, ✓. */
+/** Wartość komórki tak, jak w formularzu: etykiety list wartości i słowników, nazwy plików, TAK / NIE. */
 function cellText(f: FieldDef, v: unknown, labels: Labels): string {
   if (v === null || v === undefined || v === "") return "";
   const s = String(v);
+  // pole logiczne bez widżetu „Pole wyboru” (np. w widoku) — też TAK / NIE, nie „true” / „false”
+  if (f.widget !== "CheckBox" && (typeof v === "boolean" || /^bool/i.test(f.type ?? ""))) {
+    return v === true || s === "true" || s === "t" ? "TAK" : "NIE";
+  }
   const cfg = f.widget_config ?? {};
   switch (f.widget) {
     case "ValueMap": {
@@ -29,7 +43,7 @@ function cellText(f: FieldDef, v: unknown, labels: Labels): string {
       return entries.find(([, val]) => String(val) === s)?.[0] ?? s;
     }
     case "CheckBox":
-      return v === true || s === String(cfg.CheckedState ?? "true") ? "✓" : "—";
+      return v === true || s === String(cfg.CheckedState ?? "true") ? "TAK" : "NIE";
     case "RelationReference":
     case "ValueRelation":
       return labels[f.name]?.get(s) ?? s;
@@ -38,7 +52,7 @@ function cellText(f: FieldDef, v: unknown, labels: Labels): string {
     case "DateTime":
       return s.replace("T", " ").slice(0, String(cfg.field_format ?? "").includes("HH") ? 16 : 10);
     default:
-      return s;
+      return isoDate(s) ?? s;
   }
 }
 
@@ -112,6 +126,13 @@ export function AttributeTable({ config, layerId, reloadToken, selectedId, onOpe
   const pages = Math.max(1, Math.ceil(total / PAGE));
   const page = Math.floor(offset / PAGE) + 1;
 
+  // akcje wtyczek dla wierszy (jak w formularzu obiektu) — kolumna „Akcje”, gdy którykolwiek wiersz je ma
+  usePluginsVersion();
+  const rowActions = new Map(rows.map((r) => [String(r.id), layer.source_table
+    ? featureActions({ table: layer.source_table, pk: String(r.id), layerId, project: config.slug, properties: r.properties })
+    : []]));
+  const hasActions = [...rowActions.values()].some((a) => a.length > 0);
+
   return (
     <aside ref={win.ref} style={win.style} className={`feature-window table-window${collapsed ? " collapsed" : ""}`}
       role="dialog" aria-label={`Tabela atrybutów: ${layer.name}`}>
@@ -161,6 +182,7 @@ export function AttributeTable({ config, layerId, reloadToken, selectedId, onOpe
                   {f.alias ?? f.name}{arrow(f.name)}
                 </th>
               ))}
+              {hasActions && <th className="row-acts">Akcje</th>}
             </tr>
           </thead>
           <tbody>
@@ -172,10 +194,17 @@ export function AttributeTable({ config, layerId, reloadToken, selectedId, onOpe
                   const text = cellText(f, r.properties[f.name], labels);
                   return <td key={f.name} title={text.length > 40 ? text : undefined}>{text}</td>;
                 })}
+                {hasActions && (
+                  <td className="row-acts" onClick={(e) => e.stopPropagation()}>
+                    {(rowActions.get(String(r.id)) ?? []).map((a, i) => (
+                      <button key={i} className="link" title={a.title} onClick={a.run}>{a.label}</button>
+                    ))}
+                  </td>
+                )}
               </tr>
             ))}
             {!rows.length && !loading && (
-              <tr><td colSpan={shown.length + 1} className="muted">{q ? "Brak rekordów pasujących do wyszukiwania." : "Brak rekordów."}</td></tr>
+              <tr><td colSpan={shown.length + 1 + (hasActions ? 1 : 0)} className="muted">{q ? "Brak rekordów pasujących do wyszukiwania." : "Brak rekordów."}</td></tr>
             )}
           </tbody>
         </table>

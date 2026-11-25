@@ -102,6 +102,18 @@ MIGRATIONS: list[tuple[str, str]] = [
             PRIMARY KEY (project_id, set_id)
         );
     """),
+    ("mail_log", """
+        -- Dziennik wysłanych powiadomień e-mail (app/mail.py)
+        CREATE TABLE IF NOT EXISTS portal.mail_log (
+            id          bigserial PRIMARY KEY,
+            at          timestamptz NOT NULL DEFAULT now(),
+            plugin      text,
+            recipients  text[] NOT NULL,
+            subject     text NOT NULL,
+            ok          boolean NOT NULL,
+            error       text
+        );
+    """),
     ("protection_unlock", """
         -- Bezpiecznik obiektów chronionych (app/protection.py): odblokowanie projektu na określony czas
         CREATE TABLE IF NOT EXISTS portal.protection_unlock (

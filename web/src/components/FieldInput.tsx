@@ -139,6 +139,12 @@ export function FieldInput({ field, value, onChange, readOnly, source, saved }: 
     // fallthrough
     default: {
       if (disabled && str && /^timestamp/i.test(field.type ?? "")) return <input value={localTimestamp(str)} disabled />;
+      // pole logiczne z innym widżetem (np. pole widoku): TAK / NIE zamiast „true” / „false”; do edycji — pole wyboru
+      if (typeof value === "boolean" || /^bool/i.test(field.type ?? "")) {
+        const on = value === true || str === "true" || str === "t";
+        if (disabled) return <input value={str === "" ? "" : on ? "TAK" : "NIE"} disabled />;
+        return <input type="checkbox" checked={on} onChange={(e) => onChange(e.target.checked)} />;
+      }
       const numeric = isNumericType(field.type);
       return (
         <input type={numeric ? "number" : "text"} value={str} disabled={disabled}
