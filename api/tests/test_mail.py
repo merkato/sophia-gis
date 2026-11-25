@@ -60,3 +60,24 @@ def test_send_mail_errors(smtp, monkeypatch):
     monkeypatch.setattr(get_settings(), "smtp_host", None)
     with pytest.raises(mail.MailError, match="skonfigurowana"):
         asyncio.run(mail.send_mail(["a@x.pl"], "T", "x"))
+
+
+def test_recipients(monkeypatch):
+    rows = [{"id": 3, "login": "jan", "email": "jan@x.pl"}, {"id": 7, "login": "ola", "email": "Ola@X.pl"}]
+
+    class Res:
+        async def fetchall(self):
+            return rows
+
+    class Conn:
+        async def execute(self, q, params):
+            return Res()
+
+    @contextlib.asynccontextmanager
+    async def fake_conn():
+        yield Conn()
+
+    monkeypatch.setattr(mail, "portal_conn", fake_conn)
+    got = asyncio.run(mail.recipients("3, ola@x.pl, obcy@y.pl, jan@x.pl"))
+    # konto 3, konto z adresem ola@x.pl (adres z konta), adres spoza kont; jan@x.pl drugi raz — pominięty
+    assert got == [("jan", "jan@x.pl"), ("ola", "Ola@X.pl"), (None, "obcy@y.pl")]

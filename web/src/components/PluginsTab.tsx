@@ -161,8 +161,14 @@ export class PluginBoundary extends Component<{ name: string; children: ReactNod
 function UsersSetting({ users, value, onChange, run }: {
   users: AdminUser[]; value: string; onChange: (v: string) => void; run: Run;
 }) {
-  const ids = value.split(",").map((x) => Number(x.trim())).filter((n) => n > 0);
-  const toggle = (id: number) => onChange((ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id]).join(","));
+  // wartość: identyfikatory kont i (zapis sprzed 0.10.5 albo wpisane ręcznie) adresy e-mail — adres konta liczy się
+  // jak zaznaczone konto, adresy spoza kont zostają i są widoczne niżej
+  const tokens = value.split(/[,;\n]/).map((x) => x.trim()).filter(Boolean);
+  const byMail = new Map(users.filter((u) => u.email).map((u) => [u.email!.trim().toLowerCase(), u.id]));
+  const ids = [...new Set(tokens.flatMap((t) => (/^\d+$/.test(t) ? [Number(t)] : byMail.has(t.toLowerCase()) ? [byMail.get(t.toLowerCase())!] : [])))];
+  const extra = tokens.filter((t) => t.includes("@") && !byMail.has(t.toLowerCase()));
+  const save = (nextIds: number[], nextExtra: string[]) => onChange([...nextIds.map(String), ...nextExtra].join(","));
+  const toggle = (id: number) => save(ids.includes(id) ? ids.filter((x) => x !== id) : [...ids, id], extra);
   const sorted = [...users].sort((a, b) => Number(!!b.email) - Number(!!a.email) || a.login.localeCompare(b.login, "pl"));
   return (
     <div className="users-setting">
@@ -173,9 +179,13 @@ function UsersSetting({ users, value, onChange, run }: {
           {u.full_name || u.login} <span className="muted">{u.email || "— brak e-mail"}</span>
         </label>
       ))}
-      <button type="button" disabled={!ids.length} title="Wiadomość testowa do zaznaczonych (sprawdzenie poczty)"
+      {extra.map((m) => (
+        <div key={m} className="muted">Adres spoza kont: {m}{" "}
+          <button type="button" className="link" onClick={() => save(ids, extra.filter((x) => x !== m))}>usuń</button></div>
+      ))}
+      <button type="button" disabled={!ids.length && !extra.length} title="Wiadomość testowa do zaznaczonych (sprawdzenie poczty)"
         onClick={() => run(async () => {
-          const r = await adminApi.mailTest(ids);
+          const r = await adminApi.mailTest(ids, extra);
           alert(`Wysłano wiadomość testową do: ${r.sent_to.join(", ")}`);
         })}>Wyślij wiadomość testową</button>
     </div>

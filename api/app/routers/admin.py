@@ -168,14 +168,15 @@ async def list_projects_admin():
 # ------------------------------------------------------------------------------ powiadomienia e-mail
 
 class MailTestIn(BaseModel):
-    user_ids: list[int] = Field(min_length=1, max_length=50)
+    user_ids: list[int] = Field(default_factory=list, max_length=50)
+    emails: list[str] = Field(default_factory=list, max_length=50)   # adresy wpisane wprost w ustawieniu
 
 
 @router.post("/mail/test")
 async def mail_test(body: MailTestIn, admin: CurrentUser = Depends(require_admin)):
     """Wiadomość testowa do wskazanych użytkowników (adresy z kont) — sprawdzenie konfiguracji SMTP."""
     from .. import mail
-    to = await mail.user_emails(body.user_ids)
+    to = await mail.recipients([*map(str, body.user_ids), *body.emails])
     if not to:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, "Wskazani użytkownicy nie mają adresu e-mail w koncie")
     s = get_settings()

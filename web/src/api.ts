@@ -202,8 +202,8 @@ export const adminApi = {
     `/api/admin/projects/${id}/unlock`, { method: "POST", headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ hours, reason }) }),
   lockProtected: (id: number) => request<void>(`/api/admin/projects/${id}/unlock`, { method: "DELETE" }),
-  mailTest: (userIds: number[]) => request<{ sent_to: string[] }>("/api/admin/mail/test", {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user_ids: userIds }) }),
+  mailTest: (userIds: number[], emails: string[] = []) => request<{ sent_to: string[] }>("/api/admin/mail/test", {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user_ids: userIds, emails }) }),
   setProjectAccess: (id: number, a: ProjectAccess) => request(`/api/admin/projects/${id}/access`, json("PUT", a)),
   projectScope: (id: number) => request<ProjectScopeInfo>(`/api/admin/projects/${id}/scope`),
   projectLayers: (id: number) => request<ProjectLayerInfo[]>(`/api/admin/projects/${id}/layers`),

@@ -50,6 +50,35 @@ def parse_user_ids(value) -> list[int]:
     return out
 
 
+def _tokens(value) -> list[str]:
+    raw = value if isinstance(value, list) else str(value or "").replace(";", ",").replace("\n", ",").split(",")
+    return [str(t).strip() for t in raw if str(t).strip()]
+
+
+async def recipients(value) -> list[tuple[str | None, str]]:
+    """Odbiorcy z wartości ustawienia typu „users”: identyfikatory kont (adres z konta) i adresy e-mail wpisane
+    wprost (konto z tym adresem, a gdy go nie ma — sam adres). Bez powtórzeń, w kolejności wpisów."""
+    tokens = _tokens(value)
+    ids = parse_user_ids([t for t in tokens if t.isdigit()])
+    mails = [t for t in tokens if "@" in t]
+    by_id, by_mail = {}, {}
+    if ids or mails:
+        async with portal_conn() as conn:
+            rows = await (await conn.execute(
+                """SELECT id, login, btrim(email) AS email FROM portal.users
+                    WHERE is_active AND coalesce(btrim(email), '') <> ''
+                      AND (id = ANY(%s) OR lower(btrim(email)) = ANY(%s))""",
+                (ids, [m.lower() for m in mails]))).fetchall()
+        by_id = {r["id"]: (r["login"], r["email"]) for r in rows}
+        by_mail = {r["email"].lower(): (r["login"], r["email"]) for r in rows}
+    out: list[tuple[str | None, str]] = []
+    for t in tokens:
+        hit = by_id.get(int(t)) if t.isdigit() else (by_mail.get(t.lower()) or (None, t)) if "@" in t else None
+        if hit and hit[1].lower() not in {e.lower() for _, e in out}:
+            out.append(hit)
+    return out
+
+
 async def user_emails(user_ids: list[int]) -> list[tuple[str, str]]:
     """(login, e-mail) aktywnych użytkowników z podanym adresem — w kolejności identyfikatorów."""
     if not user_ids:
