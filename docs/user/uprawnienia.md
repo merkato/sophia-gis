@@ -33,6 +33,13 @@ zdjęć do QGIS przez Fię.
 Użytkownik w kilku grupach dostaje sumę uprawnień: najwyższą rolę, prawa z którejkolwiek grupy
 i wszystkie kody obszarów. Grupa z „całym obszarem” znosi ograniczenie zakresu.
 
+**Prawa do warstw** (w tym samym oknie, „Prawa do warstw”): rola „edycja” daje dodawanie, zmianę i usuwanie
+we **wszystkich** warstwach edytowalnych w Fii. Gdy grupa ma zmieniać tylko część — np. nadleśnictwa wprowadzają
+lustracje, a kontury rysuje RDLP — ustaw dla warstwy „własne” i zaznacz dodawanie / zmianę / usuwanie
+(np. Lustracje: dodawanie i zmiana; Kontury: nic — tylko podgląd). „Własne” zastępuje rolę tej grupy dla tej
+warstwy; użytkownik w kilku grupach dostaje sumę (grupa RDLP z rolą „edycja” bez ustawień dla konturów nadal je
+edytuje). Pasek narzędzi pokazuje tylko narzędzia, na które pozwalają prawa do wybranej warstwy.
+
 Projekt **publiczny** ogląda każdy, także bez logowania i bez ograniczeń zakresu — nie ustawiaj
 publicznego dostępu dla danych, które mają być dzielone na obszary.
 

@@ -15,6 +15,30 @@ from .security import CurrentUser
 ROLE_RANK = {"viewer": 1, "editor": 2, "manager": 3}
 
 
+def combine_layer_access(group_roles: dict[int, str], rows: list[dict]) -> dict[str, "LayerPerms"]:
+    """Prawa do warstw z kilku grup użytkownika. Ustawienie warstwy w grupie (portal.layer_access) zastępuje rolę
+    tej grupy dla tej warstwy; grupa bez ustawienia dla warstwy daje prawa z roli (edycja od roli „edycja”).
+    Użytkownik dostaje sumę z grup. Wynik tylko dla warstw, które mają ustawienie w którejś grupie użytkownika
+    (pozostałe — z roli, jak dotąd)."""
+    by_layer: dict[str, dict[int, dict]] = {}
+    for r in rows:
+        if r["group_id"] in group_roles:
+            by_layer.setdefault(r["layer_id"], {})[r["group_id"]] = r
+    out: dict[str, LayerPerms] = {}
+    for layer_id, per_group in by_layer.items():
+        p = LayerPerms()
+        for gid, role in group_roles.items():
+            r = per_group.get(gid)
+            if r is not None:
+                g = LayerPerms(bool(r["can_view"]), bool(r["can_insert"]), bool(r["can_update"]), bool(r["can_delete"]))
+            else:
+                edit = ROLE_RANK.get(role, 0) >= ROLE_RANK["editor"]
+                g = LayerPerms(True, edit, edit, edit)
+            p = LayerPerms(p.view or g.view, p.insert or g.insert, p.update or g.update, p.delete or g.delete)
+        out[layer_id] = p
+    return out
+
+
 @dataclass
 class LayerPerms:
     view: bool = False
@@ -107,7 +131,7 @@ async def load_project_context(slug: str, user: CurrentUser | None) -> ProjectCo
         elif user and user.group_ids:
             rows = await (
                 await conn.execute(
-                    """SELECT role, can_photos, can_files, scope_all, scope_codes FROM portal.project_access
+                    """SELECT group_id, role, can_photos, can_files, scope_all, scope_codes FROM portal.project_access
                        WHERE project_id = %s AND group_id = ANY(%s)""",
                     (proj["id"], user.group_ids),
                 )
@@ -118,17 +142,13 @@ async def load_project_context(slug: str, user: CurrentUser | None) -> ProjectCo
                 can_files = any(r["can_files"] for r in rows)
                 if not any(r["scope_all"] for r in rows):
                     scope_codes = sorted({c for r in rows for c in r["scope_codes"]})
-                # Suma (OR) uprawnień ze wszystkich grup użytkownika
-                for r in await (
-                    await conn.execute(
-                        """SELECT layer_id, bool_or(can_view) v, bool_or(can_insert) i,
-                                  bool_or(can_update) u, bool_or(can_delete) d
-                           FROM portal.layer_access WHERE project_id = %s AND group_id = ANY(%s)
-                           GROUP BY layer_id""",
-                        (proj["id"], user.group_ids),
-                    )
-                ).fetchall():
-                    overrides[r["layer_id"]] = LayerPerms(r["v"], r["i"], r["u"], r["d"])
+                # prawa do warstw (Panel → Projekty → Grupy i zakres…): suma z grup, ustawienie warstwy
+                # zastępuje rolę tej grupy dla tej warstwy
+                layer_rows = await (await conn.execute(
+                    """SELECT group_id, layer_id, can_view, can_insert, can_update, can_delete
+                         FROM portal.layer_access WHERE project_id = %s AND group_id = ANY(%s)""",
+                    (proj["id"], user.group_ids))).fetchall()
+                overrides = combine_layer_access({r["group_id"]: r["role"] for r in rows}, layer_rows)
 
     if user and role and not unrestricted:
         # wtyczka może podać zakres użytkownika w projekcie (np. przypisane nadleśnictwo) zamiast kodów grup

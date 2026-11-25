@@ -393,3 +393,9 @@ ul.plain li { padding: 4px 0; }
 .users-setting { display: flex; flex-direction: column; gap: 2px; max-height: 220px; overflow: auto; padding: 4px 0; }
 .users-setting label { display: flex; gap: 6px; align-items: center; }
 .users-setting button { align-self: flex-start; margin-top: 6px; }
+
+/* panel: prawa grupy do warstw */
+.layer-rights { margin: 8px 0; }
+.layer-rights summary { cursor: pointer; }
+.layer-rights table { margin-top: 4px; }
+.layer-rights td:nth-child(n+3), .layer-rights th:nth-child(n+3) { text-align: center; }

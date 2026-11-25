@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { adminApi } from "../api";
-import type { AdminProject, Group, GroupAccess, ProjectAccess, ProjectRole, ProjectScopeInfo } from "../types";
+import type { AdminProject, Group, GroupAccess, LayerAccessEntry, ProjectAccess, ProjectLayerInfo, ProjectRole, ProjectScopeInfo } from "../types";
 
 const ROLES: [ProjectRole | "", string][] = [["", "— brak dostępu —"], ["viewer", "podgląd"], ["editor", "edycja"], ["manager", "zarządzanie"]];
 const MODE_LABEL: Record<string, string> = {
@@ -20,17 +20,29 @@ export function AccessEditor({ project, groups, access, onChange, onSave, onCanc
 }) {
   const [scope, setScope] = useState<ProjectScopeInfo["scope"] | undefined>(undefined);
   const [filter, setFilter] = useState<Record<number, string>>({});
+  const [layers, setLayers] = useState<ProjectLayerInfo[]>([]);
   useEffect(() => {
     let cancelled = false;
     adminApi.projectScope(project.id).then((s) => !cancelled && setScope(s.scope)).catch(() => !cancelled && setScope(null));
+    adminApi.projectLayers(project.id).then((l) => !cancelled && setLayers(l.filter((x) => x.editable)))
+      .catch(() => !cancelled && setLayers([]));
     return () => { cancelled = true; };
   }, [project.id]);
+
+  // prawa grupy do warstw: brak wpisu = według roli; wpis zastępuje rolę tej grupy dla tej warstwy
+  const layerOf = (gid: number, lid: string) => access.layers.find((x) => x.group_id === gid && x.layer_id === lid);
+  const putLayer = (gid: number, lid: string, entry: LayerAccessEntry | null) => onChange({
+    ...access,
+    layers: [...access.layers.filter((x) => !(x.group_id === gid && x.layer_id === lid)), ...(entry ? [entry] : [])],
+  });
 
   const grantOf = (gid: number) => access.groups.find((g) => g.group_id === gid);
   const put = (gid: number, patch: Partial<GroupAccess> | null) => {
     const others = access.groups.filter((g) => g.group_id !== gid);
     const cur = grantOf(gid);
-    onChange({ ...access, groups: patch === null ? others : [...others, { ...(cur ?? newGrant(gid, "viewer")), ...patch }] });
+    onChange({ ...access, groups: patch === null ? others : [...others, { ...(cur ?? newGrant(gid, "viewer")), ...patch }],
+      // grupa bez dostępu — bez praw do warstw
+      layers: patch === null ? access.layers.filter((x) => x.group_id !== gid) : access.layers });
   };
   const toggleCode = (gid: number, code: string) => {
     const g = grantOf(gid);
@@ -73,6 +85,45 @@ export function AccessEditor({ project, groups, access, onChange, onSave, onCanc
                   <label className="check"><input type="checkbox" checked={g.can_photos} onChange={(e) => put(grp.id, { can_photos: e.target.checked })} /> zdjęcia</label>
                   <label className="check"><input type="checkbox" checked={g.can_files} onChange={(e) => put(grp.id, { can_files: e.target.checked })} /> dokumenty</label>
                 </div>
+                {layers.length > 0 && (() => {
+                  const own = layers.filter((l) => layerOf(grp.id, l.id)).length;
+                  const byRole = ["editor", "manager"].includes(g.role);
+                  return (
+                    <details className="layer-rights" open={own > 0}>
+                      <summary>Prawa do warstw{own ? ` — własne: ${own}` : " — według roli"}</summary>
+                      <p className="muted">Według roli: {byRole ? "dodawanie, zmiana i usuwanie" : "tylko podgląd"} we
+                        wszystkich warstwach edytowalnych. „Własne” zastępuje rolę tej grupy dla warstwy — np. edycja
+                        tylko lustracji, bez konturów. Użytkownik w kilku grupach dostaje sumę uprawnień.</p>
+                      <table className="grid">
+                        <thead><tr><th>Warstwa</th><th>Ustawienie</th><th>Dodawanie</th><th>Zmiana</th><th>Usuwanie</th></tr></thead>
+                        <tbody>
+                          {layers.map((l) => {
+                            const e = layerOf(grp.id, l.id);
+                            const flag = (k: "can_insert" | "can_update" | "can_delete") => (
+                              <td><input type="checkbox" aria-label={`${l.name}: ${k}`} disabled={!e}
+                                checked={e ? e[k] : byRole} onChange={(ev) => e && putLayer(grp.id, l.id, { ...e, [k]: ev.target.checked })} /></td>
+                            );
+                            return (
+                              <tr key={l.id}>
+                                <td>{l.name}{l.geometry_type ? "" : <span className="muted"> (tabela)</span>}</td>
+                                <td>
+                                  <select value={e ? "own" : "role"} aria-label={`${l.name}: ustawienie`}
+                                    onChange={(ev) => putLayer(grp.id, l.id, ev.target.value === "own"
+                                      ? { group_id: grp.id, layer_id: l.id, can_view: true, can_insert: false, can_update: false, can_delete: false }
+                                      : null)}>
+                                    <option value="role">według roli</option>
+                                    <option value="own">własne</option>
+                                  </select>
+                                </td>
+                                {flag("can_insert")}{flag("can_update")}{flag("can_delete")}
+                              </tr>
+                            );
+                          })}
+                        </tbody>
+                      </table>
+                    </details>
+                  );
+                })()}
                 {scope && (
                   <div className="scope-pick">
                     <label className="check"><input type="radio" checked={g.scope_all} onChange={() => put(grp.id, { scope_all: true })} /> cały obszar</label>

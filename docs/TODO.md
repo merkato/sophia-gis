@@ -136,6 +136,8 @@ Do zrobienia: etap 8 na serwerze po wdrożeniu (wymaga montowania `data/rasters`
 - ✔️ Zakładki formularza wyglądają jak zakładki (nie jak linki); sama „Atrybuty” — bez paska zakładek.
 - ✔️ `host.onFeatureChange` — wtyczki dostają zapis / usunięcie obiektu (odświeżenie okien).
 - ✔️ 0.10.1: „Anuluj” nowego obiektu zdejmuje szkic, etykietę pomiaru i podpowiedź rysowania.
+- ✔️ 0.10.4: prawa grup do warstw w panelu (Projekty → Grupy i zakres… → „Prawa do warstw”: według roli / własne:
+  dodawanie, zmiana, usuwanie); łączenie z kilku grup — ustawienie warstwy zastępuje rolę tej grupy, suma z grup.
 - ✔️ 0.10.2: powiadomienia e-mail — `app.mail` (SMTP z `.env`, dziennik `portal.mail_log`), lekki Postfix w
   docker-compose (profil „mail”, DKIM), ustawienie wtyczki typu „users” z wiadomością testową, `docs/ADMIN_IT.md`
   (sieć, DNS: A, SPF, DKIM, DMARC, PTR; `.env` przy starcie; sprawdzenie).

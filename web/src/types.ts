@@ -227,10 +227,16 @@ export interface GroupAccess {
   scope_all: boolean;               // cały obszar; inaczej tylko scope_codes
   scope_codes: string[];
 }
+/** Prawa grupy do warstwy (zastępują rolę grupy dla tej warstwy). */
+export interface LayerAccessEntry {
+  group_id: number; layer_id: string;
+  can_view: boolean; can_insert: boolean; can_update: boolean; can_delete: boolean;
+}
 export interface ProjectAccess {
   groups: GroupAccess[];
-  layers: Record<string, unknown>[];
+  layers: LayerAccessEntry[];
 }
+export interface ProjectLayerInfo { id: string; name: string; editable: boolean; geometry_type: string | null; table: string | null }
 /** Wymiar zakresu projektu (z Fii) i kody obszarów z warstwy granic. */
 export interface ProjectScopeInfo {
   scope: null | {

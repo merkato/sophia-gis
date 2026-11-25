@@ -1,8 +1,5 @@
 import type { PluginInfo } from "./plugins";
-import type {
-  AdminProject, AdminUser, Basemap, FetchResult, FileMeta, GeoJSONFeature, Group, PhotoMeta, ProjectAccess, ProjectConfig, ProjectScopeInfo,
-  ProjectSummary, RelatedGroup, User, WmtsCapabilities,
-} from "./types";
+import type { AdminProject, AdminUser, Basemap, FetchResult, FileMeta, GeoJSONFeature, Group, PhotoMeta, ProjectAccess, ProjectConfig, ProjectScopeInfo, ProjectSummary, RelatedGroup, User, WmtsCapabilities, ProjectLayerInfo } from "./types";
 
 export class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -209,6 +206,7 @@ export const adminApi = {
     method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ user_ids: userIds }) }),
   setProjectAccess: (id: number, a: ProjectAccess) => request(`/api/admin/projects/${id}/access`, json("PUT", a)),
   projectScope: (id: number) => request<ProjectScopeInfo>(`/api/admin/projects/${id}/scope`),
+  projectLayers: (id: number) => request<ProjectLayerInfo[]>(`/api/admin/projects/${id}/layers`),
   projectStorage: (id: number) => request<ProjectStorage>(`/api/admin/projects/${id}/storage`),
   setProjectStorage: (id: number, limits: Record<string, number | null>) =>
     request<ProjectStorage>(`/api/admin/projects/${id}/storage`, json("PUT", { limits })),

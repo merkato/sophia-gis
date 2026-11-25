@@ -59,3 +59,23 @@ def test_can_edit_protected():
     assert ctx("viewer", admin=True, until=soon).can_edit_protected     # administrator
     assert not ctx("editor", until=soon).can_edit_protected             # edytor — nie
     assert not ctx("manager", until=past).can_edit_protected            # po czasie — nie
+
+
+def test_combine_layer_access():
+    from app.permissions import combine_layer_access, LayerPerms
+    row = lambda g, l, i=False, u=False, d=False, v=True: {"group_id": g, "layer_id": l, "can_view": v,  # noqa: E731
+                                                           "can_insert": i, "can_update": u, "can_delete": d}
+    # nadleśnictwa (edycja): lustracje — dodawanie i zmiana, kontury — tylko podgląd
+    rows = [row(1, "lustracje", True, True), row(1, "kontury")]
+    p = combine_layer_access({1: "editor"}, rows)
+    assert p["lustracje"] == LayerPerms(True, True, True, False)
+    assert p["kontury"] == LayerPerms(True, False, False, False)
+    assert "dzialki" not in p                                            # bez ustawienia — z roli
+    # druga grupa z rolą „edycja” bez ustawień dla konturów — suma: kontury edytowalne
+    p = combine_layer_access({1: "editor", 2: "editor"}, rows)
+    assert p["kontury"] == LayerPerms(True, True, True, True)
+    # druga grupa tylko „podgląd” — kontury nadal tylko podgląd
+    p = combine_layer_access({1: "editor", 2: "viewer"}, rows)
+    assert p["kontury"] == LayerPerms(True, False, False, False)
+    # wpis grupy, do której użytkownik nie należy — pomijany
+    assert combine_layer_access({1: "editor"}, [row(9, "kontury")]) == {}

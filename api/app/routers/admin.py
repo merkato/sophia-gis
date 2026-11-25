@@ -275,6 +275,21 @@ async def get_project_access(project_id: int):
     }
 
 
+@router.get("/projects/{project_id}/layers")
+async def project_layers(project_id: int):
+    """Warstwy wektorowe projektu (z Fii: edytowalne) — do praw grup do warstw w panelu."""
+    row = await _exec("SELECT file_name FROM portal.projects WHERE id=%s", (project_id,))
+    if row is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Nieznany projekt")
+    path = (get_settings().projects_dir / row["file_name"]).resolve()
+    if not path.exists():
+        return []
+    p = get_project(path)
+    return [{"id": lid, "name": lyr.name, "editable": lyr.editable, "geometry_type": lyr.geometry_type,
+             "table": f"{lyr.pg.schema}.{lyr.pg.table}" if lyr.pg else None}
+            for lid, lyr in p.layers.items() if lyr.type == "vector" and not lyr.hidden]
+
+
 @router.put("/projects/{project_id}/access")
 async def set_project_access(project_id: int, groups: list[ProjectAccessIn], layers: list[LayerAccessIn]):
     async with portal_conn() as conn, conn.transaction():
