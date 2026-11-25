@@ -9,7 +9,7 @@ from . import __version__, plugins
 from .config import get_settings
 from .db import close_pools, portal_conn
 from .migrations import run_migrations
-from .routers import admin, auth, basemaps, features, fetch, fields, history, ows, photos, projects, reports
+from .routers import admin, auth, basemaps, features, fetch, fields, history, ows, photos, projects, rasters, reports
 from .routers import plugins as plugins_router
 from .security import hash_password
 
@@ -49,12 +49,14 @@ app = FastAPI(title="Sophia API", version=__version__, lifespan=lifespan,
 @app.exception_handler(psycopg.errors.RaiseException)
 async def db_rejected(_: Request, e: psycopg.Error) -> JSONResponse:
     msg = (e.diag.message_primary if e.diag else None) or str(e).splitlines()[0]
+    if isinstance(e, psycopg.errors.CheckViolation) and e.diag and e.diag.constraint_name:
+        msg = f"niedozwolona wartość (warunek „{e.diag.constraint_name}”)"
     return JSONResponse({"detail": f"Baza danych odrzuciła zapis: {msg}"}, status_code=409)
 
 
 # photos przed features: klucz obiektu może zawierać „/” ({pk:path}), więc ogólna trasa obiektu
 # przechwyciłaby …/features/{pk}/files/{field}, gdyby była sprawdzana wcześniej
-ROUTERS = (auth, projects, photos, features, history, fields, fetch, reports, ows, admin, basemaps)
+ROUTERS = (auth, projects, photos, features, history, fields, fetch, reports, ows, admin, basemaps, rasters)
 for r in ROUTERS:
     app.include_router(r.router)
 app.include_router(basemaps.admin)

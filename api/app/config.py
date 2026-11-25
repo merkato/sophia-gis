@@ -17,6 +17,8 @@ class Settings(BaseSettings):
     admin_password: str | None = None
 
     projects_dir: Path = Path("/projects")
+    # Biblioteka rastrów wspólna dla projektów (data/rasters; w QGIS ../../rasters) — wysyłka z Fii (routers/rasters.py)
+    rasters_dir: Path = Path("/rasters")
     max_attachment_mb: int = 50                 # dokumenty z WebUI (PDF, GML…)
     # Zdjęcia i pliki wysyłane z WebUI: <uploads_dir>/<slug>/zdjecia/... (data/uploads na hoście)
     uploads_dir: Path = Path("/uploads")

@@ -1,7 +1,7 @@
-import { forwardRef, useCallback, useEffect, useImperativeHandle, useState } from "react";
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useRef, useState } from "react";
 import { api } from "../api";
 import type { FieldDef, GeoJSONFeature, ProjectConfig, RelatedGroup } from "../types";
-import { FieldInput } from "./FieldInput";
+import { FieldInput, rangeProblem } from "./FieldInput";
 import { useFloatingWindow } from "./FloatingWindow";
 import { DocumentList, fileFieldOf } from "./Files";
 import { PhotoGallery, photoFieldOf } from "./Photos";
@@ -18,6 +18,9 @@ interface Props {
   onClose: () => void;
   onOpenRelated: (layerId: string, pk: string) => void;
   onNewRelated?: (layerId: string, props: Record<string, unknown>) => void;   // nowy rekord podrzędny (klucz rodzica wypełniony)
+  onCancel?: () => void;                   // nowy obiekt: rezygnacja bez pytania (przycisk „Anuluj”)
+  zIndex?: number;                         // warstwa okna (nad oknami wtyczek, gdy formularz jest na wierzchu)
+  onFocus?: () => void;                    // kliknięcie w okno — na wierzch
 }
 
 type Tab = "attrs" | "photos" | "docs" | "reports";
@@ -32,7 +35,8 @@ export interface FeaturePanelHandle {
 const norm = (v: unknown) => (v === null || v === undefined ? "" : String(v));
 
 export const FeaturePanel = forwardRef<FeaturePanelHandle, Props>(function FeaturePanel(
-  { config, layerId, feature, isNew, cutFrom, onSaved, onDeleted, onClose, onOpenRelated, onNewRelated }, ref) {
+  { config, layerId, feature, isNew, cutFrom, onSaved, onDeleted, onClose, onOpenRelated, onNewRelated, onCancel, zIndex, onFocus },
+  ref) {
   const layer = config.layers[layerId];
   const [values, setValues] = useState<Record<string, unknown>>({});
   const [tab, setTab] = useState<Tab>("attrs");
@@ -40,16 +44,27 @@ export const FeaturePanel = forwardRef<FeaturePanelHandle, Props>(function Featu
   const [busy, setBusy] = useState(false);
   const [related, setRelated] = useState<RelatedGroup[]>([]);
   const pk = isNew ? null : feature?.id ?? null;
-  const canEdit = isNew ? layer.perms.insert : layer.perms.update;
+  // obiekt chroniony (np. z importu GML): tylko do odczytu, chyba że administrator odblokował projekt
+  // (wtedy administrator i zarządzający projektem — config.protection.can_edit)
+  const locked = !isNew && !!feature?.protected && !config.protection?.can_edit;
+  const canEdit = (isNew ? layer.perms.insert : layer.perms.update) && !locked;
   const reports = config.reports.filter((r) => r.layer_id === layerId);
   const win = useFloatingWindow("sophia.featureWindow");
   const [collapsed, setCollapsed] = useState(false);
+  const [missing, setMissing] = useState<Set<string>>(new Set());   // pola do uzupełnienia / poprawy (obramowanie)
+  const actionsRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     setValues({ ...(feature?.properties ?? {}) });
     setError(null);
+    setMissing(new Set());
     if (isNew) setTab("attrs");
   }, [feature, isNew]);
+
+  // komunikat przy „Zapisz” — przewiń do niego (w długim formularzu przycisk jest na dole)
+  useEffect(() => {
+    if (error) actionsRef.current?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }, [error]);
 
   const loadRelated = useCallback(() => {
     if (!pk || !config.relations.some((r) => r.parent_layer === layerId || r.child_layer === layerId)) return;
@@ -80,7 +95,9 @@ export const FeaturePanel = forwardRef<FeaturePanelHandle, Props>(function Featu
   const pluginActions = !isNew && layer.source_table && pk !== null
     ? featureActions({ table: layer.source_table, pk: String(pk), layerId, project: config.slug, properties: feature?.properties ?? {} })
     : [];
-  const visibleFields = layer.fields.filter((f) => f.widget !== "Hidden" && f.name !== layer.primary_key);
+  // nowy obiekt: bez pól tylko do odczytu, które i tak są puste (np. data utworzenia — wypełnia baza)
+  const visibleFields = layer.fields.filter((f) => f.widget !== "Hidden" && f.name !== layer.primary_key
+    && (!isNew || f.editable || norm(feature?.properties[f.name]) !== ""));
 
   const editableFields = visibleFields.filter((f) => f.editable);
 
@@ -90,12 +107,16 @@ export const FeaturePanel = forwardRef<FeaturePanelHandle, Props>(function Featu
     || editableFields.some((f) => norm(values[f.name]) !== norm(feature?.properties[f.name])));
 
   const save = async (): Promise<boolean> => {
-    const missing = visibleFields.filter((f) => f.not_null && f.editable && (values[f.name] ?? "") === "");
-    if (missing.length) {
+    const empty = visibleFields.filter((f) => f.not_null && f.editable && (values[f.name] ?? "") === "");
+    const range = editableFields.map((f) => [f, rangeProblem(f, values[f.name])] as const).filter(([, p]) => p);
+    if (empty.length || range.length) {
       setTab("attrs");
-      setError(`Wymagane pola: ${missing.map((f) => f.alias ?? f.name).join(", ")}`);
+      setMissing(new Set([...empty, ...range.map(([f]) => f)].map((f) => f.name)));
+      setError([empty.length ? `Wymagane pola: ${empty.map((f) => f.alias ?? f.name).join(", ")}` : "",
+        ...range.map(([f, p]) => `${f.alias ?? f.name}: ${p}`)].filter(Boolean).join(". "));
       return false;
     }
+    setMissing(new Set());
     // nowy obiekt: pola wypełnione z góry, których nie ma w formularzu (ukryte, klucz naturalny — np. identyfikator
     // działki ustawiony przez wtyczkę, klucz obcy rekordu powiązanego), idą do zapisu razem z polami formularza
     const preset = isNew ? Object.fromEntries(Object.entries(feature?.properties ?? {}).filter(([k, v]) =>
@@ -135,7 +156,8 @@ export const FeaturePanel = forwardRef<FeaturePanelHandle, Props>(function Featu
   };
 
   return (
-    <aside ref={win.ref} style={win.style} className={`feature-window${collapsed ? " collapsed" : ""}`}
+    <aside ref={win.ref} style={zIndex ? { ...win.style, zIndex } : win.style} onMouseDown={onFocus}
+      className={`feature-window${collapsed ? " collapsed" : ""}`}
       role="dialog" aria-label={`${layer.name}: ${isNew ? "nowy obiekt" : `#${pk}`}`}>
       <header className="fw-head" {...win.handle} title="Przeciągnij, aby przesunąć · dwuklik: na środek">
         <div className="fw-title">
@@ -156,8 +178,8 @@ export const FeaturePanel = forwardRef<FeaturePanelHandle, Props>(function Featu
         </div>
       )}
 
-      {!isNew && (
-        <nav className="tabs">
+      {!isNew && (photoGroups.length > 0 || docGroups.length > 0 || reports.length > 0) && (
+        <nav className="tabs" role="tablist" aria-label="Zakładki obiektu">
           <button className={tab === "attrs" ? "active" : ""} onClick={() => setTab("attrs")}>Atrybuty</button>
           {photoGroups.length > 0 && <button className={tab === "photos" ? "active" : ""} onClick={() => setTab("photos")}>Zdjęcia ({photoCount})</button>}
           {docGroups.length > 0 && <button className={tab === "docs" ? "active" : ""} onClick={() => setTab("docs")}>Dokumenty ({docCount})</button>}
@@ -165,14 +187,21 @@ export const FeaturePanel = forwardRef<FeaturePanelHandle, Props>(function Featu
         </nav>
       )}
 
-      {error && <div className="error">{error}</div>}
+      {!isNew && feature?.protected && (locked
+        ? <div className="notice protected-note" role="note">🔒 {feature.protected}</div>
+        : <div className="notice protected-note unlocked" role="note">
+            ⚠ Obiekt chroniony — edycja odblokowana{config.protection?.unlocked_until
+              ? ` do ${new Date(config.protection.unlocked_until).toLocaleString("pl-PL")}` : ""}
+            {config.protection?.reason ? ` (${config.protection.reason})` : ""}. Zmieniaj tylko w uzasadnionych przypadkach.
+          </div>)}
+      {error && !(tab === "attrs" && canEdit) && <div className="error">{error}</div>}
 
       {tab === "attrs" && (
         <div className="form">
           {formRows(visibleFields).map((row) => (
             <div key={row[0][0].name} className="field-row">
             {row.map(([f, span]) => (
-            <label key={f.name} className="field" style={{ flex: `${span} 1 0` }}>
+            <label key={f.name} className={`field${missing.has(f.name) ? " missing" : ""}`} style={{ flex: `${span} 1 0` }}>
               <span>{f.alias ?? f.name}{f.not_null && f.editable ? " *" : ""}</span>
               <FieldInput field={f} value={values[f.name]} readOnly={!canEdit}
                 source={{ slug: config.slug, layerId, version: config.version, pk: pk === null ? null : String(pk), crs: config.crs,
@@ -184,15 +213,20 @@ export const FeaturePanel = forwardRef<FeaturePanelHandle, Props>(function Featu
             </div>
           ))}
           {canEdit && (
-            <div className="actions">
+            <div className="actions" ref={actionsRef}>
               <button className="primary" disabled={busy} onClick={save}>{busy ? "Zapisywanie…" : "Zapisz"}</button>
+              {isNew && onCancel && <button onClick={onCancel} title="Nie dodawaj obiektu">Anuluj</button>}
               {!isNew && layer.perms.delete && <button className="danger" onClick={remove}>Usuń</button>}
+              {error && <div className="error form-error" role="alert">{error}</div>}
             </div>
           )}
           {!isNew && otherGroups.map((g) => (
             <RelatedTable key={g.relation} config={config} group={g} parentValues={values}
               onOpen={(id) => onOpenRelated(g.layer_id, id)}
+              // „+ Dodaj” podrzędny tylko z warstwy edytowalnej — z warstwy referencyjnej (np. zasięg nadleśnictwa
+              // w relacji z konturami) dodawanie obiektu innej warstwy jest mylące
               onNew={g.direction === "child" && onNewRelated && config.layers[g.layer_id]?.perms.insert
+                && (layer.perms.update || layer.perms.insert)
                 ? () => onNewRelated(g.layer_id, Object.fromEntries(g.pairs.map(([pf, cf]) => [cf, values[pf]])))
                 : undefined} />
           ))}

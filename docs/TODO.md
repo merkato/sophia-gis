@@ -1,6 +1,6 @@
 # TO DO — Sophia (WebUI, API, Fia)
 
-Aktualizacja 22.11.2026 (wdrożona Sophia 0.8.2). Na górze plan (kolejność = kolejność realizacji), niżej zrobione — tematycznie.
+Aktualizacja 25.11.2026 (wdrożona Sophia 0.9.2). Na górze plan (kolejność = kolejność realizacji), niżej zrobione — tematycznie.
 Tylko rdzeń Sophii i ogólne wtyczki z `sophia-plugins`; prace wtyczek branżowych (np. wyłączenia) — w ich repozytoriach.
 
 Oznaczenia: ✅ zrobione · ✔️ zrobione częściowo (co zostało — w planie) · ⬜ do zrobienia
@@ -14,7 +14,8 @@ Oznaczenia: ✅ zrobione · ✔️ zrobione częściowo (co zostało — w plani
 
 ### ⬜ 2. Drobne zaległości
 - ⬜ Kolejne źródła narzędzi pobierania: PRG adresy, BDOT10k (nowy wpis w `SOURCES` i w `fia/tools.py`).
-- ✔️ Przyciąganie i kontrola topologii w edycji — **od początku, na każdej warstwie edycyjnej** (ustalenia 23.11):
+- ✅ Przyciąganie i kontrola topologii w edycji — **od początku, na każdej warstwie edycyjnej** (ustalenia 23.11;
+  przetestowane 23.11: wierzchołki, pierścień, przyciąganie do wierzchołków i krawędzi innej warstwy, blokada nakładania):
   - przyciąganie do węzłów (i krawędzi) istniejących geometrii: warstwy edycyjnej i wskazanych warstw odniesienia
     (np. kontur → działki, użytki, inne kontury; użytek → działki, inne użytki; działka z dnia decyzji → działki);
     zestaw warstw i tolerancja z ustawień przyciągania projektu QGIS, przełącznik w aplikacji;
@@ -33,7 +34,109 @@ Oznaczenia: ✅ zrobione · ✔️ zrobione częściowo (co zostało — w plani
        (> tolerancja) — błąd z geometrią miejsca, mapa pokazuje je na czerwono (warstwa porównania „uwaga”).
     5. Usuwanie wierzchołka: kliknięcie wierzchołka w trybie zmiany wierzchołków + Delete (obok Alt+klik).
 
-### ⬜ 3. Graficzny edytor schematu bazy (WebUI) — plan z 15.11
+### ✔️ 3. Wysyłka rastrów z Fii (TIFF, OVR, VRT) — plan z 25.11 (Sophia 0.10.0, Fia 0.2.0 — etapy 1–7 ✔️, do testu)
+Pełny ciąg od warstw rastrowych projektu QGIS do serwera, w Fii i API — bez `sync-rasters.ps1` i bez poleceń
+na serwerze. Fia: Python + GDAL z QGIS; API: nowy router. Skrypt PowerShell zostaje jako zapas.
+
+**Test na serwerze (25.11, projekt testowy, posprzątane):** QGIS Server trzyma otwarte rastry — podmiana pliku
+(zapis pod nazwą tymczasową + `rename`) bez zmiany projektu daje stary obraz; po zmianie czasu modyfikacji
+pliku projektu (`touch`) wszystkie procesy od razu pokazują nowy obraz. Sprawdzone: pojedynczy TIFF, mozaika VRT
+z podmienionymi arkuszami, piramidy `.vrt.ovr` (widok oddalony), plik dodany po wczytaniu projektu (wcześniej
+błąd 500 — po `touch` warstwa działa), raster biblioteki `/rasters` (poza katalogiem projektu), kilka procesów
+naraz. **Restart `qgis` nie jest potrzebny** (wystarczy `touch` projektu). Adresy kafli zawierają wersję
+projektu (= czas modyfikacji `.qgz`), więc cache kafli nie wymaga czyszczenia — poza podkładami typu „sophia”
+(wersja z `updated_at` podkładu).
+
+**Stan na serwerze (sprawdzone 25.11):** API działa jako root → pliki 644 czytelne dla `www-data` (QGIS Server);
+`data/rasters` (właściciel ubuntu) — API ma zapis po zamontowaniu; wolne 67 GB z 96 GB; Caddy: `max_size 100MB`
+na `/api/*`; kopia zapasowa pomija `*.tif/.ovr/.vrt/.aux.xml` (bez zmian); w obrazie API brak GDAL — walidacja
+plików bez GDAL (nagłówek TIFF, XML VRT).
+**Stan lokalnie:** VRT z Fii mają ścieżki względne (`relativeToVRT="1"`); w folderach `rastry/` leżą też pliki
+nieużywane (geojson, py, VRT robocze — np. 15 VRT, z których projekt używa 4) → wysyłamy **pliki warstw**
+(`GetFileList()`), nie cały folder. Fia: QGIS 3.40–4.x, wzorzec postępu jak „Pobierz zdjęcia” (`photosync.py`).
+
+#### Etapy
+1. ✔️ **Serwer (docker-compose):** w `api` zamontować `./data/rasters:/rasters` z zapisem (`qgis` bez zmian — ro);
+   `RASTERS_DIR` w ustawieniach API. Wdrożenie: `docker compose up -d api`.
+2. ✔️ **API `routers/rasters.py`** (`/api/admin/rasters`), uprawnienia: rastry projektu — administrator albo
+   właściciel projektu (jak publikacja); biblioteka `data/rasters/<seria>` — tylko administrator.
+   - `POST /plan` `{target: {project: slug} | {library: seria}, files: [{path, size, sha256}]}` →
+     `{upload: [...], same: [...], extra: [...], free_bytes, session}`; projekt musi być opublikowany;
+     odmowa, gdy brak miejsca (rozmiar + 10%).
+   - `PUT /sessions/{id}/files/{path}?offset=` — części po 32 MB do `<cel>/.upload-<id>/<path>.part`
+     (poniżej limitu Caddy); `GET /sessions/{id}` — ile odebrano (wznawianie po przerwie).
+   - `POST /sessions/{id}/commit` `{delete_extra: bool}` — kontrola SHA-256, walidacja, `rename` w kolejności
+     arkusze → `.ovr` → `.vrt`, usuwanie nadmiaru tylko na żądanie; potem `touch` projektu (biblioteka: wszystkich
+     projektów, które jej używają — źródła warstw z `.qgz`) i `updated_at = now()` podkładów „sophia” z tych
+     projektów; wpis w dzienniku zmian; usunięcie katalogu sesji. `DELETE /sessions/{id}` — przerwanie.
+   - Walidacja: rozszerzenia `.tif .tiff .vrt .ovr .aux.xml` (opcjonalnie `.tfw`); ścieżka względna bez `..`,
+     bez `\`, NFC; nagłówek TIFF/BigTIFF (`II*\0`, `MM\0*`, `II+\0`); **VRT:** poprawny XML, każde
+     `SourceFilename` z `relativeToVRT="1"`, wskazuje plik wewnątrz katalogu docelowego (po wysyłce albo już
+     na serwerze), bez `/vsi…`, bez `PixelFunctionLanguage`/`PixelFunctionCode` (Python) — spreparowany VRT
+     mógłby przez WMS czytać dowolne pliki serwera albo pobierać z sieci.
+   - Sprzątanie sesji starszych niż 24 h (przy każdym `plan`). Testy: walidacja VRT i ścieżek, plan
+     (nowe/zmienione/nadmiar), wznawianie, commit z `touch`.
+3. ✔️ **Fia — spis i kontrola** (`fia/rasterupload.py`, zakładka „Wysyłka rastrów” — `fia/raster_upload_tab.py`):
+   - warstwy GDAL z plikiem: `gdal.Open(źródło).GetFileList()` (VRT → arkusze; `.ovr`, `.aux.xml`); miejsce
+     na serwerze z reguły `checks._raster_location` (obok projektu → `data/projects/<slug>/…`,
+     `../../rasters/<seria>` → biblioteka); raster poza oboma — błąd z podpowiedzią;
+   - kontrole: ścieżka względna w projekcie (ustawienie „Zapisz ścieżki: względne”), źródła VRT względne,
+     **zgodność wielkości liter** nazw w VRT z plikami na dysku (Linux), brak piramid (VRT — błąd; duży TIFF —
+     ostrzeżenie), raster bez kompresji (informacja), znaki w nazwach (spacje i polskie litery są dozwolone);
+   - tabela: warstwa · pliki (liczba, rozmiar) · miejsce na serwerze · stan (nowe / zmienione / aktualne —
+     po „Sprawdź na serwerze”) · uwagi.
+4. ✔️ **Fia — wysyłka:** „Sprawdź na serwerze” (SHA-256 lokalnie, z pamięcią sum w `.fia-hash.json` po
+   rozmiarze i czasie modyfikacji — 2 GB nie liczymy za każdym razem) → podsumowanie (do wysłania N plików / X MB,
+   nadmiar na serwerze) → „Wyślij” z postępem (plik, MB/s, pozostały czas), przerwaniem i wznawianiem; nadmiar —
+   pytanie o usunięcie (domyślnie nie). Komunikacja przez `urllib` jak `publish.py` (token, weryfikacja SSL).
+5. ✔️ **Fia — przygotowanie** („Przygotuj…” przy warstwie z problemem): przepisanie źródeł VRT na względne,
+   poprawa wielkości liter, kopia rastra spoza projektu do `rastry/<nazwa>/` z przepięciem źródła warstwy,
+   budowa brakujących piramid (`overview_settings` jak w „Zbuduj VRT + piramidy”). Konwersja TIFF do COG — później.
+6. ✔️ **Publikacja:** w zakładce „Serwer” pole „Po publikacji wyślij zmienione rastry” — najpierw `.qgz`
+   (działa też przy pierwszej publikacji; dotychczasowe rastry działają do podmiany), potem rastry; zatwierdzenie
+   wysyłki odświeża projekt. Notka o `data/rasters` w zakładce zmieniona; token zapamiętany na czas pracy okna.
+7. ✔️ **Dokumentacja i wersje:** `docs/SERVER.md` (rastry: Fia jako główna droga, `sync-rasters.ps1` jako
+   zapas), `docs/user`/Fia, `docs/ARCHITECTURE.md` (punkt „biblioteka rastrów + narzędzie wysyłki” — odhaczyć); Sophia 0.10.0, Fia 0.2.0.
+8. ⬜ **Test końcowy:** wysyłka nowej serii do projektu testowego, podmiana arkusza i piramid, wznowienie po
+   przerwanym połączeniu, odmowa VRT ze ścieżką bezwzględną, biblioteka (tylko administrator), widok w WebUI
+   bez restartu `qgis`.
+
+**Zrobione 25.11:** testy API (walidacja ścieżek i VRT, nadmiar, pamięć sum, sesje, zatwierdzenie z odświeżeniem
+projektów, biblioteka), logika Fii w PyQGIS (spis, kontrola, poprawa VRT — także odporna na nadpisanie przez
+otwarty VRT, piramidy, kopia do projektu) i ciąg end-to-end klient Fii ↔ API (przerwanie i wznowienie, korekta
+przesunięcia, odmowa niedokończonej sesji, zmiana i usunięcie arkusza, odmowa VRT z `/etc/passwd`).
+Do zrobienia: etap 8 na serwerze po wdrożeniu (wymaga montowania `data/rasters` w `api`) i test okna Fii w QGIS.
+
+#### Ustalenia (25.11, przyjęte propozycje)
+- Biblioteka `data/rasters` z Fii: tylko administrator.
+- „Przygotuj” poprawia VRT w miejscu (kopia `.bak`), piramidy obok (`.ovr`); COG — jako nowy plik (później).
+- Nadmiar na serwerze: pytanie przy wysyłce, domyślnie nie usuwać.
+- Konwersja do COG: później (poza tym zakresem).
+
+### ✔️ Obiekty chronione i bezpiecznik (25.11, Sophia 0.10.0, egib 1.6.0 — do testu)
+- ✔️ Manifest wtyczki `protected` (tabela, pole, wartości, komunikat) — `app/protection.py`; obiekt w API z `protected`,
+  WebUI: formularz tylko do odczytu (🔒), obiekty poza warstwą edycyjną (narzędzia ich nie chwytają), bez usuwania.
+- ✔️ Kontrola w API przy każdym zapisie istniejącego obiektu (`in_scope` → `check_protected`).
+- ✔️ Bezpiecznik: Panel → Projekty → „Odblokuj obiekty chronione…” (powód, 1–24 h; `portal.protection_unlock`,
+  dziennik `protection_unlock_log`); zmieniać mogą administrator i zarządzający; `sophia.odblokowanie = 'on'`
+  w transakcji dla wyzwalaczy wtyczki. egib 1.6.0 (migracja 007): działki i użytki z GML chronione; przy
+  odblokowaniu zmiana bieżącego wiersza rejestru (geometria, powierzchnia, OFU), usunięcie — zawsze tylko importem.
+  Sprawdzone na bazie w transakcji wycofanej (odmowa / zapis przy odblokowaniu / odmowa usunięcia).
+
+### ✔️ Formularze i pasek narzędzi — uwagi z testów (25.11, Sophia 0.10.0, do testu)
+- ✔️ Nowy obiekt: „Anuluj” w formularzu (bez pytania); okno „Niezapisane zmiany” zawsze na wierzchu; formularz nad oknami
+  wtyczek po otwarciu i kliknięciu (wspólny licznik warstw okien).
+- ✔️ Komunikat o brakach przy „Zapisz” (pod przyciskiem, z przewinięciem) i obramowanie pól do uzupełnienia;
+  zakres widżetu „Zakres” z projektu (Min / Max) sprawdzany przed zapisem; naruszony warunek CHECK w bazie —
+  „niedozwolona wartość (warunek …)”.
+- ✔️ Nowy obiekt bez pól tylko do odczytu, które i tak są puste (np. data utworzenia).
+- ✔️ „+ Dodaj obiekt” (rysowanie) / „+ Dodaj rekord” w tabeli atrybutów każdej warstwy z prawem dodawania;
+  „+ Dodaj” rekordu podrzędnego tylko w formularzu warstwy edytowalnej (nie z warstw referencyjnych).
+- ✔️ Pasek: narzędzia edycji dopiero po wybraniu warstwy edycyjnej i tylko te, na które pozwalają prawa i typ geometrii.
+- ✔️ Zakładki formularza wyglądają jak zakładki (nie jak linki); sama „Atrybuty” — bez paska zakładek.
+- ✔️ `host.onFeatureChange` — wtyczki dostają zapis / usunięcie obiektu (odświeżenie okien).
+
+### ⬜ 4. Graficzny edytor schematu bazy (WebUI) — plan z 15.11
 Diagram tabel jak w narzędziach ERD: karty tabel przeciągane po płótnie, relacja = „sznurek”
 przeciągnięty z pola na pole. Działa na istniejących schematach danych (dziś `dane`, `rdlp`,
 `straznicy`) i na nowych. Panel administratora → **Baza danych**.

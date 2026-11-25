@@ -311,7 +311,10 @@ export function MapView(props: Props) {
       const fc = await api.features(config.slug, editLayerId, extent, crs);
       if (cancelled) return;
       source.clear();
-      source.addFeatures(format.readFeatures({ type: "FeatureCollection", features: fc.features }) as Feature<Geometry>[]);
+      // obiekty chronione (np. z importu GML) poza warstwą edycyjną — narzędzia ich nie chwytają;
+      // widać je na mapie z warstwy projektu, formularz otwiera się tylko do odczytu
+      const editable = config.protection?.can_edit ? fc.features : fc.features.filter((f) => !f.protected);
+      source.addFeatures(format.readFeatures({ type: "FeatureCollection", features: editable }) as Feature<Geometry>[]);
     };
     load().catch(console.error);
     map.on("moveend", load);

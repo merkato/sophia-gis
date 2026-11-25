@@ -89,6 +89,11 @@ async def project_config(slug: str, user: CurrentUser | None = Depends(optional_
         "crs": p.crs,
         # zmienia się przy każdej publikacji -> nowe adresy kafli (cache serwera i przeglądarki)
         "version": int(p.mtime),
+        # obiekty chronione (app/protection.py): stan bezpiecznika i czy ten użytkownik może je teraz zmieniać
+        "protection": {"unlocked_until": ctx.unlock_until.isoformat() if ctx.unlocked else None,
+                       "unlocked_by": ctx.unlock_by if ctx.unlocked else None,
+                       "reason": ctx.unlock_reason if ctx.unlocked else None,
+                       "can_edit": ctx.can_edit_protected},
         "extent": p.extent,
         "options": p.options,
         "tree": _filter_tree(p.tree, visible),

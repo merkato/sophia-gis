@@ -9,7 +9,10 @@ import uuid
 
 
 class ApiError(Exception):
-    pass
+    def __init__(self, message: str, status: int | None = None, detail=None):
+        super().__init__(message)
+        self.status = status            # kod HTTP (None — brak połączenia)
+        self.detail = detail            # „detail” z odpowiedzi API (tekst albo słownik)
 
 
 def _ssl_context(verify: bool) -> ssl.SSLContext:
@@ -30,9 +33,10 @@ def _request(url: str, data: bytes | None, headers: dict, verify: bool, method: 
             detail = json.loads(e.read()).get("detail")
         except Exception:  # noqa: BLE001
             detail = e.reason
-        raise ApiError(f"HTTP {e.code}: {detail}") from e
-    except urllib.error.URLError as e:
-        raise ApiError(f"Brak połączenia z serwerem: {e.reason}") from e
+        text = detail.get("message", detail) if isinstance(detail, dict) else detail
+        raise ApiError(f"HTTP {e.code}: {text}", e.code, detail) from e
+    except (urllib.error.URLError, TimeoutError, ConnectionError) as e:
+        raise ApiError(f"Brak połączenia z serwerem: {getattr(e, 'reason', e)}") from e
 
 
 def get_json(url: str, verify: bool = True) -> dict | list:

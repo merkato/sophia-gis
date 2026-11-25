@@ -84,6 +84,8 @@ export interface ProjectConfig {
   role: string | null;
   crs: string;
   version: number;                   // zmienia się przy publikacji projektu (adresy kafli)
+  /** Obiekty chronione: stan bezpiecznika (odblokowanie w administracji) i czy można je teraz zmieniać. */
+  protection?: { unlocked_until: string | null; unlocked_by: string | null; reason: string | null; can_edit: boolean };
   extent: [number, number, number, number] | null;
   options: Record<string, unknown>;
   tree: TreeNode;
@@ -137,6 +139,7 @@ export interface GeoJSONFeature {
   id: string;
   geometry: { type: string; coordinates: unknown } | null;
   properties: Record<string, unknown>;
+  protected?: string;                // obiekt chroniony (np. z importu GML) — komunikat; tylko do odczytu
 }
 
 /** Zdjęcie po przetworzeniu na serwerze (ścieżka względna do wpisania w pole „Załącznik”). */
@@ -212,6 +215,7 @@ export interface Group { id: number; name: string; description: string | null }
 export interface AdminProject {
   id: number; slug: string; title: string; description: string | null; file_name: string;
   sort_order: number; is_public: boolean;
+  unlock_until?: string | null; unlock_by?: string | null; unlock_reason?: string | null;   // bezpiecznik
 }
 export type ProjectRole = "viewer" | "editor" | "manager";
 /** Grupa w projekcie: rola, prawa do zdjęć/dokumentów i zakres danych. */

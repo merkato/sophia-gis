@@ -50,6 +50,7 @@ class Plugin:
     pages: list[dict] = field(default_factory=list)    # [{"id", "title", "capability"}]
     windows: list[dict] = field(default_factory=list)  # okna z górnego paska: [{"id", "title", "capability"}]
     settings: list[dict] = field(default_factory=list)  # [{"id", "title", "type": "text"|"project", "description"}]
+    protected: list = field(default_factory=list)      # reguły obiektów chronionych (app/protection.py)
     error: str | None = None                           # wtyczka nie załadowana (manifest, zgodność, import)
     module: object | None = None                       # zaimportowany pakiet API (opcjonalnie `async def startup()`)
 
@@ -119,6 +120,12 @@ def read_manifest(path: Path) -> Plugin:
     plugin.windows = [w for w in web.get("windows") or [] if isinstance(w, dict) and w.get("id")]
     plugin.settings = [s for s in m.get("settings") or [] if isinstance(s, dict) and s.get("id")
                        and s.get("type", "text") in ("text", "project")]
+    try:
+        from .protection import parse_rules
+        plugin.protected = parse_rules(m.get("protected"), pid)
+    except ValueError as exc:
+        plugin.error = f"Błędny manifest: {exc}"
+        return plugin
     if not version_ok(plugin.sophia, SOPHIA_VERSION):
         plugin.error = f"Wymaga Sophii {plugin.sophia}, zainstalowana {SOPHIA_VERSION}"
     return plugin

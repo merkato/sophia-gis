@@ -150,18 +150,45 @@ D:\dev\sophia\scripts\rasters\messtischblatt.bat oryginaly\5364_*.tif E:\gis\ras
 z ramką na mapie, georeferencja jest zła i trzeba użyć `--corners`. `--margin 4` (ok. 1 piksel)
 usuwa szparę między sąsiednimi arkuszami.
 
-Wiele arkuszy → wtyczka **Fia** → „Zbuduj VRT + piramidy”. Na serwer wysyła je
-`scripts\windows\sync-rasters.ps1` (opis niżej, „Wysyłanie rastrów”).
+Wiele arkuszy → wtyczka **Fia** → „Zbuduj VRT + piramidy”. Na serwer wysyła je Fia, zakładka
+**Wysyłka rastrów** (opis niżej, „Wysyłanie rastrów”).
 
 W projekcie QGIS ścieżki muszą być **względne**. Fia publikuje projekt do
 `data/projects/<slug>/<slug>.qgz`, więc najprościej trzymać rastry w podkatalogu obok projektu
 (lokalnie `moj-projekt\rastry\`, na serwerze `data/projects/moj-projekt/rastry/`). Ścieżki `./rastry/…`
 działają wtedy po obu stronach bez zmian. Kopia zapasowa pomija pliki rastrowe także w tym miejscu.
 
-### Wysyłanie rastrów (`sync-rasters.ps1`)
+### Wysyłanie rastrów (Fia → „Wysyłka rastrów”)
+
+Fia wysyła rastry projektu z QGIS, bez skryptów i poleceń na serwerze (Sophia ≥ 0.10, Fia ≥ 0.2):
+
+1. **Spis i kontrola.** Tabela pokazuje warstwy rastrowe z plików i ich miejsce na serwerze według położenia
+   w projekcie: folder obok projektu (`rastry/…`) → `data/projects/<slug>/…`; `../../rasters/<seria>` →
+   `data/rasters/<seria>` (biblioteka — tylko administrator). Wysyłane są pliki warstw (GeoTIFF, VRT z arkuszami,
+   `.ovr`, `.aux.xml`), nie cały folder. Fia sprawdza: zapis ścieżek względnych w projekcie, źródła VRT
+   względne, wielkość liter nazw (serwer na Linuksie ją rozróżnia), piramidy (VRT bez `.vrt.ovr` — błąd),
+   rastry spoza projektu i biblioteki.
+2. **„Przygotuj zaznaczone…”** poprawia to, co się da: źródła VRT na względne (kopia `.bak`), piramidy,
+   kopia rastra spoza projektu do `rastry/<folder>/` z przepięciem warstwy (potem zapisz projekt).
+3. **„Sprawdź na serwerze”** — sumy SHA-256 (zapamiętane w `.fia-hash.json` obok projektu) i porównanie
+   z serwerem: ile plików do wysłania, ile aktualnych, co jest na serwerze w nadmiarze.
+4. **„Wyślij zmienione”** — tylko nowe i zmienione pliki, częściami po 32 MB, z postępem; przerwaną wysyłkę
+   (przycisk „Przerwij”, zerwane połączenie) wznawia ponowne „Wyślij zmienione”. Pliki z serwera, których nie
+   ma lokalnie, Fia usuwa tylko po potwierdzeniu.
+5. Serwer sprawdza sumy i zawartość (nagłówek TIFF; VRT tylko ze źródłami względnymi wewnątrz katalogu
+   docelowego, bez `/vsi…` i funkcji Pythona), podmienia pliki w kolejności arkusze → piramidy → VRT
+   (QGIS Server nie czyta niedokończonego pliku) i zmienia czas modyfikacji projektów, które ich używają.
+   QGIS Server przeładowuje wtedy projekt i otwiera rastry od nowa — **bez restartu** — a nowa wersja projektu
+   daje nowe adresy kafli (cache kafli nie wymaga czyszczenia; podkłady „warstwa Sophii” dostają nową wersję).
+
+W zakładce „Serwer” opcja **„Po publikacji wyślij zmienione rastry”** łączy oba kroki: najpierw projekt, potem
+rastry. API: `/api/admin/rasters` (`plan`, części `PUT …/sessions/{id}/file`, `commit`); sesje w ukrytym
+katalogu `.upload-<id>` celu, porzucone usuwane po 24 h.
+
+#### Zapas: `sync-rasters.ps1`
 
 Jedno polecenie z Windows (PowerShell, w katalogu repozytorium) wysyła folder z rastrami we właściwe
-miejsce na serwerze:
+miejsce na serwerze (wymaga SSH do serwera):
 
 ```powershell
 .\scripts\windows\sync-rasters.ps1 -Source E:\gis\projekty\moj-projekt\rastry\mapa_1900 -DryRun
@@ -205,8 +232,8 @@ gdaladdo -r average --config COMPRESS_OVERVIEW WEBP --config WEBP_LEVEL_OVERVIEW
 
 **Piramidy VRT (`tk25.vrt.ovr`) są obowiązkowe.** Arkusze mają różne rozdzielczości, więc GDAL nie
 użyje piramid samych arkuszy i bez `.ovr` oddalony widok czyta pełną rozdzielczość: 150 s zamiast
-0,3 s na jeden obraz. Potem `sync-rasters.ps1 -Source E:\gis\rasters\tk25` — wyśle nowe arkusze,
-`tk25.vrt` i `tk25.vrt.ovr`, zrestartuje `qgis` i wyczyści cache kafli.
+0,3 s na jeden obraz. Potem Fia → „Wysyłka rastrów” w projekcie z warstwą TK25 (albo
+`sync-rasters.ps1 -Source E:\gis\rasters\tk25`) — wyśle nowe arkusze, `tk25.vrt` i `tk25.vrt.ovr`.
 
 ### Kafle i cache
 

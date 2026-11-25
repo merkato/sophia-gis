@@ -53,7 +53,7 @@ export function AttributeTable({ config, layerId, reloadToken, selectedId, onOpe
   reloadToken: number;
   selectedId: string | null;
   onOpen: (pk: string) => void;
-  onNew: (() => void) | null;          // „Dodaj rekord” — tylko tabele bez geometrii z prawem dodawania
+  onNew: (() => void) | null;          // „Dodaj” — każda warstwa z prawem dodawania (z geometrią: rysowanie na mapie)
   onClose: () => void;
 }) {
   const layer = config.layers[layerId];
@@ -143,7 +143,9 @@ export function AttributeTable({ config, layerId, reloadToken, selectedId, onOpe
             </div>
           )}
         </div>
-        {onNew && <button className="primary" onClick={onNew}>+ Dodaj rekord</button>}
+        {onNew && <button className="primary" onClick={onNew}
+          title={layer.geometry_type ? "Narysuj nowy obiekt na mapie" : "Nowy rekord w formularzu"}>
+          {layer.geometry_type ? "+ Dodaj obiekt" : "+ Dodaj rekord"}</button>}
       </div>
       {error && <div className="error">{error}</div>}
 

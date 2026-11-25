@@ -147,3 +147,17 @@ export function FieldInput({ field, value, onChange, readOnly, source, saved }: 
     }
   }
 }
+
+/** Wartość poza zakresem widżetu „Zakres” z projektu QGIS (Min / Max) — opis problemu albo null. */
+export function rangeProblem(field: FieldDef, value: unknown): string | null {
+  if (field.widget !== "Range" || value === null || value === undefined || value === "") return null;
+  const cfg = (field.widget_config ?? {}) as Record<string, unknown>;
+  const v = Number(value);
+  const min = cfg.Min === undefined || cfg.Min === null || cfg.Min === "" ? null : Number(cfg.Min);
+  const max = cfg.Max === undefined || cfg.Max === null || cfg.Max === "" ? null : Number(cfg.Max);
+  if (Number.isNaN(v)) return "to nie jest liczba";
+  // QGIS zapisuje skrajne wartości typu jako „bez ograniczenia” (np. −2147483648)
+  if (min !== null && Math.abs(min) < 2e9 && v < min) return `najmniej ${min}`;
+  if (max !== null && Math.abs(max) < 2e9 && v > max) return `najwyżej ${max}`;
+  return null;
+}

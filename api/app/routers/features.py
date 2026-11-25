@@ -19,6 +19,7 @@ from psycopg import sql
 from pydantic import BaseModel
 
 from ..db import layer_conn, portal_conn
+from ..protection import UNLOCK_GUC, flag_sql, rule_for
 from ..permissions import ProjectContext, load_project_context
 from ..qgsproject import LayerDef
 from ..scope import Mode, T, col, row_filter, single_code
@@ -72,6 +73,9 @@ def _select_list(lyr: LayerDef, out_srid: int, geometry: bool = True) -> sql.Com
     if lyr.pg.geometry_column and geometry:
         parts.append(sql.SQL("ST_AsGeoJSON(ST_Transform({g}, {s}), 9)::json AS __geom").format(
             g=col(T, lyr.pg.geometry_column), s=sql.Literal(out_srid)))
+    rule = rule_for(lyr)
+    if rule:
+        parts.append(sql.SQL("{} AS __protected").format(flag_sql(rule, T)))
     if names:
         # jsonb_build_object nie ma limitu 100 argumentów jak json_build_object — łączymy po 50 pól
         chunks = [names[i:i + 50] for i in range(0, len(names), 50)]
@@ -81,9 +85,12 @@ def _select_list(lyr: LayerDef, out_srid: int, geometry: bool = True) -> sql.Com
     return sql.SQL(", ").join(parts)
 
 
-def _row_to_feature(row: dict) -> dict:
-    return {"type": "Feature", "id": row["__pk"], "geometry": row.get("__geom"),
-            "properties": row.get("__props") or {}}
+def _row_to_feature(row: dict, lyr: LayerDef | None = None) -> dict:
+    f = {"type": "Feature", "id": row["__pk"], "geometry": row.get("__geom"), "properties": row.get("__props") or {}}
+    if row.get("__protected"):
+        rule = rule_for(lyr) if lyr else None
+        f["protected"] = rule.message if rule else "Obiekt chroniony — tylko do odczytu"
+    return f
 
 
 def _writable_values(lyr: LayerDef, props: dict[str, Any], with_key: bool = False) -> dict[str, Any]:
@@ -151,7 +158,27 @@ async def _fetch_one(conn, ctx: ProjectContext | None, lyr: LayerDef, pk: str, s
 async def in_scope(conn, ctx: ProjectContext, lyr: LayerDef, pk: str, mode: Mode = "edit") -> bool:
     q = sql.SQL("SELECT 1 FROM {t} AS {a} WHERE {pk} AND {c}").format(
         t=_table(lyr), a=sql.Identifier(*T), pk=_pk_is(lyr, pk), c=row_filter(ctx, lyr, T, mode))
-    return await (await conn.execute(q)).fetchone() is not None
+    ok = await (await conn.execute(q)).fetchone() is not None
+    if ok and mode == "edit":
+        await check_protected(conn, ctx, lyr, pk)
+    return ok
+
+
+async def check_protected(conn, ctx: ProjectContext, lyr: LayerDef, pk: str) -> None:
+    """Obiekt chroniony (app/protection.py): zapis tylko w czasie odblokowania, przez administratora albo
+    zarządzającego — wtedy `sophia.odblokowanie = 'on'` w transakcji (dla wyzwalaczy wtyczki)."""
+    rule = rule_for(lyr)
+    if rule is None:
+        return
+    q = sql.SQL("SELECT {f} AS p FROM {t} AS {a} WHERE {pk}").format(
+        f=flag_sql(rule, T), t=_table(lyr), a=sql.Identifier(*T), pk=_pk_is(lyr, pk))
+    row = await (await conn.execute(q)).fetchone()
+    if not row or not row["p"]:
+        return
+    if not ctx.can_edit_protected:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, rule.message + (
+            "" if not ctx.unlocked else " (odblokowanie: tylko administrator i zarządzający projektem)"))
+    await conn.execute("SELECT set_config(%s, 'on', true)", (UNLOCK_GUC,))
 
 
 def _autofill_scope(ctx: ProjectContext, lyr: LayerDef, values: dict[str, Any]) -> None:
@@ -223,7 +250,7 @@ async def list_features(
         if total:
             count = (await (await conn.execute(sql.SQL("SELECT count(*) AS n FROM {t} AS {a} WHERE {w}").format(
                 t=_table(lyr), a=sql.Identifier(*T), w=cond))).fetchone())["n"]
-    out = {"type": "FeatureCollection", "features": [_row_to_feature(r) for r in rows],
+    out = {"type": "FeatureCollection", "features": [_row_to_feature(r, lyr) for r in rows],
            "truncated": len(rows) >= limit}
     if count is not None:
         out["total"] = count
@@ -239,7 +266,7 @@ async def get_feature(slug: str, layer_id: str, pk: str, crs: str = "EPSG:3857",
         row = await _fetch_one(conn, ctx, lyr, pk, _srid(crs))
     if row is None:
         raise HTTPException(status.HTTP_404_NOT_FOUND, "Brak obiektu")
-    return _row_to_feature(row)
+    return _row_to_feature(row, lyr)
 
 
 @router.post("", status_code=201)

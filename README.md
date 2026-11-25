@@ -10,7 +10,7 @@ z kontrolą uprawnień i zasięgów przestrzennych.
 | `docker-compose.yml` | PostGIS, QGIS Server, API, WebUI, Caddy (SSL) |
 | `api/` | FastAPI: projekty, edycja obiektów, załączniki PDF, raporty, użytkownicy/grupy/zasięgi |
 | `web/` | React + OpenLayers: mapa, drzewo warstw, edycja, formularze, dokumenty, wydruki |
-| `fia/` | Wtyczka QGIS **Fia**: konfiguracja, diagnostyka, mozaiki GeoTIFF/VRT, publikacja |
+| `fia/` | Wtyczka QGIS **Fia**: konfiguracja, diagnostyka, mozaiki GeoTIFF/VRT, wysyłka rastrów, publikacja |
 | `db/init/` | Schemat `portal` (tworzony przy pierwszym starcie bazy) |
 | `docs/ARCHITECTURE.md` | Architektura, model uprawnień, roadmapa |
 | `docs/SERVER.md` | Wdrożenie na VPS: klucz SSH na Windows, konfiguracja Ubuntu, rastry, kopie zapasowe |

@@ -46,6 +46,23 @@ export interface SophiaHost {
   currentProject: () => string | null;
   /** Zasięg bieżącego widoku mapy: [minX, minY, maxX, maxY] w układzie projektu (`crs`), null bez mapy. Sophia ≥ 0.7. */
   currentExtent: () => { bbox: [number, number, number, number]; crs: string } | null;
+  /** Zapis / usunięcie obiektu na mapie (formularz, edycja geometrii) — np. odświeżenie okna wtyczki.
+   *  Zwraca funkcję wyrejestrowania. Sophia ≥ 0.10. */
+  onFeatureChange: (fn: (e: FeatureChange) => void) => () => void;
+}
+
+export interface FeatureChange {
+  project: string;
+  layerId: string;
+  table: string | null;           // tabela źródłowa warstwy (schemat.tabela)
+  pk: string;
+  action: "insert" | "update" | "delete";
+}
+
+const featureListeners = new Set<(e: FeatureChange) => void>();
+/** App zgłasza zapis / usunięcie obiektu — dostają je wtyczki (host.onFeatureChange). */
+export function emitFeatureChange(e: FeatureChange) {
+  featureListeners.forEach((fn) => { try { fn(e); } catch { /* błąd wtyczki nie psuje mapy */ } });
 }
 
 export interface PluginWindowProps { host: SophiaHost; props: Record<string, unknown>; close: () => void }
@@ -195,6 +212,7 @@ export function loadPlugin(p: PluginInfo, user: User, notify: (m: string) => voi
       closeWindow: (id) => { if (windowHandler) windowHandler(p.id, id, null); },
       currentProject: () => (projectGetter ? projectGetter() : null),
       currentExtent: () => (extentGetter ? extentGetter() : null),
+      onFeatureChange: (fn) => { featureListeners.add(fn); return () => { featureListeners.delete(fn); }; },
     };
     m = (import(/* @vite-ignore */ p.web!) as Promise<PluginModule>)
       .then((mod) => {

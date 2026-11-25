@@ -36,6 +36,16 @@ i wszystkie kody obszarów. Grupa z „całym obszarem” znosi ograniczenie zak
 Projekt **publiczny** ogląda każdy, także bez logowania i bez ograniczeń zakresu — nie ustawiaj
 publicznego dostępu dla danych, które mają być dzielone na obszary.
 
+### Obiekty chronione i bezpiecznik
+
+Niektóre dane zmienia tylko import — np. działki i użytki z GML (wtyczka EGiB). Takie obiekty są **tylko do
+odczytu** dla wszystkich: formularz pokazuje 🔒 z wyjaśnieniem, nie ma „Zapisz” ani „Usuń”, a narzędzia edycji
+ich nie chwytają (warstwa może być edytowalna, np. dla działek pobieranych z ULDK). W wyjątkowej sytuacji
+administrator odblokowuje je w *Panel → Projekty → **Odblokuj obiekty chronione…***: podaje powód i czas
+(1–24 h). Do tej pory zmieniać je mogą tylko administrator i zarządzający projektem (formularz pokazuje ⚠
+z terminem i powodem); przycisk „🔓 do … — zablokuj” kończy odblokowanie wcześniej. Usuwanie danych z importu
+zostaje zablokowane także wtedy.
+
 ## Zakres danych — konfiguracja w Fii
 
 *Web → Fia → zakładka **Zakres danych***.

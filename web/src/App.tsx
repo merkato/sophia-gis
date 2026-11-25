@@ -14,7 +14,7 @@ import { createEmpty, extend as extendExtent, isEmpty as isEmptyExtent } from "o
 import { Toolbar } from "./components/Toolbar";
 import { FetchCard } from "./components/FetchCard";
 import { AdminPanel } from "./components/AdminPanel";
-import { setCurrentExtentGetter, setCurrentProjectGetter, setMapFocusHandler, setWindowHandler, takeMapFocus, type MapFocus, type PluginInfo, preloadPlugins, toolbarWidgets, usePluginsVersion } from "./plugins";
+import { emitFeatureChange, setCurrentExtentGetter, setCurrentProjectGetter, setMapFocusHandler, setWindowHandler, takeMapFocus, type FeatureChange, type MapFocus, type PluginInfo, preloadPlugins, toolbarWidgets, usePluginsVersion } from "./plugins";
 import { TopMenu } from "./components/TopMenu";
 import { PluginWindows, type OpenWindow } from "./components/PluginWindows";
 import { BasemapSwitcher, initialBasemapChoice, saveBasemapChoice } from "./components/BasemapSwitcher";
@@ -173,6 +173,11 @@ export default function App() {
     else action();
   };
 
+  /** Zapis / usunięcie obiektu — dla wtyczek (np. odświeżenie otwartego drzewa decyzji). */
+  const featureChanged = (layerId: string, pk: string, action: FeatureChange["action"]) => {
+    if (config) emitFeatureChange({ project: config.slug, layerId, table: config.layers[layerId]?.source_table ?? null, pk, action });
+  };
+
   const resolvePending = async (choice: "save" | "discard" | "cancel") => {
     const action = pending;
     setPending(null);
@@ -200,6 +205,16 @@ export default function App() {
   const widgets = user ? toolbarWidgets().filter((x) => plugins.some((p) => p.id === x.id)) : [];
   const [openWindows, setOpenWindows] = useState<OpenWindow[]>([]);
   const zTop = useRef(0);
+  // formularz obiektu nad oknami wtyczek, gdy go otwarto albo kliknięto (np. nowy kontur z drzewa decyzji)
+  const [formZ, setFormZ] = useState(6);
+  const raiseForm = () => {
+    if (formZ === 15 + zTop.current) return;
+    zTop.current += 1;
+    setFormZ(15 + zTop.current);
+  };
+  useEffect(() => { if (selection) raiseForm(); },   // nowy / inny obiekt w formularzu — na wierzch
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selection?.layerId, selection?.feature.id, selection?.isNew]);
   const openWindow = useCallback((plugin: PluginInfo, windowId: string, opts?: { props?: Record<string, unknown>; title?: string } | null) => {
     const key = `${plugin.id}:${windowId}`;
     setOpenWindows((list) => {
@@ -721,7 +736,8 @@ export default function App() {
     return () => document.removeEventListener("keydown", onKey);
   }, []);
 
-  const canDelete = !!(selection && editLayer && selection.layerId === editLayer.id && !selection.isNew && editLayer.perms.delete);
+  const canDelete = !!(selection && editLayer && selection.layerId === editLayer.id && !selection.isNew && editLayer.perms.delete
+    && (!selection.feature.protected || config?.protection?.can_edit));
   const deleteSelected = async () => {
     if (!config || !selection || !canDelete) return;
     if (!confirm(`Usunąć obiekt #${selection.feature.id} z warstwy „${editLayer!.name}”? Tej operacji nie można cofnąć.`)) return;
@@ -860,6 +876,7 @@ export default function App() {
                 if (!config) return;
                 try {
                   await api.updateFeature(config.slug, layerId, pk, { geometry }, config.crs);
+                  featureChanged(layerId, pk, "update");
                   setReloadToken((t) => t + 1);
                 } catch (e) {
                   setMessage((e as Error).message);
@@ -872,9 +889,9 @@ export default function App() {
             <AttributeTable config={config} layerId={tableLayerId} reloadToken={reloadToken}
               selectedId={selection && selection.layerId === tableLayerId && !selection.isNew ? String(selection.feature.id) : null}
               onOpen={(pk) => openFeature(tableLayerId, pk, !!config.layers[tableLayerId].geometry_type)}
-              onNew={!config.layers[tableLayerId].geometry_type && config.layers[tableLayerId].perms.insert
-                ? () => guard(() => setSelection({ layerId: tableLayerId, isNew: true, feature: { type: "Feature", id: "", geometry: null, properties: {} } }))
-                : null}
+              onNew={!config.layers[tableLayerId].perms.insert ? null
+                : config.layers[tableLayerId].geometry_type ? () => startDrawing(tableLayerId, {})
+                : () => guard(() => setSelection({ layerId: tableLayerId, isNew: true, feature: { type: "Feature", id: "", geometry: null, properties: {} } }))}
               onClose={() => setTableLayerId(null)} />
           )}
           {config && fetchTool && (
@@ -907,14 +924,20 @@ export default function App() {
               config={config} layerId={selection.layerId} feature={selection.feature} isNew={selection.isNew}
               cutFrom={selection.cutFrom}
               onSaved={(f) => {
+                featureChanged(selection.layerId, String(f.id), selection.isNew ? "insert" : "update");
                 // po zapisie nowego obiektu: następne kliknięcie wybiera obiekt, nie zaczyna rysowania
                 if (selection.isNew && tool === "draw") setTool("select");
                 if (selection.cutFrom) setMessage(`Dodano obiekt #${f.id} i wycięto go z #${selection.cutFrom}.`);
                 setSelection({ layerId: selection.layerId, feature: f, isNew: false });
                 setReloadToken((t) => t + 1);
               }}
-              onDeleted={() => { setSelection(null); setReloadToken((t) => t + 1); }}
+              onDeleted={() => {
+                featureChanged(selection.layerId, String(selection.feature.id), "delete");
+                setSelection(null); setReloadToken((t) => t + 1);
+              }}
               onClose={() => guard(() => { if (selection.isNew) setReloadToken((t) => t + 1); setSelection(null); })}
+              onCancel={() => { setReloadToken((t) => t + 1); setSelection(null); }}
+              zIndex={formZ} onFocus={raiseForm}
               onOpenRelated={openFeature}
               onNewRelated={(layerId, props) => startDrawing(layerId, props)}
             />

@@ -11,11 +11,12 @@ import zipfile
 from typing import Literal
 
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile, status
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .. import storage, uploads
 from ..config import get_settings
 from ..db import layer_conn, portal_conn
+from ..protection import MAX_UNLOCK_HOURS
 from ..qgsproject import get_project
 from ..security import CurrentUser, hash_password, require_admin, require_publisher
 
@@ -158,7 +159,48 @@ class LayerAccessIn(BaseModel):
 
 @router.get("/projects")
 async def list_projects_admin():
-    return await _all("SELECT * FROM portal.projects ORDER BY sort_order, title")
+    return await _all("""SELECT p.*, u.until AS unlock_until, u.by_login AS unlock_by, u.reason AS unlock_reason
+                           FROM portal.projects p
+                           LEFT JOIN portal.protection_unlock u ON u.project_id = p.id AND u.until > now()
+                          ORDER BY p.sort_order, p.title""")
+
+
+# ------------------------------------------------------------------------------ bezpiecznik obiektów chronionych
+
+class UnlockIn(BaseModel):
+    hours: float = Field(gt=0, le=MAX_UNLOCK_HOURS)
+    reason: str = Field(min_length=5, max_length=500)
+
+
+@router.post("/projects/{project_id}/unlock")
+async def unlock_protected(project_id: int, body: UnlockIn, admin: CurrentUser = Depends(require_admin)):
+    """Odblokowanie obiektów chronionych projektu (np. działek z importu GML) na określony czas — zmieniać je mogą
+    wtedy tylko administrator i zarządzający projektem (app/protection.py). Wpis w dzienniku odblokowań."""
+    if not await _exec("SELECT 1 FROM portal.projects WHERE id = %s", (project_id,)):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Nieznany projekt")
+    row = await _exec(
+        """INSERT INTO portal.protection_unlock (project_id, until, reason, by_login)
+           VALUES (%s, now() + make_interval(secs => %s), %s, %s)
+           ON CONFLICT (project_id) DO UPDATE SET until = EXCLUDED.until, reason = EXCLUDED.reason,
+                  by_login = EXCLUDED.by_login, created = now()
+           RETURNING until""", (project_id, body.hours * 3600, body.reason.strip(), admin.login))
+    await _exec("""INSERT INTO portal.protection_unlock_log (project_id, action, until, reason, by_login)
+                   VALUES (%s, 'unlock', %s, %s, %s)""", (project_id, row["until"], body.reason.strip(), admin.login))
+    return {"unlock_until": row["until"]}
+
+
+@router.delete("/projects/{project_id}/unlock")
+async def lock_protected(project_id: int, admin: CurrentUser = Depends(require_admin)):
+    await _exec("DELETE FROM portal.protection_unlock WHERE project_id = %s", (project_id,))
+    await _exec("INSERT INTO portal.protection_unlock_log (project_id, action, by_login) VALUES (%s, 'lock', %s)",
+                (project_id, admin.login))
+    return {"ok": True}
+
+
+@router.get("/projects/{project_id}/unlock-log")
+async def unlock_log(project_id: int):
+    return await _all("""SELECT action, until, reason, by_login, at FROM portal.protection_unlock_log
+                          WHERE project_id = %s ORDER BY at DESC LIMIT 50""", (project_id,))
 
 
 @router.get("/project-files")

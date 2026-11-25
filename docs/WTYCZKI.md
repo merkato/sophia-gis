@@ -67,6 +67,16 @@ przyciskiem w przeglądarce.
 - `settings` (opcjonalnie) — pola ustawień w panelu administratora:
   `[{"id": "projekt", "title": "Projekt mapy", "type": "project", "description": "…"}]`; typy `text`
   i `project` (lista projektów). Odczyt w API wtyczki: `await get_settings_for("<id>")` (`app.plugins`).
+- `protected` (opcjonalnie, Sophia ≥ 0.10) — **obiekty chronione** w tabelach wtyczki, np. dane z importu, które
+  zmienia tylko kolejny import:
+  `[{"table": "egib.v_dzialka", "field": "zrodlo", "values": ["EGiB"], "message": "Działka z importu GML — …"}]`.
+  Warstwa projektu z tej tabeli (albo widoku): obiekt z wartością pola z listy ma w API `protected` (komunikat),
+  WebUI pokazuje go tylko do odczytu (bez „Zapisz”/„Usuń”, poza warstwą edycyjną na mapie), a API odrzuca każdy
+  zapis istniejącego obiektu (atrybuty, geometria, usunięcie, podział, łączenie…). **Bezpiecznik**: administrator
+  odblokowuje obiekty chronione projektu na określony czas z podaniem powodu (Panel → Projekty → „Odblokuj obiekty
+  chronione…”, dziennik `portal.protection_unlock_log`); zmieniać je mogą wtedy tylko administrator i zarządzający
+  projektem, a rdzeń ustawia w transakcji `sophia.odblokowanie = 'on'` — wyzwalacz wtyczki może na tej podstawie
+  przyjąć zapis (`current_setting('sophia.odblokowanie', true) = 'on'`; przykład: `egib`, migracja 007).
 
 ### API
 Router montowany pod `/api/plugins/<id>`; wyłączona wtyczka zwraca 404 bez udziału jej kodu. Z rdzenia
@@ -128,7 +138,9 @@ host.showOnMap({
 Ten sam obiekt można podać w adresie: `?p=<slug>&obiekt=<schemat.tabela>:<klucz>` (link do wysłania).
 `host.startDraw({ project, table: "schemat.tabela", defaults: { pole: wartość }, geometry, label })` (Sophia ≥ 0.3) —
 przybliża mapę i włącza rysowanie w warstwie z tej tabeli; po narysowaniu formularz ma wypełnione `defaults`
-(warstwa bez geometrii: od razu formularz). Sophia ≥ 0.9.2: pola z `defaults`, których nie ma w formularzu
+(warstwa bez geometrii: od razu formularz). Sophia ≥ 0.10: `host.onFeatureChange((e) => …)` — zapis albo usunięcie
+obiektu na mapie (formularz, edycja geometrii): `{ project, layerId, table, pk, action: "insert" | "update" | "delete" }`;
+zwraca funkcję wyrejestrowania (np. odświeżenie otwartego okna wtyczki po dodaniu obiektu). Sophia ≥ 0.9.2: pola z `defaults`, których nie ma w formularzu
 (ukryte, klucz naturalny tabeli — np. identyfikator działki), też trafiają do zapisu nowego obiektu.
 Sophia ≥ 0.8.5: `raster: { url, extent: [minx, miny, maxx, maxy], crs: "EPSG:2180", label }` — obraz (PNG/WEBP/JPEG,
 np. GeoTIFF przetworzony przez wtyczkę) nad podkładami, pod warstwami projektu; mapa przybliża się do zasięgu,

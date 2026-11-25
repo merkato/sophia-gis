@@ -78,7 +78,8 @@ function SnapControl({ config, on, layers, onToggle, onLayers }: {
 
 /**
  * Pasek narzędzi pod paskiem tytułu (jak paski „Digitalizacja” i „Atrybuty” w QGIS).
- * Narzędzia edycji są zawsze widoczne; bez aktywnej warstwy edycyjnej są wyszarzone.
+ * Grupa edycji pojawia się tylko, gdy użytkownik może zmieniać jakąś warstwę; narzędzia — dopiero po wybraniu
+ * warstwy edycyjnej i tylko te, na które pozwalają prawa do niej (dodawanie / zmiana / usuwanie) i typ geometrii.
  */
 export function Toolbar({ config, editLayerId, onEditLayer, tool, onTool, canDelete, onDelete, onNewRecord, onUndo,
   sidebarOpen, onToggleSidebar, fetchToolId, onFetchTool, onOpenTable, onPrint, widgets, snap }: {
@@ -108,6 +109,8 @@ export function Toolbar({ config, editLayerId, onEditLayer, tool, onTool, canDel
   const DrawIcon = geom ? GEOMETRY_ICON[geom] : IconAddPolygon;
   const poly = geom === "Polygon";
   const lineOrPoly = geom === "Polygon" || geom === "Line";
+  // narzędzia edycji tylko po wybraniu warstwy edycyjnej i tylko te, na które pozwalają prawa i typ geometrii
+  const can = layer?.perms ?? { insert: false, update: false, delete: false };
 
   return (
     <div className="toolbar" role="toolbar" aria-label="Narzędzia">
@@ -132,52 +135,50 @@ export function Toolbar({ config, editLayerId, onEditLayer, tool, onTool, canDel
             <option value="">— bez edycji —</option>
             {editable.map((l) => <option key={l.id} value={l.id}>{l.name}{l.geometry_type ? "" : " (tabela)"}</option>)}
           </select>
-          <span className="sep" />
-          <ToolButton icon={IconSelect} label="Zaznacz obiekt (kliknięcie otwiera formularz)"
-            active={tool === "select"} disabled={!geom} onClick={() => onTool("select")} />
-          {layer && !geom ? (
-            <ToolButton icon={IconAddRecord} label="Dodaj rekord" disabled={!layer.perms.insert} onClick={onNewRecord} />
-          ) : (
-            <ToolButton icon={DrawIcon} label={geom ? DRAW_LABEL[geom] : "Dodaj obiekt"} active={tool === "draw"}
-              disabled={!geom || !layer?.perms.insert} onClick={() => onTool("draw")} />
-          )}
-          <ToolButton icon={IconVertex} label="Narzędzie wierzchołków: przeciągnij wierzchołek; klik na krawędzi dodaje; najedź na wierzchołek i Delete (albo Alt+klik) usuwa" active={tool === "modify"}
-            disabled={!geom || !layer?.perms.update} onClick={() => onTool("modify")} />
-          <ToolButton icon={IconMove} label="Przesuń obiekt (przeciągnij)" active={tool === "move"}
-            disabled={!geom || !layer?.perms.update} onClick={() => onTool("move")} />
-          <ToolButton icon={IconRotate} label="Obróć obiekt (przeciągnij wokół środka; Shift = co 15°)" active={tool === "rotate"}
-            disabled={!lineOrPoly || !layer?.perms.update} onClick={() => onTool("rotate")} />
-          <ToolButton icon={IconCopy} label="Kopiuj obiekt (przeciągnij kopię w nowe miejsce)" active={tool === "copy"}
-            disabled={!geom || !layer?.perms.insert} onClick={() => onTool("copy")} />
-          <ToolButton icon={IconReshape} label="Przekształć obiekt (linia przecinająca granicę dwa razy)" active={tool === "reshape"}
-            disabled={!lineOrPoly || !layer?.perms.update} onClick={() => onTool("reshape")} />
-          <ToolButton icon={IconSplit} label="Podziel obiekty (linią; zaznaczony obiekt albo wszystkie przecięte)"
-            active={tool === "split"} onClick={() => onTool("split")}
-            disabled={!(geom === "Polygon" || geom === "Line") || !layer?.perms.update || !layer?.perms.insert} />
-          <ToolButton icon={IconMerge} label="Połącz obiekty (kliknij kolejne; pierwszy zostaje)" active={tool === "merge"}
-            disabled={!geom || !layer?.perms.update || !layer?.perms.delete} onClick={() => onTool("merge")} />
-          <ToolButton icon={IconRing} label="Dodaj pierścień (dziura w poligonie)" active={tool === "ring"}
-            disabled={!poly || !layer?.perms.update} onClick={() => onTool("ring")} />
-          <ToolButton icon={IconFillRing} label="Wypełnij pierścień (dziura z nowym obiektem)" active={tool === "fillring"}
-            disabled={!poly || !layer?.perms.update || !layer?.perms.insert} onClick={() => onTool("fillring")} />
-          <ToolButton icon={IconDeleteRing} label="Usuń pierścień (kliknij w dziurę)" active={tool === "delring"}
-            disabled={!poly || !layer?.perms.update} onClick={() => onTool("delring")} />
-          <ToolButton icon={IconAddPart} label={layer && geom && !layer.multi
-            ? "Dodaj część — warstwa nie ma obiektów wieloczęściowych" : "Dodaj część do obiektu otwartego w formularzu"}
-            active={tool === "addpart"} disabled={!geom || !layer?.multi || !layer?.perms.update} onClick={() => onTool("addpart")} />
-          <ToolButton icon={IconDeletePart} label={layer && geom && !layer.multi
-            ? "Usuń część — warstwa nie ma obiektów wieloczęściowych" : "Usuń część obiektu wieloczęściowego (kliknij część)"}
-            active={tool === "delpart"} disabled={!geom || !layer?.multi || !layer?.perms.update} onClick={() => onTool("delpart")} />
-          {snap && geom && (
+          {layer && (
             <>
               <span className="sep" />
-              <SnapControl config={config} on={snap.on} layers={snap.layers} onToggle={snap.onToggle} onLayers={snap.onLayers} />
-              <span className="sep" />
+              {geom && <ToolButton icon={IconSelect} label="Zaznacz obiekt (kliknięcie otwiera formularz)"
+                active={tool === "select"} onClick={() => onTool("select")} />}
+              {can.insert && (geom
+                ? <ToolButton icon={DrawIcon} label={DRAW_LABEL[geom]} active={tool === "draw"} onClick={() => onTool("draw")} />
+                : <ToolButton icon={IconAddRecord} label="Dodaj rekord" onClick={onNewRecord} />)}
+              {geom && can.update && <ToolButton icon={IconVertex} label="Narzędzie wierzchołków: przeciągnij wierzchołek; klik na krawędzi dodaje; najedź na wierzchołek i Delete (albo Alt+klik) usuwa"
+                active={tool === "modify"} onClick={() => onTool("modify")} />}
+              {geom && can.update && <ToolButton icon={IconMove} label="Przesuń obiekt (przeciągnij)" active={tool === "move"}
+                onClick={() => onTool("move")} />}
+              {lineOrPoly && can.update && <ToolButton icon={IconRotate} label="Obróć obiekt (przeciągnij wokół środka; Shift = co 15°)"
+                active={tool === "rotate"} onClick={() => onTool("rotate")} />}
+              {geom && can.insert && <ToolButton icon={IconCopy} label="Kopiuj obiekt (przeciągnij kopię w nowe miejsce)"
+                active={tool === "copy"} onClick={() => onTool("copy")} />}
+              {lineOrPoly && can.update && <ToolButton icon={IconReshape} label="Przekształć obiekt (linia przecinająca granicę dwa razy)"
+                active={tool === "reshape"} onClick={() => onTool("reshape")} />}
+              {lineOrPoly && can.update && can.insert && <ToolButton icon={IconSplit}
+                label="Podziel obiekty (linią; zaznaczony obiekt albo wszystkie przecięte)" active={tool === "split"}
+                onClick={() => onTool("split")} />}
+              {geom && can.update && can.delete && <ToolButton icon={IconMerge} label="Połącz obiekty (kliknij kolejne; pierwszy zostaje)"
+                active={tool === "merge"} onClick={() => onTool("merge")} />}
+              {poly && can.update && <ToolButton icon={IconRing} label="Dodaj pierścień (dziura w poligonie)" active={tool === "ring"}
+                onClick={() => onTool("ring")} />}
+              {poly && can.update && can.insert && <ToolButton icon={IconFillRing} label="Wypełnij pierścień (dziura z nowym obiektem)"
+                active={tool === "fillring"} onClick={() => onTool("fillring")} />}
+              {poly && can.update && <ToolButton icon={IconDeleteRing} label="Usuń pierścień (kliknij w dziurę)" active={tool === "delring"}
+                onClick={() => onTool("delring")} />}
+              {geom && layer.multi && can.update && <ToolButton icon={IconAddPart} label="Dodaj część do obiektu otwartego w formularzu"
+                active={tool === "addpart"} onClick={() => onTool("addpart")} />}
+              {geom && layer.multi && can.update && <ToolButton icon={IconDeletePart} label="Usuń część obiektu wieloczęściowego (kliknij część)"
+                active={tool === "delpart"} onClick={() => onTool("delpart")} />}
+              {snap && geom && (can.insert || can.update) && (
+                <>
+                  <span className="sep" />
+                  <SnapControl config={config} on={snap.on} layers={snap.layers} onToggle={snap.onToggle} onLayers={snap.onLayers} />
+                  <span className="sep" />
+                </>
+              )}
+              {can.delete && <ToolButton icon={IconDelete} label="Usuń zaznaczony obiekt" disabled={!canDelete} onClick={onDelete} />}
+              <ToolButton icon={IconTable} label={`Otwórz tabelę atrybutów: ${layer.name}`} onClick={onOpenTable} />
             </>
           )}
-          <ToolButton icon={IconDelete} label="Usuń zaznaczony obiekt" disabled={!canDelete} onClick={onDelete} />
-          <ToolButton icon={IconTable} label={layer ? `Otwórz tabelę atrybutów: ${layer.name}` : "Otwórz tabelę atrybutów"}
-            disabled={!layer} onClick={onOpenTable} />
           <ToolButton icon={IconUndo} label="Cofnij ostatnią operację (Ctrl+Z)" disabled={!onUndo} onClick={() => onUndo?.()} />
         </>
       )}

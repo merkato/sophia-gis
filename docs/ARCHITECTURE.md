@@ -135,8 +135,9 @@ zostaje. Wydruk widoku mapy zawiera tylko warstwy włączone w WebUI, na razie b
 
 **Etap 3 — eksploatacja**
 - [x] Cache kafli rastrów (nginx przed QGIS Server, kafle WMS na stałej siatce)
-- [ ] Wspólna biblioteka rastrów (`data/rasters/<seria>/`) dla wielu projektów + narzędzie
-      do synchronizacji (wgrywa tylko nowe/zmienione arkusze, przebudowuje VRT, czyści cache kafli)
+- [x] Wspólna biblioteka rastrów (`data/rasters/<seria>/`) dla wielu projektów + narzędzie
+      do synchronizacji: Fia → „Wysyłka rastrów” (tylko nowe/zmienione pliki, odświeżenie projektów
+      bez restartu QGIS Server; Sophia 0.10), zapasowo `sync-rasters.ps1`
 - [x] Katalog podkładów (WMTS/XYZ/warstwa Sophii) z edytorem GetCapabilities; panel administratora
       (użytkownicy, grupy, projekty publiczne / z uprawnieniami)
 - [ ] Podkład z katalogu w wydruku widoku mapy (GetPrint: zewnętrzna warstwa WMTS w żądaniu)

@@ -284,6 +284,18 @@ function ProjectsTab({ run, onChanged }: { run: Run; onChanged: () => void }) {
                   <button onClick={() => { setAccess(null); setStorageOf(p); }}
                     title="Zbiory plików projektu (pola „Załącznik”, wtyczki) i limity wielkości plików">Przechowywanie plików…</button>
                   <button onClick={() => run(async () => { setStorageOf(null); setAccess({ project: p, data: await adminApi.projectAccess(p.id) }); })}>Grupy i zakres…</button>
+                  {p.unlock_until
+                    ? <button className="danger" title={`Odblokował(a): ${p.unlock_by ?? "—"}. Powód: ${p.unlock_reason ?? "—"}`}
+                        onClick={() => run(() => adminApi.lockProtected(p.id)).then(load)}>
+                        🔓 do {new Date(p.unlock_until).toLocaleTimeString("pl-PL", { hour: "2-digit", minute: "2-digit" })} — zablokuj</button>
+                    : <button title="Bezpiecznik: obiekty chronione (np. działki i użytki z importu GML) są tylko do odczytu; odblokowanie na określony czas — zmieniać je mogą wtedy administrator i zarządzający projektem"
+                        onClick={() => {
+                          const reason = prompt(`Odblokować obiekty chronione w „${p.title}”?\nPowód (zapisywany w dzienniku):`);
+                          if (!reason || reason.trim().length < 5) return;
+                          const hours = Number(prompt("Na ile godzin (1–24)?", "1"));
+                          if (!(hours > 0 && hours <= 24)) return;
+                          run(() => adminApi.unlockProtected(p.id, hours, reason.trim())).then(load);
+                        }}>Odblokuj obiekty chronione…</button>}
                   <button className="danger" title="Usuwa projekt z menu; plik zostaje na serwerze"
                     onClick={() => confirm(`Usunąć „${p.title}” z portalu? Plik projektu zostanie na serwerze.`) && run(() => adminApi.deleteProject(p.id)).then(() => { load(); onChanged(); })}>Usuń</button>
                 </td>

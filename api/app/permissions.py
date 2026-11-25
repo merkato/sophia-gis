@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import HTTPException, status
@@ -41,6 +42,19 @@ class ProjectContext:
     scope_codes: list[str] | None = None
     can_photos: bool = False            # dodawanie zdjęć (z grup w projekcie; domyślnie włączone)
     can_files: bool = False             # dodawanie dokumentów
+    # bezpiecznik obiektów chronionych (app/protection.py): odblokowanie projektu do tej chwili
+    unlock_until: datetime | None = None
+    unlock_by: str | None = None
+    unlock_reason: str | None = None
+
+    @property
+    def unlocked(self) -> bool:
+        return self.unlock_until is not None and self.unlock_until > datetime.now(timezone.utc)
+
+    @property
+    def can_edit_protected(self) -> bool:
+        """Zmiana obiektów chronionych: tylko w czasie odblokowania, administrator albo zarządzający projektem."""
+        return self.unlocked and bool(self.user) and (self.user.is_admin or self.role == "manager")
 
     def layer(self, layer_id: str) -> LayerDef:
         lyr = self.project.layers.get(layer_id)
@@ -123,6 +137,11 @@ async def load_project_context(slug: str, user: CurrentUser | None) -> ProjectCo
         if handled:
             scope_codes = codes
 
+    async with portal_conn() as conn:
+        unlock = await (await conn.execute(
+            "SELECT until, by_login, reason FROM portal.protection_unlock WHERE project_id = %s AND until > now()",
+            (proj["id"],))).fetchone()
+
     if role is None and not proj["is_public"]:
         raise HTTPException(
             status.HTTP_401_UNAUTHORIZED if user is None else status.HTTP_403_FORBIDDEN,
@@ -137,5 +156,7 @@ async def load_project_context(slug: str, user: CurrentUser | None) -> ProjectCo
         id=proj["id"], slug=proj["slug"], title=proj["title"], path=path,
         project=get_project(path), role=role, user=user, _layer_overrides=overrides,
         scope_codes=scope_codes, can_photos=can_photos, can_files=can_files,
+        unlock_until=unlock["until"] if unlock else None, unlock_by=unlock["by_login"] if unlock else None,
+        unlock_reason=unlock["reason"] if unlock else None,
     )
 

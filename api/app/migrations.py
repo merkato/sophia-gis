@@ -102,6 +102,25 @@ MIGRATIONS: list[tuple[str, str]] = [
             PRIMARY KEY (project_id, set_id)
         );
     """),
+    ("protection_unlock", """
+        -- Bezpiecznik obiektów chronionych (app/protection.py): odblokowanie projektu na określony czas
+        CREATE TABLE IF NOT EXISTS portal.protection_unlock (
+            project_id  int PRIMARY KEY REFERENCES portal.projects(id) ON DELETE CASCADE,
+            until       timestamptz NOT NULL,
+            reason      text NOT NULL,
+            by_login    text NOT NULL,
+            created     timestamptz NOT NULL DEFAULT now()
+        );
+        CREATE TABLE IF NOT EXISTS portal.protection_unlock_log (
+            id          bigserial PRIMARY KEY,
+            project_id  int NOT NULL,
+            action      text NOT NULL CHECK (action IN ('unlock', 'lock')),
+            until       timestamptz,
+            reason      text,
+            by_login    text NOT NULL,
+            at          timestamptz NOT NULL DEFAULT now()
+        );
+    """),
 ]
 
 

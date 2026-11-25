@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import os
 import re
+import time
 import unicodedata
 
 from qgis.core import QgsLayerTreeGroup, QgsProject, QgsRasterLayer, QgsSettings, QgsVectorLayer
@@ -39,6 +40,7 @@ from qgis.PyQt.QtWidgets import (
 )
 
 from . import basemap_sources, checks, credentials, photosync, publish, rasters
+from .raster_upload_tab import RasterUploadTab
 from .scope_tab import ScopeTab
 from .tools import ToolsTab
 
@@ -87,6 +89,11 @@ class FiaDialog(QDialog):
         self.tabs = QTabWidget()
         self.tabs.addTab(self._build_layers_tab(), "Warstwy")
         self.tabs.addTab(self._build_rasters_tab(), "Rastry")
+        self._token_cache: tuple[str, str, str, float] | None = None
+        self.upload_tab = RasterUploadTab(
+            iface, server=lambda: (self.url.text().strip(), self.verify.isChecked()), token=self._token,
+            slug=lambda: self.cfg.get("slug") or self.slug.text())
+        self.tabs.addTab(self.upload_tab, "Wysyłka rastrów")
         self.tabs.addTab(self._build_reports_tab(), "Raporty")
         self.tabs.addTab(self._build_files_tab(), "Pliki")
         self.tools_tab = ToolsTab(self.cfg.get("tools", []))
@@ -238,8 +245,9 @@ class FiaDialog(QDialog):
             self.setCursor(Qt.CursorShape.WaitCursor)
             rasters.build_vrt(folder, vrt_path, name)
             self._mark_group(name)
+            self.upload_tab.refresh()
             QMessageBox.information(self, "Fia", f"Utworzono {vrt_path}.\n"
-                                    "Skopiuj cały katalog (GeoTIFF + VRT + .ovr) do data/rasters na serwerze.")
+                                    "Na serwer wyślesz go w zakładce „Wysyłka rastrów” (GeoTIFF + VRT + .ovr).")
         except Exception as e:  # noqa: BLE001
             QMessageBox.critical(self, "Fia", str(e))
         finally:
@@ -483,6 +491,8 @@ class FiaDialog(QDialog):
         self.slug = QLineEdit(self.cfg.get("slug") or slugify(title))
         btn = QPushButton("Zapisz projekt i opublikuj")
         btn.clicked.connect(self.on_publish)
+        self.send_rasters = QCheckBox("Po publikacji wyślij zmienione rastry (zakładka „Wysyłka rastrów”)")
+        self.send_rasters.setChecked(s.value("fia/send_rasters", False, type=bool))
         sync_btn = QPushButton("Pobierz zdjęcia z serwera do folderu projektu")
         sync_btn.clicked.connect(self.on_sync_photos)
 
@@ -494,9 +504,11 @@ class FiaDialog(QDialog):
         form.addRow("", self.verify)
         form.addRow("Tytuł projektu (menu)", self.title)
         form.addRow("Identyfikator (URL)", self.slug)
+        form.addRow("", self.send_rasters)
         form.addRow("", btn)
-        note = QLabel("Publikacja (administrator albo autor projektów) wysyła tylko plik projektu i konfigurację; "
-                      "rastry biblioteki (data/rasters) kopiuj na serwer osobno.")
+        note = QLabel("Publikacja (administrator albo autor projektów) wysyła plik projektu i konfigurację; "
+                      "rastry z plików — z zaznaczoną opcją powyżej albo w zakładce „Wysyłka rastrów” "
+                      "(biblioteka data/rasters — tylko administrator).")
         note.setWordWrap(True)
         form.addRow(note)
         form.addRow("", sync_btn)
@@ -562,6 +574,9 @@ class FiaDialog(QDialog):
     def _token(self) -> str | None:
         """Loguje do Sophii: hasło z pola albo z menedżera uwierzytelniania QGIS. Rzuca publish.ApiError."""
         url, login, password = self.url.text().strip(), self.login.text().strip(), self.password.text()
+        c = self._token_cache                  # token na czas pracy okna (publikacja + rastry bez ponownego hasła)
+        if c and not password and c[0] == url and c[1] == login and time.monotonic() - c[3] < 30 * 60:
+            return c[2]
         typed = bool(password)
         if not typed:
             saved = credentials.load()
@@ -583,6 +598,7 @@ class FiaDialog(QDialog):
         self.password.clear()
         if credentials.saved_id():
             self.password.setPlaceholderText("zapisane w menedżerze uwierzytelniania QGIS")
+        self._token_cache = (url, self.login.text().strip(), token, time.monotonic())
         return token
 
     def on_sync_photos(self):
@@ -652,6 +668,10 @@ class FiaDialog(QDialog):
             return
         finally:
             self.unsetCursor()
+        QgsSettings().setValue("fia/send_rasters", self.send_rasters.isChecked())
+        if self.send_rasters.isChecked():
+            # po .qgz: dotychczasowe rastry działają do podmiany, a zatwierdzenie wysyłki odświeża projekt
+            self.upload_tab.on_send(quiet_when_nothing=True)
         QMessageBox.information(
             self, "Fia",
             f"Opublikowano jako {res.get('file_name')}.\n"

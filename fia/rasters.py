@@ -56,6 +56,43 @@ def overview_settings(ds) -> tuple[str, str]:
     return "DEFLATE", "AVERAGE"
 
 
+def build_overviews_ds(ds, levels=(2, 4, 8, 16, 32, 64, 128)) -> None:
+    """Piramidy zewnętrzne (.ovr) z kompresją dobraną do kanałów (overview_settings)."""
+    from osgeo import gdal
+
+    compress, resampling = overview_settings(ds)
+    options = {"COMPRESS_OVERVIEW": compress, "INTERLEAVE_OVERVIEW": "PIXEL",
+               "PHOTOMETRIC_OVERVIEW": "YCBCR" if compress == "JPEG" else None,
+               "JPEG_QUALITY_OVERVIEW": "85" if compress == "JPEG" else None,
+               "WEBP_LEVEL_OVERVIEW": "85" if compress == "WEBP" else None,
+               "PREDICTOR_OVERVIEW": "2" if compress == "DEFLATE" else None}
+    try:
+        for k, v in options.items():
+            gdal.SetConfigOption(k, v)
+        if ds.BuildOverviews(resampling, list(levels)) != 0:
+            raise RuntimeError(f"Budowa piramid ({compress}) nie powiodła się: {gdal.GetLastErrorMsg()}")
+    finally:
+        for k in options:
+            gdal.SetConfigOption(k, None)   # nie zostawiamy ustawień dla innych operacji QGIS
+
+
+def build_overviews(path: str) -> str:
+    """Piramidy dla pliku (GeoTIFF albo VRT) — zewnętrzny <plik>.ovr; zwraca jego ścieżkę."""
+    from osgeo import gdal
+
+    ds = gdal.Open(path, gdal.GA_ReadOnly)   # tylko do odczytu -> GDAL zapisuje piramidy obok jako .ovr
+    if ds is None:
+        raise RuntimeError(f"Nie można otworzyć {path}")
+    levels, size = [], max(ds.RasterXSize, ds.RasterYSize)
+    f = 2
+    while size / f >= 256:
+        levels.append(f)
+        f *= 2
+    build_overviews_ds(ds, levels or [2])
+    ds = None
+    return path + ".ovr"
+
+
 def build_vrt(folder: str, vrt_path: str, group_name: str, build_overviews: bool = True) -> QgsRasterLayer:
     """Strategia 2: VRT z wszystkich GeoTIFF w katalogu, dodany jako warstwa w grupie."""
     from osgeo import gdal  # dostępne w każdej instalacji QGIS
@@ -70,20 +107,7 @@ def build_vrt(folder: str, vrt_path: str, group_name: str, build_overviews: bool
     if vrt is None:
         raise RuntimeError("gdal.BuildVRT nie powiodło się — sprawdź, czy pliki mają ten sam układ i liczbę kanałów")
     if build_overviews:
-        compress, resampling = overview_settings(vrt)
-        options = {"COMPRESS_OVERVIEW": compress, "INTERLEAVE_OVERVIEW": "PIXEL",
-                   "PHOTOMETRIC_OVERVIEW": "YCBCR" if compress == "JPEG" else None,
-                   "JPEG_QUALITY_OVERVIEW": "85" if compress == "JPEG" else None,
-                   "WEBP_LEVEL_OVERVIEW": "85" if compress == "WEBP" else None,
-                   "PREDICTOR_OVERVIEW": "2" if compress == "DEFLATE" else None}
-        try:
-            for k, v in options.items():
-                gdal.SetConfigOption(k, v)
-            if vrt.BuildOverviews(resampling, [2, 4, 8, 16, 32, 64, 128]) != 0:
-                raise RuntimeError(f"Budowa piramid ({compress}) nie powiodła się: {gdal.GetLastErrorMsg()}")
-        finally:
-            for k in options:
-                gdal.SetConfigOption(k, None)   # nie zostawiamy ustawień dla innych operacji QGIS
+        build_overviews_ds(vrt)
     vrt = None  # zapis na dysk
 
     prj = QgsProject.instance()

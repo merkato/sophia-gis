@@ -201,6 +201,10 @@ export const adminApi = {
   updateProject: (id: number, p: Omit<AdminProject, "id">) => request(`/api/admin/projects/${id}`, json("PUT", p)),
   deleteProject: (id: number) => request<void>(`/api/admin/projects/${id}`, { method: "DELETE" }),
   projectAccess: (id: number) => request<ProjectAccess>(`/api/admin/projects/${id}/access`),
+  unlockProtected: (id: number, hours: number, reason: string) => request<{ unlock_until: string }>(
+    `/api/admin/projects/${id}/unlock`, { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ hours, reason }) }),
+  lockProtected: (id: number) => request<void>(`/api/admin/projects/${id}/unlock`, { method: "DELETE" }),
   setProjectAccess: (id: number, a: ProjectAccess) => request(`/api/admin/projects/${id}/access`, json("PUT", a)),
   projectScope: (id: number) => request<ProjectScopeInfo>(`/api/admin/projects/${id}/scope`),
   projectStorage: (id: number) => request<ProjectStorage>(`/api/admin/projects/${id}/storage`),
