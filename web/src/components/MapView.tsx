@@ -81,6 +81,7 @@ interface Props {
   onFetchClick?: (coordinate: number[]) => void;         // narzędzie pobierania (ULDK…)
   preview?: GeoJSONFeature["geometry"] | null;           // obrys pobranego obiektu przed dodaniem
   compare?: MapFocus["compare"] | null;                  // porównanie geometrii z wtyczki (EPSG:4326)
+  highlight?: { geometry: GeoJSONFeature["geometry"]; label?: string } | null;   // trwałe podświetlenie z wtyczki (EPSG:4326)
   snapOn?: boolean;                                      // przyciąganie włączone (domyślnie tak)
   snapLayers?: string[];                                 // warstwy odniesienia (id) — oprócz warstwy edycyjnej
   snapTolerance?: number;                                // tolerancja w pikselach (domyślnie 12)
@@ -101,6 +102,19 @@ const previewStyle = new Style({
   fill: new Fill({ color: "rgba(28,126,214,0.12)" }),
   image: new Circle({ radius: 7, fill: new Fill({ color: "#1c7ed6" }), stroke: new Stroke({ color: "#fff", width: 2 }) }),
 });
+
+// podświetlenie z wtyczki: grube żółte obramowanie z białą obwódką (czytelne na kolorowych stylach warstw)
+const highlightStyle = (f: FeatureLike) => [
+  new Style({ stroke: new Stroke({ color: "rgba(255,255,255,0.95)", width: 7 }),
+    image: new Circle({ radius: 10, stroke: new Stroke({ color: "rgba(255,255,255,0.95)", width: 6 }) }) }),
+  new Style({
+    stroke: new Stroke({ color: "#f59f00", width: 3.5 }),
+    fill: new Fill({ color: "rgba(245,159,0,0.12)" }),
+    image: new Circle({ radius: 10, stroke: new Stroke({ color: "#f59f00", width: 3 }) }),
+    text: f.get("label") ? new Text({ text: f.get("label") as string, font: "bold 12px sans-serif", overflow: true,
+      fill: new Fill({ color: "#7a4b00" }), stroke: new Stroke({ color: "#fff", width: 3 }) }) : undefined,
+  }),
+];
 
 const frameStyle = new Style({
   stroke: new Stroke({ color: "#1c7ed6", width: 2.5 }),
@@ -160,6 +174,7 @@ export function MapView(props: Props) {
   const editSourceRef = useRef(new VectorSource<Feature<Geometry>>());
   const previewSourceRef = useRef(new VectorSource<Feature<Geometry>>());
   const compareSourceRef = useRef(new VectorSource<Feature<Geometry>>());
+  const highlightSourceRef = useRef(new VectorSource<Feature<Geometry>>());
   const snapRefSourceRef = useRef(new VectorSource<Feature<Geometry>>());   // obiekty warstw odniesienia (niewidoczne)
   const frameSourceRef = useRef(new VectorSource<Feature<Geometry>>());
   const selectRef = useRef<Select | null>(null);
@@ -204,6 +219,7 @@ export function MapView(props: Props) {
           style: (f) => (markedRef.current.has(String(f.getId())) ? markStyle : editStyle),
         }),
         new VectorLayer({ source: compareSourceRef.current, style: compareStyle, declutter: true }),
+        new VectorLayer({ source: highlightSourceRef.current, style: highlightStyle }),
         new VectorLayer({ source: previewSourceRef.current, style: previewStyle }),
         new VectorLayer({ source: frameSourceRef.current, style: frameStyle }),
       ],
@@ -365,6 +381,26 @@ export function MapView(props: Props) {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [preview]);
+
+  // --- trwałe podświetlenie z wtyczki: przesunięcie mapy tylko, gdy obiekt jest poza widokiem (bez zmiany skali)
+  const { highlight } = props;
+  useEffect(() => {
+    const src = highlightSourceRef.current;
+    src.clear();
+    if (!highlight?.geometry) return;
+    const f = format.readFeature({ type: "Feature", geometry: highlight.geometry, properties: { label: highlight.label } },
+      { dataProjection: "EPSG:4326", featureProjection: config.crs }) as Feature<Geometry>;
+    src.addFeature(f);
+    const map = mapRef.current;
+    const ext = f.getGeometry()?.getExtent();
+    if (map && ext) {
+      const view = map.getView();
+      const visible = view.calculateExtent(map.getSize());
+      const inside = ext[0] >= visible[0] && ext[1] >= visible[1] && ext[2] <= visible[2] && ext[3] <= visible[3];
+      if (!inside) view.fit(ext, { padding: [80, 80, 80, 80], maxZoom: Math.max(view.getZoom() ?? 0, 12), duration: 250 });
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [highlight, config.crs]);
 
   // --- porównanie geometrii (z wtyczki): historyczne pod aktualnymi, żeby obrys aktualnych był czytelny
   const { compare } = props;

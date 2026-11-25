@@ -49,7 +49,16 @@ export interface SophiaHost {
   /** Zapis / usunięcie obiektu na mapie (formularz, edycja geometrii) — np. odświeżenie okna wtyczki.
    *  Zwraca funkcję wyrejestrowania. Sophia ≥ 0.10. */
   onFeatureChange: (fn: (e: FeatureChange) => void) => () => void;
+  /** Trwałe podświetlenie obiektu na mapie (np. zaznaczony element w oknie wtyczki): geometria w EPSG:4326,
+   *  bez otwierania formularza; mapa przesuwa się tylko, gdy obiekt jest poza widokiem. Zostaje do następnego
+   *  wywołania, `null` albo zmiany projektu. Sophia ≥ 0.10.8. */
+  highlight: (h: MapHighlight | null) => void;
 }
+
+export interface MapHighlight { geometry: { type: string; coordinates: unknown }; label?: string; project?: string }
+let highlightHandler: ((h: MapHighlight | null) => void) | null = null;
+/** App rejestruje tu obsługę `host.highlight`. */
+export function setHighlightHandler(fn: ((h: MapHighlight | null) => void) | null) { highlightHandler = fn; }
 
 export interface FeatureChange {
   project: string;
@@ -213,6 +222,7 @@ export function loadPlugin(p: PluginInfo, user: User, notify: (m: string) => voi
       currentProject: () => (projectGetter ? projectGetter() : null),
       currentExtent: () => (extentGetter ? extentGetter() : null),
       onFeatureChange: (fn) => { featureListeners.add(fn); return () => { featureListeners.delete(fn); }; },
+      highlight: (hl) => { if (highlightHandler) highlightHandler(hl); },
     };
     m = (import(/* @vite-ignore */ p.web!) as Promise<PluginModule>)
       .then((mod) => {

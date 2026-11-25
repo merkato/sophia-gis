@@ -143,7 +143,9 @@ Ten sam obiekt można podać w adresie: `?p=<slug>&obiekt=<schemat.tabela>:<kluc
 przybliża mapę i włącza rysowanie w warstwie z tej tabeli; po narysowaniu formularz ma wypełnione `defaults`
 (warstwa bez geometrii: od razu formularz). Sophia ≥ 0.10: `host.onFeatureChange((e) => …)` — zapis albo usunięcie
 obiektu na mapie (formularz, edycja geometrii): `{ project, layerId, table, pk, action: "insert" | "update" | "delete" }`;
-zwraca funkcję wyrejestrowania (np. odświeżenie otwartego okna wtyczki po dodaniu obiektu). Sophia ≥ 0.9.2: pola z `defaults`, których nie ma w formularzu
+zwraca funkcję wyrejestrowania (np. odświeżenie otwartego okna wtyczki po dodaniu obiektu). Sophia ≥ 0.10.8: `host.highlight({ geometry, label, project })` — trwałe podświetlenie obiektu (GeoJSON
+w EPSG:4326, np. zaznaczony element okna wtyczki) bez otwierania formularza; mapa przesuwa się tylko, gdy obiekt jest
+poza widokiem; zostaje do kolejnego wywołania, `host.highlight(null)` albo zmiany projektu (`project` inny niż otwarty — pomijane). Sophia ≥ 0.9.2: pola z `defaults`, których nie ma w formularzu
 (ukryte, klucz naturalny tabeli — np. identyfikator działki), też trafiają do zapisu nowego obiektu.
 Sophia ≥ 0.8.5: `raster: { url, extent: [minx, miny, maxx, maxy], crs: "EPSG:2180", label }` — obraz (PNG/WEBP/JPEG,
 np. GeoTIFF przetworzony przez wtyczkę) nad podkładami, pod warstwami projektu; mapa przybliża się do zasięgu,

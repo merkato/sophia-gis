@@ -14,7 +14,7 @@ import { createEmpty, extend as extendExtent, isEmpty as isEmptyExtent } from "o
 import { Toolbar } from "./components/Toolbar";
 import { FetchCard } from "./components/FetchCard";
 import { AdminPanel } from "./components/AdminPanel";
-import { emitFeatureChange, setCurrentExtentGetter, setCurrentProjectGetter, setMapFocusHandler, setWindowHandler, takeMapFocus, type FeatureChange, type MapFocus, type PluginInfo, preloadPlugins, toolbarWidgets, usePluginsVersion } from "./plugins";
+import { emitFeatureChange, setCurrentExtentGetter, setCurrentProjectGetter, setHighlightHandler, setMapFocusHandler, setWindowHandler, takeMapFocus, type FeatureChange, type MapFocus, type PluginInfo, preloadPlugins, toolbarWidgets, usePluginsVersion } from "./plugins";
 import { TopMenu } from "./components/TopMenu";
 import { PluginWindows, type OpenWindow } from "./components/PluginWindows";
 import { BasemapSwitcher, initialBasemapChoice, saveBasemapChoice } from "./components/BasemapSwitcher";
@@ -157,6 +157,8 @@ export default function App() {
     return o && i > 0 ? { project: q.get("p") ?? undefined, targets: [{ table: o.slice(0, i), pk: o.slice(i + 1) }] } : null;
   });
   const [focusGeom, setFocusGeom] = useState<GeoJSONFeature["geometry"] | null>(null);
+  // trwałe podświetlenie z wtyczki (host.highlight, EPSG:4326) — do zmiany, wyczyszczenia albo zmiany projektu
+  const [pluginHighlight, setPluginHighlight] = useState<{ geometry: GeoJSONFeature["geometry"]; label?: string } | null>(null);
   // obraz z pliku pokazany przez wtyczkę (host.showOnMap({ raster })) — do zmiany projektu albo usunięcia w panelu
   const [fileRaster, setFileRaster] = useState<(NonNullable<MapFocus["raster"]> & { visible: boolean }) | null>(null);
   // przyciąganie: wybór użytkownika dla projektu (przeglądarka); brak wyboru = ustawienia projektu QGIS
@@ -243,6 +245,13 @@ export default function App() {
   useEffect(() => { if (!user) setOpenWindows([]); }, [user]);
   // wtyczki pytają o projekt otwarty w mapie (np. wyszukiwarka)
   useEffect(() => { setCurrentProjectGetter(() => slug); return () => setCurrentProjectGetter(null); }, [slug]);
+  useEffect(() => {
+    setHighlightHandler((hl) => {
+      if (hl && hl.project && hl.project !== slug) return;     // obiekt z innego projektu — nie podświetlamy
+      setPluginHighlight(hl ? { geometry: hl.geometry as GeoJSONFeature["geometry"], label: hl.label } : null);
+    });
+    return () => setHighlightHandler(null);
+  }, [slug]);
   // …i o zasięg bieżącego widoku mapy (np. eksport „bieżący widok”)
   useEffect(() => {
     setCurrentExtentGetter(() => {
@@ -291,6 +300,7 @@ export default function App() {
     history.replaceState(null, "", `?p=${encodeURIComponent(slug)}${location.search.match(/[?&](obiekt=[^&]*)/)?.[0].replace("?", "&") ?? ""}`);
     setSelection(null);
     setFocusGeom(null);
+    setPluginHighlight(null);
     setFileRaster(null);
     setCompare(null);
     setEditLayerId(null);
@@ -858,6 +868,7 @@ export default function App() {
               basemaps={basemaps} baseId={baseId} overlayIds={overlayIds}
               fileRaster={fileRaster?.visible ? fileRaster : null}
               compare={compare?.visible ? compare.items : null}
+              highlight={pluginHighlight}
               snapOn={snapState.on} snapLayers={snapState.layers}
               snapTolerance={config?.snapping?.tolerance_px} snapSegment={config?.snapping?.segment}
               onIdentify={openFeature}

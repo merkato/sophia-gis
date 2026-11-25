@@ -135,6 +135,7 @@ Do zrobienia: etap 8 na serwerze po wdrożeniu (wymaga montowania `data/rasters`
 - ✔️ Pasek: narzędzia edycji dopiero po wybraniu warstwy edycyjnej i tylko te, na które pozwalają prawa i typ geometrii.
 - ✔️ Zakładki formularza wyglądają jak zakładki (nie jak linki); sama „Atrybuty” — bez paska zakładek.
 - ✔️ `host.onFeatureChange` — wtyczki dostają zapis / usunięcie obiektu (odświeżenie okien).
+- ✔️ 0.10.8: `host.highlight` — trwałe podświetlenie obiektu przez wtyczkę (zaznaczony liść drzewa decyzji), bez formularza.
 - ✔️ 0.10.1: „Anuluj” nowego obiektu zdejmuje szkic, etykietę pomiaru i podpowiedź rysowania.
 - ✔️ 0.10.4: prawa grup do warstw w panelu (Projekty → Grupy i zakres… → „Prawa do warstw”: według roli / własne:
   dodawanie, zmiana, usuwanie); łączenie z kilku grup — ustawienie warstwy zastępuje rolę tej grupy, suma z grup.
