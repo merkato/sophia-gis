@@ -96,7 +96,7 @@ services:
       DKIM_SELECTOR: ${MAIL_DKIM_SELECTOR:-sophia}
       INBOUND_DEBUGGING: "0"
     volumes:
-      - ./data/mail-dkim:/etc/opendkim/keys
+      - ./data/mail-dkim:/var/lib/rspamd/dkim      # klucz DKIM (backend rspamd) — trwały; DNS: data/mail-dkim/*.txt
 
   proxy:
     image: caddy:2.8
