@@ -18,6 +18,7 @@ from psycopg import sql
 from pydantic import BaseModel
 
 from ..db import layer_conn, portal_conn
+from ..dberrors import komunikat_bazy
 from ..permissions import ProjectContext, load_project_context
 from ..qgsproject import LayerDef
 from ..scope import T, col
@@ -141,7 +142,7 @@ async def undo(slug: str, body: UndoIn, user: CurrentUser = Depends(require_user
         await _revert(ctx, rows, layers, conninfos.pop(), conflict, done)
     except psycopg.errors.IntegrityError as e:
         raise HTTPException(status.HTTP_409_CONFLICT,
-                            f"Nie można cofnąć: {e.diag.message_primary} (np. obiekt ma już rekordy powiązane)") from e
+                            f"Nie można cofnąć: {await komunikat_bazy(e)}") from e
 
     async with portal_conn() as pconn:
         await pconn.execute("UPDATE portal.audit_log SET undone_at = now() WHERE op = %s::uuid", (body.op,))

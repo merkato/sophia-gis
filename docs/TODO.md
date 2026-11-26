@@ -128,13 +128,16 @@ Do zrobienia: etap 8 na serwerze po wdrożeniu (wymaga montowania `data/rasters`
   wtyczek po otwarciu i kliknięciu (wspólny licznik warstw okien).
 - ✔️ Komunikat o brakach przy „Zapisz” (pod przyciskiem, z przewinięciem) i obramowanie pól do uzupełnienia;
   zakres widżetu „Zakres” z projektu (Min / Max) sprawdzany przed zapisem; naruszony warunek CHECK w bazie —
-  „niedozwolona wartość (warunek …)”.
+  komentarz warunku (0.10.11), bez komentarza „niedozwolona wartość (warunek …)”.
 - ✔️ Nowy obiekt bez pól tylko do odczytu, które i tak są puste (np. data utworzenia).
 - ✔️ „+ Dodaj obiekt” (rysowanie) / „+ Dodaj rekord” w tabeli atrybutów każdej warstwy z prawem dodawania;
   „+ Dodaj” rekordu podrzędnego tylko w formularzu warstwy edytowalnej (nie z warstw referencyjnych).
 - ✔️ Pasek: narzędzia edycji dopiero po wybraniu warstwy edycyjnej i tylko te, na które pozwalają prawa i typ geometrii.
 - ✔️ Zakładki formularza wyglądają jak zakładki (nie jak linki); sama „Atrybuty” — bez paska zakładek.
 - ✔️ `host.onFeatureChange` — wtyczki dostają zapis / usunięcie obiektu (odświeżenie okien).
+- ✔️ 0.10.11: komunikaty błędów zapisu po polsku, z tym, co poprawić (`app.dberrors`): komentarz ograniczenia
+  w bazie albo opis ogólny (powtórzona wartość z polami i wartościami, wymagane pole, powiązane rekordy, za długi tekst,
+  zły format liczby / daty); także błędy formatu wartości (dotąd błąd 500), cofanie w historii i rekordy powiązane.
 - ✔️ 0.10.10: PDF/A-2b z obrazami — WeasyPrint ustawiał /Interpolate true (niedozwolone, ISO 19005-2 6.2.8);
   `app.pdf` wymusza `image-rendering: crisp-edges`. Sprawdzone veraPDF: Załączniki 1 i 3 (z danymi i ze zdjęciami) — zgodne.
 - ✔️ 0.10.9: identyfikacja na mapie — warstwa rozpoznawana po nazwie WMS (klucze z kropkami, np. działki „ULDK:…126/4”,

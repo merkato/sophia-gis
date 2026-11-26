@@ -26,6 +26,7 @@ from psycopg import sql
 from .. import photos, storage
 from ..config import get_settings
 from ..db import layer_conn
+from ..dberrors import komunikat_bazy
 from ..permissions import ProjectContext, load_project_context
 from ..qgsproject import FieldDef, LayerDef
 from ..scope import T, col, row_filter
@@ -186,7 +187,7 @@ async def _insert_child(ctx: ProjectContext, user: CurrentUser, lyr: LayerDef, f
                 k=sql.Identifier(lyr.pg.key)))).fetchone())["pk"]
         except psycopg.errors.IntegrityError as e:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY,
-                                f"Nie można dodać rekordu: {e.diag.message_primary}") from e
+                                f"Nie można dodać rekordu: {await komunikat_bazy(e)}") from e
         if not await in_scope(conn, ctx, lyr, pk, "edit"):
             raise _scope_error(ctx, lyr)
         row = await _fetch_one(conn, None, lyr, pk, srid, None)

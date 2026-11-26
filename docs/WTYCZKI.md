@@ -116,6 +116,12 @@ async def notatki(user: CurrentUser = Depends(require_plugin("przyklad", "przykl
   `counter(page)` / `counter(pages)`), `<thead>` powtarza się na każdej stronie. Obrazy jako `data:` URI —
   zasoby z sieci i dysku są blokowane. Czcionki w obrazie: DejaVu Sans/Serif, Liberation Sans/Serif/Mono.
   Wołaj w wątku (`asyncio.to_thread`).
+- **Komunikaty błędów zapisu**: odrzucenie zapisu przez bazę (ograniczenia, wyzwalacze, złe wartości) rdzeń zamienia
+  na tekst dla użytkownika — najpierw komentarz ograniczenia (`COMMENT ON CONSTRAINT nazwa ON tabela IS '…'`, może
+  zawierać `{kolumna}` z wartością powtórzonego klucza), potem opis ogólny po polsku (powtórzona wartość, wymagane pole,
+  powiązane rekordy, za długi tekst, zły format liczby lub daty); komunikat wyzwalacza (`RAISE EXCEPTION`) bez zmian.
+  W migracjach wtyczki pisz komentarze do swoich ograniczeń: co jest nie tak i co poprawić. We własnym endpoincie:
+  `await app.dberrors.komunikat_bazy(e)` — ten sam tekst co w formularzach mapy.
 
 ### WebUI
 Moduł ES bez budowania (albo zbudowany do jednego pliku), ładowany dynamicznie. Sophia przekazuje

@@ -8,6 +8,7 @@ from fastapi.responses import JSONResponse
 from . import __version__, plugins
 from .config import get_settings
 from .db import close_pools, portal_conn
+from .dberrors import komunikat_bazy
 from .migrations import run_migrations
 from .routers import admin, auth, basemaps, features, fetch, fields, history, ows, photos, projects, rasters, reports
 from .routers import plugins as plugins_router
@@ -44,14 +45,13 @@ app = FastAPI(title="Sophia API", version=__version__, lifespan=lifespan,
 
 
 
-# odrzucenie zapisu przez bazę (ograniczenia, wyzwalacze z RAISE) — komunikat bazy zamiast błędu 500
+# odrzucenie zapisu przez bazę (ograniczenia, wyzwalacze z RAISE, złe wartości) — komunikat dla użytkownika
+# zamiast błędu 500: komentarz ograniczenia albo opis po polsku z tym, co poprawić (app.dberrors)
 @app.exception_handler(psycopg.errors.IntegrityError)
 @app.exception_handler(psycopg.errors.RaiseException)
+@app.exception_handler(psycopg.errors.DataError)
 async def db_rejected(_: Request, e: psycopg.Error) -> JSONResponse:
-    msg = (e.diag.message_primary if e.diag else None) or str(e).splitlines()[0]
-    if isinstance(e, psycopg.errors.CheckViolation) and e.diag and e.diag.constraint_name:
-        msg = f"niedozwolona wartość (warunek „{e.diag.constraint_name}”)"
-    return JSONResponse({"detail": f"Baza danych odrzuciła zapis: {msg}"}, status_code=409)
+    return JSONResponse({"detail": f"Nie zapisano: {await komunikat_bazy(e)}"}, status_code=409)
 
 
 # photos przed features: klucz obiektu może zawierać „/” ({pk:path}), więc ogólna trasa obiektu
